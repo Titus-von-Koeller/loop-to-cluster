@@ -8,3 +8,6 @@
 # The solved environment stays ignored — it is large, machine-specific build output.
 .pixi/
 .direnv/
+
+# Throwaway local Jupyter token — never commit.
+.jupyter-token

@@ -23,3 +23,19 @@ torch = ">=2.13,<3"
 # tensor<->ndarray interop. Taken from PyPI, not conda-forge, so that it resolves
 # against the same wheels as torch rather than mixing ABIs across sources.
 numpy = ">=2.5"
+
+# Notebooks. jupyterlab and ipykernel live in *this* environment on purpose: the kernel
+# has to be the interpreter that has torch, so a separately installed Jupyter would
+# execute cells against the wrong Python.
+#
+# jupyter-mcp-server pulls jupyter-collaboration and jupyter-mcp-tools itself. It is
+# kept in the same environment as JupyterLab deliberately — it speaks the collaborative
+# ydoc protocol to that server, so their versions must agree.
+#
+# NOTE: do NOT swap pycrdt for datalayer_pycrdt. That instruction is stale: it is frozen
+# at 0.12.17 while jupyter-nbmodel-client requires pycrdt>=0.12.50, so the swap
+# downgrades a dependency below what the stack needs. Datalayer's own current quick
+# start installs upstream pycrdt.
+jupyterlab = ">=4.4"
+ipykernel = ">=6.29"
+jupyter-mcp-server = ">=1.2"
