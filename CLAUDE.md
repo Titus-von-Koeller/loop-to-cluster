@@ -2,9 +2,31 @@
 
 ## Environment
 
-Python 3.14 + PyTorch 2.13 (CUDA 13) managed by pixi. **Always invoke Python through
-pixi** — `pixi run python ...`. There is no system Python on this host, so a bare
-`python3` fails.
+Python 3.14 + PyTorch 2.13 (CUDA 13) managed by pixi. There is no system Python on this
+host, so a bare `python3` fails.
+
+**Name the project directory explicitly, in the same command:**
+
+```bash
+cd /home/titus/src/from-loop-to-cluster && pixi run python -c '...'
+```
+
+- **Never bare `pixi run`** from a parent directory: manifest lookup walks *upward* and
+  will silently bind a different workspace rather than erroring. `--manifest-path <abs>`
+  is the alternative when you cannot `cd`.
+- **Do not rely on ambient direnv activation.** It is applied at shell-init, so
+  `cd X && cmd` activates for the shell's *starting* directory, and an agent's cwd can
+  reset between commands. Both fail silently with a working-but-wrong environment.
+- The inline `cd` above is safe because `pixi run` resolves its manifest at exec time.
+- Need `nvcc`, `CUDA_PATH` or nix's `libstdc++` as well? Use
+  `direnv exec <abs-dir> <cmd>`, which supplies both layers from any cwd. Plain
+  torch/CUDA work does not need it — the wheels bundle their CUDA userspace and
+  `libcuda.so.1` comes from the system driver.
+
+`.envrc` is untracked (machine-local) and carries a `PATH_add "$CONDA_PREFIX/bin"` line
+after the pixi hook. That works around `use flake` clobbering the bin directory
+`pixi shell-hook` prepends; see ADR 003 in `~/dotfiles/docs/adr/`. It is a convenience
+only — the explicit invocations above are the dependable path.
 
 ## Jupyter notebooks
 
