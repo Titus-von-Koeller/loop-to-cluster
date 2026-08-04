@@ -1,0 +1,10 @@
+# This project owns its pixi manifest, so undo the global ignores set in
+# ~/dotfiles/home/shell.nix (programs.git.ignores). Those exist to stop pixi files
+# leaking into upstream HF repos; here they are the project definition. A repo
+# .gitignore outranks core.excludesFile, so these negations win.
+!pixi.toml
+!pixi.lock
+
+# The solved environment stays ignored — it is large, machine-specific build output.
+.pixi/
+.direnv/

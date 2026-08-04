@@ -1,0 +1,25 @@
+[workspace]
+name = "from-loop-to-cluster"
+channels = ["conda-forge"]
+platforms = ["linux-64"]
+
+[dependencies]
+# Python 3.14 is the newest version with full support across the training stack:
+# torch ships cp314 wheels, triton has cp314 and caps itself at <3.15, numpy has
+# cp314, and tokenizers/safetensors are abi3 so they are version-agnostic.
+python = "3.14.*"
+
+[pypi-dependencies]
+# From PyPI rather than conda-forge. conda-forge builds trail for brand-new CPython
+# versions, and since 2.11 the default PyPI wheels *are* the CUDA 13 build — torch
+# 2.13.0 depends on nvidia-cudnn-cu13, nvidia-nccl-cu13 and friends — which matches
+# this host's driver (__cuda=13.0). No download.pytorch.org index is needed.
+#
+# Consequence: anything that depends on torch must also come from PyPI, not
+# conda-forge. libcuda.so.1 still comes from the system driver, since no wheel can
+# bundle it.
+torch = ">=2.13,<3"
+# torch treats numpy as optional but warns on every import without it and loses
+# tensor<->ndarray interop. Taken from PyPI, not conda-forge, so that it resolves
+# against the same wheels as torch rather than mixing ABIs across sources.
+numpy = ">=2.5"
