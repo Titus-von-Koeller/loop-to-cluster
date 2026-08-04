@@ -1,4 +1,4 @@
-# from-loop-to-cluster
+# loop-to-cluster
 
 PyTorch workspace managed with [pixi](https://pixi.sh).
 

@@ -1,4 +1,4 @@
-# CLAUDE.md — from-loop-to-cluster
+# CLAUDE.md — loop-to-cluster
 
 ## Environment
 
@@ -8,7 +8,7 @@ host, so a bare `python3` fails.
 **Name the project directory explicitly, in the same command:**
 
 ```bash
-cd /home/titus/src/from-loop-to-cluster && pixi run python -c '...'
+cd /home/titus/src/loop-to-cluster && pixi run python -c '...'
 ```
 
 - **Never bare `pixi run`** from a parent directory: manifest lookup walks *upward* and

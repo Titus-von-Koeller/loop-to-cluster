@@ -1,5 +1,5 @@
 [workspace]
-name = "from-loop-to-cluster"
+name = "loop-to-cluster"
 channels = ["conda-forge"]
 platforms = ["linux-64"]
 
