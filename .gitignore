@@ -11,3 +11,13 @@
 
 # Throwaway local Jupyter token — never commit.
 .jupyter-token
+
+# Python build artefacts.
+__pycache__/
+*.egg-info/
+
+# Lab output. Regenerable from the step scripts, and `.cache/` holds a tokenised
+# corpus that is far too large to version.
+.cache/
+results.jsonl
+runs/
