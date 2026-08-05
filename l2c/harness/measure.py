@@ -14,16 +14,24 @@ different questions.
 saved-tensor ledger both perturb what they observe — the ledger adds a Python call per
 saved tensor. They run in their own passes, before and after the timed one.
 
-**3. Report `allocated` and `reserved` separately.** There are three different true
-answers to "how much memory does this use", and conflating them is what makes memory
-arithmetic feel unpredictable:
+**3. Distinguish the four answers to "how much memory does this use".** Conflating them
+is what makes memory arithmetic feel unpredictable:
 
-    memory_allocated   bytes in live tensors            <- what theory predicts
-    memory_reserved    what the caching allocator holds <- allocated + free blocks
-    nvidia-smi         reserved + CUDA context (~0.3-0.6 GB) + driver overhead
+    requested        sum of tensor storage bytes       <- what theory predicts
+    memory_allocated sum of allocator *block* bytes    <- requested + block padding
+    memory_reserved  what the allocator holds          <- allocated + free cached blocks
+    nvidia-smi       reserved + CUDA context (~0.3-0.6 GB) + driver overhead
 
-Predictions are checked against `allocated`. `reserved` is recorded alongside so the
-gap — allocator block padding and cuBLAS workspaces — is visible rather than mysterious.
+The first gap is the one that surprises people. `memory_allocated` is *not* the sum of
+tensor sizes: the caching allocator rounds each request up, and when splitting a segment
+would leave a remainder too small to reuse it hands that remainder to the block instead.
+So an identical request can occupy different amounts depending on the state of the pool —
+for a 135M-parameter model the parameters alone come to 513.13 MiB requested against
+520.88 MiB of blocks, 1.5% of padding that no arithmetic can predict.
+
+Arithmetic is therefore checked against `requested` (see `state_inventory`), and the
+allocator's view is reported next to it so the padding is quantified rather than
+mistaken for a broken prediction.
 
 In accelerate: there is no counterpart, because accelerate does not measure. The
 closest relatives live in accelerate/utils/memory.py and *react* to memory pressure
@@ -35,7 +43,7 @@ getting numbers *out*, accelerate offers `accelerate.tracking` and `Accelerator.
 
 import statistics
 import time
-from collections.abc import Callable, Iterator
+from collections.abc import Callable, Iterable, Iterator
 from contextlib import contextmanager
 from dataclasses import dataclass
 
@@ -117,6 +125,58 @@ def snapshot(device: torch.device) -> Snapshot:
 
 def reset_peak(device: torch.device) -> None:
     torch.cuda.reset_peak_memory_stats(device)
+
+
+def requested_bytes(tensors: Iterable[torch.Tensor]) -> int:
+    """Sum of distinct CUDA storages, which is what the arithmetic predicts.
+
+    Deduplicated by storage address, so a tied weight counts once and a view counts with
+    its base. CPU tensors are skipped: AdamW keeps its `step` counter on the host, and it
+    is not GPU memory.
+    """
+    seen: dict[int, int] = {}
+    for tensor in tensors:
+        if tensor is None or not tensor.is_cuda:
+            continue
+        storage = tensor.untyped_storage()
+        seen[storage.data_ptr()] = storage.nbytes()
+    return sum(seen.values())
+
+
+@dataclass(frozen=True, slots=True)
+class StateInventory:
+    """The three model-state buckets, measured as requested bytes.
+
+    Independent of allocator behavior, so these can be checked against 4/4/8 bytes per
+    parameter exactly rather than approximately.
+    """
+
+    param_bytes: int
+    grad_bytes: int
+    optimizer_bytes: int
+
+    @property
+    def total_bytes(self) -> int:
+        return self.param_bytes + self.grad_bytes + self.optimizer_bytes
+
+
+def state_inventory(model: nn.Module, optimizer: torch.optim.Optimizer) -> StateInventory:
+    """Measure model states directly. Requires gradients and optimizer state to exist.
+
+    Call after a first `optimizer.step()` and before `zero_grad`, since AdamW creates its
+    moments lazily on that first step and `set_to_none=True` discards the gradients.
+    """
+    parameters = list(model.parameters())
+    return StateInventory(
+        param_bytes=requested_bytes(parameters),
+        grad_bytes=requested_bytes(p.grad for p in parameters),
+        optimizer_bytes=requested_bytes(
+            value
+            for state in optimizer.state.values()
+            for value in state.values()
+            if isinstance(value, torch.Tensor)
+        ),
+    )
 
 
 @dataclass(frozen=True, slots=True)

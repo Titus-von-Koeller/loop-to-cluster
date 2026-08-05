@@ -115,6 +115,9 @@ def main() -> None:
     # ---- phases: the memory staircase, and step 0 ---------------------------------
     measure.reset_peak(device)
     phases = measure.measure_phases(net, optimizer, next(batches), device, loss_from)
+    # Between the step and the zero_grad: gradients are still live and AdamW's moments
+    # now exist, which is the only moment all three buckets can be counted directly.
+    inventory_states = measure.state_inventory(net, optimizer)
     optimizer.zero_grad(set_to_none=True)
 
     # ---- warmup -------------------------------------------------------------------
@@ -149,13 +152,15 @@ def main() -> None:
 
     actual = {
         "num_params": num_params,
-        "bytes_per_param": states.total_bytes / num_params,
+        "bytes_per_param": inventory_states.total_bytes / num_params,
         "initial_loss": phases.initial_loss,
         "final_loss": losses[-1],
-        "params_mib": measure.mib(phases.after_model),
-        "gradients_mib": measure.mib(phases.gradients),
-        "optimizer_states_mib": measure.mib(phases.optimizer_states),
-        "model_states_mib": measure.mib(phases.after_step),
+        "params_mib": measure.mib(inventory_states.param_bytes),
+        "gradients_mib": measure.mib(inventory_states.grad_bytes),
+        "optimizer_states_mib": measure.mib(inventory_states.optimizer_bytes),
+        "model_states_mib": measure.mib(inventory_states.total_bytes),
+        "model_states_allocated_mib": measure.mib(phases.after_step),
+        "block_padding_mib": measure.mib(phases.after_step - inventory_states.total_bytes),
         "activations_mib": measure.mib(phases.activations),
         "peak_mib": measure.mib(peak.peak_allocated),
         "peak_reserved_mib": measure.mib(peak.peak_reserved),
@@ -209,6 +214,7 @@ def main() -> None:
             ",.1f",
             0.1,
         ),
+        report.Row("block padding (MiB)", None, actual["block_padding_mib"], ",.1f"),
         report.Row(
             "activations (MiB)",
             prediction.get("activations_mib"),

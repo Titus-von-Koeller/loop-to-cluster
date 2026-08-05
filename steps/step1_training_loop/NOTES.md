@@ -15,7 +15,7 @@ tied embeddings. transformers derives `head_dim = h / heads = 576 / 9 = 64`, so 
 query projection is square while K and V are a third as wide.
 
 | term | expression | value |
-|---|---|---|
+| --- | --- | --- |
 | embedding | `V · h` | 28,311,552 |
 | Q | `h · (9 · 64)` = `h · h` | 331,776 |
 | K | `h · (3 · 64)` | 110,592 |
@@ -64,7 +64,7 @@ learning rate, which is small enough that a contaminated reading still looks pla
 elements:
 
 | saved tensor | elements |
-|---|---|
+| --- | --- |
 | normalized input to Q/K/V | 576 |
 | Q, K, V | 576 + 192 + 192 |
 | Q, K after RoPE | 576 + 192 |
@@ -107,11 +107,66 @@ layers of small matmuls will not reach that, so: **12 steps/s**.
 
 ## Result
 
-<!-- paste the harness table -->
+```
+quantity                           predicted        measured     delta  verdict
+-------------------------------------------------------------------------------
+parameters                       134,515,008     134,515,008    +0.00%  ok
+bytes/param                            16.00           16.00    +0.00%  ok
+initial loss                         10.8027         10.8992    +0.89%  ok
+params (MiB)                           513.1           513.1    +0.00%  ok
+gradients (MiB)                        513.1           513.1    +0.00%  ok
+optim states (MiB)                   1,026.3         1,026.3    +0.00%  ok
+model states (MiB)                   2,052.5         2,052.5    +0.00%  ok
+block padding (MiB)                       --            90.3
+activations (MiB)                    3,840.0         4,277.3   +11.39%  OFF
+peak allocated (MiB)                 6,000.0         6,621.9   +10.37%  OFF
+steps/sec                              12.00            9.41   -21.60%  OFF
+
+step time   median 106.2 ms   p10 105.9   p90 106.7
+throughput  19,267 tokens/sec
+loss        10.8992 -> 7.3267
+```
+
+The depth sweep is the stronger result, because it validates the formula rather than a
+point. Six runs, `num_layers` from 5 to 30, `R² = 1.00000` on every quantity:
+
+| fitted | slope | intercept |
+| --- | --- | --- |
+| `num_params` | 3,540,096.00 | 28,312,128.00 |
+| derivation above | **3,540,096** | 28,311,552 + 576 = **28,312,128** |
+| `model_states_mib` | 54.02 | 432.01 |
+| derivation × 16 B | 3,540,096 × 16 = **54.02 MiB** | 28,312,128 × 16 = **432.01 MiB** |
+
+Both slope and intercept exact. `peak_mib` fits a line too, with slope 170.38 against the
+54.02 + 129.02 = 183.04 that summing the buckets would give — lower because gradients are
+created while activations are released, so the two overlap instead of adding.
 
 ## What surprised me
 
-<!-- -->
+**`memory_allocated()` is not the sum of tensor sizes.** It is the sum of allocator
+*block* sizes. The caching allocator rounds each request up, and when splitting a segment
+would leave a remainder too small to reuse it hands that remainder to the block. So the
+parameters are 513.13 MiB of tensor but 520.88 MiB of blocks, and the same 1,327,104-byte
+request was observed occupying both 1,507,328 and 1,949,696 bytes depending on the pool
+state. Three arithmetic rows read as 1.5–11.75% wrong until the harness started checking
+against summed storage sizes and reporting the 90.3 MiB of padding as its own line. The
+first instinct — widen the tolerance — would have buried the most useful fact in the step.
+
+**Activation memory has a `T²` term, because fp32 cannot use flash attention.** The 26%
+shortfall in the activation estimate was one forgotten tensor: a materialized
+`(B, heads, T, T)` attention matrix, `heads × seq_len` = 4,608 elements per token per
+layer at T=512, 36 of the 129 MiB per layer. It is there because flash attention is
+dtype-gated — `sdpa_kernel` reports only `MATH` as usable for fp32 inputs, with the reason
+"Expected query, key and value to all be of dtype: {Half, BFloat16}". So activation
+memory is not linear in tokens at fp32, and the correction is not a fudge factor but a
+term with its own scaling law. It also sets up step 2: switching to bf16 does not merely
+halve tensors, it makes a fused kernel *available* and deletes this term.
+
+**Throughput was the worst prediction, at −21.6%.** 106 ms/step against a FLOP-based
+estimate of 47. A 576-wide model runs 30 layers of small matmuls, and at that size the
+work per kernel launch is low enough that peak GEMM throughput is not the binding
+constraint. FLOP counting sets a floor on step time and says nothing about whether you
+approach it.
 
 ## Bare torch → accelerate
 
@@ -119,7 +174,7 @@ The loop is bare torch on purpose. These are the calls that would replace each l
 the file each one lives in:
 
 | here | accelerate | where |
-|---|---|---|
+| --- | --- | --- |
 | `net.to(device)` | `accelerator.prepare(model)` | `accelerator.py`, `_prepare_model` |
 | `loss.backward()` | `accelerator.backward(loss)` | `accelerator.py:2818` |
 | `clip_grad_norm_(net.parameters(), n)` | `accelerator.clip_grad_norm_(...)` | `accelerator.py:2946` |
