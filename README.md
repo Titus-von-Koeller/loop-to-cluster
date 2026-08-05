@@ -16,7 +16,7 @@ and `tokenizers`/`safetensors` publish `abi3` wheels so they are version-agnosti
 ## Usage
 
 ```bash
-pixi install                                              # materialise the environment
+pixi install                                              # materialize the environment
 pixi run python -c 'import torch; print(torch.cuda.is_available())'
 ```
 

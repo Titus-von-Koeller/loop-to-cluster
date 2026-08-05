@@ -1,0 +1,32 @@
+# Build metadata only.
+#
+# Runtime dependencies live in pixi.toml, where the lock file governs them.
+# Declaring them in both places would create two competing sources of truth.
+# This file exists because an editable install requires a build system:
+# pixi.toml's `l2c = { path = ".", editable = true }` needs a backend to
+# generate the .pth file that puts the repo root on sys.path.
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "l2c"
+version = "0.1.0"
+description = "A lab notebook for learning distributed training, one concept at a time"
+readme = "README.md"
+# Pinned to the interpreter this lab actually runs on, so ruff's pyupgrade rules
+# hold the code to 3.14 idiom rather than a lowest common denominator. Notably
+# PEP 649 makes annotations lazy in 3.14, so `from __future__ import annotations`
+# is obsolete here and ruff will flag it.
+requires-python = ">=3.14"
+
+[tool.hatch.build.targets.wheel]
+packages = ["l2c"]
+
+[tool.ruff]
+line-length = 95
+target-version = "py314"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM", "RUF"]
