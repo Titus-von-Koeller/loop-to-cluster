@@ -53,6 +53,11 @@ ACTIVATIONS = "activations"
 CATEGORIES = (PARAMETERS, WEIGHT_CASTS, LOGITS, ACTIVATIONS)
 
 
+def _shape_key(tensor: torch.Tensor) -> tuple[int, ...]:
+    """A transpose-insensitive shape, for matching a saved view against its parameter."""
+    return tuple(sorted(tensor.shape))
+
+
 @dataclass(frozen=True, slots=True)
 class SavedTensor:
     category: str
@@ -116,16 +121,22 @@ def record(model: nn.Module, *, vocab_size: int) -> Iterator[Ledger]:
     inventory = Ledger()
 
     param_storages = {p.untyped_storage().data_ptr() for p in model.parameters()}
-    cast_shapes = {tuple(w.shape) for w in autocast_eligible_weights(model)}
+    # Keyed on the sorted shape, because autograd saves a linear's weight *transposed*:
+    # a (192, 576) k_proj weight is saved as a (576, 192) view. Matching the shape as
+    # written would recognize only the square projections, plus any pair that happen to
+    # be each other's transpose, and silently file the rest as activations.
+    cast_shapes = {_shape_key(w) for w in autocast_eligible_weights(model)}
     seen: set[int] = set()
 
     def classify(tensor: torch.Tensor, storage_ptr: int) -> str:
         if storage_ptr in param_storages:
             return PARAMETERS
+        # Before the logits test: a transposed cast of a tied lm_head weight is
+        # (hidden, vocab), whose trailing dimension is also vocab_size.
+        if tensor.dtype is not torch.float32 and _shape_key(tensor) in cast_shapes:
+            return WEIGHT_CASTS
         if tensor.dim() > 0 and tensor.shape[-1] == vocab_size:
             return LOGITS
-        if tensor.dtype is not torch.float32 and tuple(tensor.shape) in cast_shapes:
-            return WEIGHT_CASTS
         return ACTIVATIONS
 
     def pack(tensor: torch.Tensor) -> torch.Tensor:
