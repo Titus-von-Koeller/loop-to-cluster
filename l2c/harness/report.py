@@ -27,7 +27,9 @@ from pathlib import Path
 
 import torch
 
-from l2c.harness.measure import describe_device, gib
+from l2c.harness import runs
+from l2c.harness.measure import describe_device, gib, mib
+from l2c.harness.rows import RowSpec
 
 
 @dataclass(frozen=True, slots=True)
@@ -74,6 +76,95 @@ def load_prediction(step_dir: str | Path) -> dict[str, float]:
         return {}
     with path.open("rb") as handle:
         return tomllib.load(handle)
+
+
+def build_rows(
+    specs: Sequence[RowSpec],
+    predicted: dict[str, float],
+    actual: dict[str, object],
+    tolerances: dict[str, float] | None = None,
+) -> list[Row]:
+    """Pair each spec's key with both sides. An absent prediction leaves the row open."""
+    overrides = tolerances or {}
+    built = []
+    for spec in specs:
+        measured = actual.get(spec.measured_key())
+        built.append(
+            Row(
+                label=spec.label,
+                predicted=predicted.get(spec.key),
+                actual=None if measured is None else float(measured),
+                fmt=spec.fmt,
+                tolerance_pct=overrides.get(spec.key, spec.tolerance_pct),
+            )
+        )
+    return built
+
+
+def publish(
+    step: str,
+    specs: Sequence[RowSpec],
+    *,
+    step_dir: str | Path,
+    preset: dict[str, object],
+    run: dict[str, object],
+    environment: dict[str, object],
+    actual: dict[str, object],
+    headline: str,
+    derived: dict[str, float] | None = None,
+    notes: Sequence[str] = (),
+) -> Path:
+    """Print the comparison and record the run. The only reporting a step performs.
+
+    `derived` carries predictions the harness computes rather than reads; a
+    `prediction.toml` entry of the same name wins, since a hand derivation is the thing
+    being checked.
+    """
+    prediction = load_prediction(step_dir)
+    tolerances = prediction.get("tolerance", {})
+    claims = {key: value for key, value in prediction.items() if key != "tolerance"}
+    predicted = (derived or {}) | claims
+    tokens_per_step = run["batch_size"] * run["seq_len"]
+
+    print(f"\n{step}   {headline}   {tokens_per_step:,} tokens/step\n")
+    print(table(build_rows(specs, predicted, actual, tolerances)))
+    print(
+        f"\nstep time   median {actual['median_step_ms']:.1f} ms   "
+        f"p10 {actual['p10_step_ms']:.1f}   p90 {actual['p90_step_ms']:.1f}"
+    )
+    print(f"throughput  {actual['tokens_per_second']:,.0f} tokens/sec")
+    print(f"loss        {actual['initial_loss']:.4f} -> {actual['final_loss']:.4f}")
+    print(
+        f"memory      peak allocated {actual['peak_mib']:,.1f} MiB   "
+        f"reserved {actual['peak_reserved_mib']:,.1f} MiB   "
+        f"allocator overhead {actual['allocator_overhead_mib']:,.1f} MiB"
+    )
+    for note in notes:
+        print(note)
+    print(_saved_for_backward(actual["saved_tensors"]))
+
+    # The prediction as written, not as compared: the derived half is arithmetic that
+    # can be recomputed, while `prediction.toml` is the claim that was committed first.
+    path = runs.save(
+        step,
+        preset=preset,
+        run=run,
+        environment=environment,
+        predicted=prediction,
+        actual=actual,
+    )
+    print(f"\nrecorded to {path}")
+    return path
+
+
+def _saved_for_backward(summary: dict[str, object]) -> str:
+    lines = ["\nsaved for backward:"]
+    for category, byte_count in summary["bytes_by_category"].items():
+        lines.append(f"  {category:<14}{mib(byte_count):>10,.1f} MiB")
+    lines.append("  by dtype:")
+    for dtype, byte_count in summary["bytes_by_dtype"].items():
+        lines.append(f"    {dtype:<12}{mib(byte_count):>10,.1f} MiB")
+    return "\n".join(lines)
 
 
 def environment(

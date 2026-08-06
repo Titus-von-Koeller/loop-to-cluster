@@ -151,6 +151,25 @@ def autocast_weight_cache(model: nn.Module, dtype: torch.dtype) -> WeightCache:
     )
 
 
+def exact(num_params: int, vocab_size: int, *, optimizer: str = "adamw") -> dict[str, float]:
+    """The bucket arithmetic, keyed as a report compares it.
+
+    Deliberately narrow. These distribute a *measured* parameter count across the three
+    buckets, so they check the 4/4/8 rule rather than anything a step asks for. Anything
+    the exercise is to derive — the parameter count itself, bytes per parameter,
+    activations, peak — is absent on purpose: a prediction the harness supplies would
+    confirm itself. A hand-written `prediction.toml` overrides any key here.
+    """
+    states = model_states(num_params, optimizer=optimizer)
+    return {
+        "params_mib": states.param_bytes / 1024**2,
+        "gradients_mib": states.grad_bytes / 1024**2,
+        "optimizer_states_mib": states.optimizer_bytes / 1024**2,
+        "model_states_mib": states.total_bytes / 1024**2,
+        "initial_loss": expected_initial_loss(vocab_size),
+    }
+
+
 def expected_initial_loss(vocab_size: int) -> float:
     """ln(V): a randomly initialized LM is uniform over the vocabulary.
 

@@ -43,7 +43,7 @@ import torch
 
 from l2c.common import data
 from l2c.common import model as model_lib
-from l2c.harness import cli, ledger, measure, predict, report, runs
+from l2c.harness import cli, collect, ledger, measure, predict, report, rows
 
 STEP = "step1_training_loop"
 STEP_DIR = Path(__file__).resolve().parent
@@ -127,129 +127,28 @@ def main() -> None:
     optimizer.zero_grad(set_to_none=True)
 
     # ---- predicted versus measured ------------------------------------------------
-    states = predict.model_states(num_params, optimizer="adamw")
-    prediction = report.load_prediction(STEP_DIR)
-    tokens_per_step = args.batch_size * args.seq_len
-
-    actual = {
-        "num_params": num_params,
-        "bytes_per_param": inventory_states.total_bytes / num_params,
-        "initial_loss": phases.initial_loss,
-        "final_loss": losses[-1],
-        "params_mib": measure.mib(inventory_states.param_bytes),
-        "gradients_mib": measure.mib(inventory_states.grad_bytes),
-        "optimizer_states_mib": measure.mib(inventory_states.optimizer_bytes),
-        "model_states_mib": measure.mib(inventory_states.total_bytes),
-        "model_states_allocated_mib": measure.mib(phases.after_step),
-        "block_padding_mib": measure.mib(phases.after_step - inventory_states.total_bytes),
-        "activations_mib": measure.mib(phases.activations),
-        "peak_mib": measure.mib(peak.peak_allocated),
-        "peak_reserved_mib": measure.mib(peak.peak_reserved),
-        "allocator_overhead_mib": measure.mib(peak.allocator_overhead),
-        "median_step_ms": timings.median_ms,
-        "p10_step_ms": timings.p10_ms,
-        "p90_step_ms": timings.p90_ms,
-        "steps_per_second": timings.steps_per_second,
-        "tokens_per_second": timings.tokens_per_second(tokens_per_step),
-        "saved_tensors": inventory.summary(),
-        "loss_curve": losses,
-    }
-
-    # Tolerances say how exact each claim is. Model states are arithmetic and must match
-    # to a rounding error; the activation and throughput rows are first guesses.
-    rows = [
-        report.Row("parameters", prediction.get("num_params"), num_params, ",.0f", 0.0),
-        report.Row(
-            "bytes/param",
-            prediction.get("bytes_per_param"),
-            actual["bytes_per_param"],
-            ",.2f",
-        ),
-        report.Row(
-            "initial loss",
-            predict.expected_initial_loss(preset.vocab_size),
-            phases.initial_loss,
-            ",.4f",
-        ),
-        report.Row(
-            "params (MiB)", measure.mib(states.param_bytes), actual["params_mib"], ",.1f", 0.1
-        ),
-        report.Row(
-            "gradients (MiB)",
-            measure.mib(states.grad_bytes),
-            actual["gradients_mib"],
-            ",.1f",
-            0.1,
-        ),
-        report.Row(
-            "optim states (MiB)",
-            measure.mib(states.optimizer_bytes),
-            actual["optimizer_states_mib"],
-            ",.1f",
-            0.1,
-        ),
-        report.Row(
-            "model states (MiB)",
-            measure.mib(states.total_bytes),
-            actual["model_states_mib"],
-            ",.1f",
-            0.1,
-        ),
-        report.Row("block padding (MiB)", None, actual["block_padding_mib"], ",.1f"),
-        report.Row(
-            "activations (MiB)",
-            prediction.get("activations_mib"),
-            actual["activations_mib"],
-            ",.1f",
-            10.0,
-        ),
-        report.Row(
-            "peak allocated (MiB)",
-            prediction.get("peak_mib"),
-            actual["peak_mib"],
-            ",.1f",
-            10.0,
-        ),
-        report.Row(
-            "steps/sec",
-            prediction.get("steps_per_second"),
-            actual["steps_per_second"],
-            ",.2f",
-            20.0,
-        ),
-    ]
-
-    print(f"\n{STEP}   {num_params:,} parameters   {tokens_per_step:,} tokens/step\n")
-    print(report.table(rows))
-
-    print(
-        f"\nstep time   median {timings.median_ms:.1f} ms   "
-        f"p10 {timings.p10_ms:.1f}   p90 {timings.p90_ms:.1f}"
-    )
-    print(f"throughput  {actual['tokens_per_second']:,.0f} tokens/sec")
-    print(f"loss        {phases.initial_loss:.4f} -> {losses[-1]:.4f}")
-    print(
-        f"memory      peak allocated {actual['peak_mib']:,.1f} MiB   "
-        f"reserved {actual['peak_reserved_mib']:,.1f} MiB   "
-        f"allocator overhead {actual['allocator_overhead_mib']:,.1f} MiB"
+    actual = collect.run(
+        num_params=num_params,
+        tokens_per_step=args.batch_size * args.seq_len,
+        phases=phases,
+        model_states=inventory_states,
+        timings=timings,
+        peak=peak,
+        saved=inventory,
+        losses=losses,
     )
 
-    print("\nsaved for backward:")
-    for category, byte_count in inventory.by_category().items():
-        print(f"  {category:<14}{measure.mib(byte_count):>10,.1f} MiB")
-    print("  by dtype:")
-    for dtype, byte_count in inventory.by_dtype().items():
-        print(f"    {dtype:<12}{measure.mib(byte_count):>10,.1f} MiB")
-
-    path = runs.save(
+    report.publish(
         STEP,
+        rows.TRAINING_LOOP,
+        step_dir=STEP_DIR,
         preset=model_lib.preset_dict(preset),
         run=cli.run_args(args),
         environment=report.environment(device, memory_in_use_bytes=memory_at_start),
-        predicted=prediction,
         actual=actual,
+        headline=f"{num_params:,} parameters",
+        derived=predict.exact(num_params, preset.vocab_size),
     )
-    print(f"\nrecorded to {path}")
 
 
 if __name__ == "__main__":
