@@ -104,5 +104,14 @@ def replace_preset(preset: Preset, **changes: object) -> Preset:
     return replace(preset, **changes)
 
 
+def preset_for(num_layers: int | None = None, *, base: Preset = SMOLLM2_135M) -> Preset:
+    """The preset a run uses, with the depth sweep applied if it was asked for.
+
+    Resolving this in one place is what lets a result be keyed by the model it
+    measured rather than by the flags that happened to describe it.
+    """
+    return base if num_layers is None else replace_preset(base, num_hidden_layers=num_layers)
+
+
 def preset_dict(preset: Preset) -> dict[str, object]:
     return asdict(preset)

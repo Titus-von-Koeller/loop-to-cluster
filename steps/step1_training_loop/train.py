@@ -41,34 +41,24 @@ import json
 from pathlib import Path
 
 import torch
-from torch.utils.data import DataLoader
 
 from l2c.common import data
 from l2c.common import model as model_lib
-from l2c.harness import ledger, measure, predict, report
+from l2c.harness import cli, ledger, measure, predict, report
 
 STEP = "step1_training_loop"
 STEP_DIR = Path(__file__).resolve().parent
 
 
-def parse_args() -> argparse.Namespace:
+def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--seq-len", type=int, default=512)
-    parser.add_argument("--batch-size", type=int, default=4)
-    parser.add_argument("--num-steps", type=int, default=30)
-    parser.add_argument("--warmup-steps", type=int, default=5)
-    parser.add_argument("--learning-rate", type=float, default=3e-4)
-    parser.add_argument("--max-grad-norm", type=float, default=1.0)
-    parser.add_argument("--seed", type=int, default=42)
-    # The sweep knob. Depth is the right axis: parameters are linear in it, so a fit
-    # returns the per-layer cost as its slope and the embedding table as its intercept.
-    parser.add_argument("--num-layers", type=int, default=None)
+    cli.common_args(parser)
     parser.add_argument("--json-out", type=Path, default=None)
-    return parser.parse_args()
+    return parser
 
 
 def main() -> None:
-    args = parse_args()
+    args = build_parser().parse_args()
     device = measure.require_cuda()
     # Sampled before anything is allocated. Includes this process's CUDA context, so the
     # signal is the excess over an idle run: a busy GPU invalidates every timing below.
@@ -81,24 +71,14 @@ def main() -> None:
     # speedup measured against it means nothing. Step 2 sweeps it deliberately.
     torch.set_float32_matmul_precision("highest")
 
-    preset = model_lib.SMOLLM2_135M
-    if args.num_layers is not None:
-        preset = model_lib.replace_preset(preset, num_hidden_layers=args.num_layers)
+    preset = model_lib.preset_for(args.num_layers)
 
     net = model_lib.build_model(preset, seed=args.seed).to(device)
     net.train()
     num_params = model_lib.count_parameters(net)
 
     dataset = data.build_packed_dataset(model_lib.TOKENIZER, seq_len=args.seq_len)
-    loader = DataLoader(
-        dataset,
-        batch_size=args.batch_size,
-        shuffle=True,
-        drop_last=True,
-        num_workers=0,  # in-process: step time measures the model, not the input pipeline
-        pin_memory=True,
-        generator=data.batch_generator(args.seed),
-    )
+    loader = data.build_loader(dataset, batch_size=args.batch_size, seed=args.seed)
     batches = data.endless(loader)
 
     optimizer = torch.optim.AdamW(net.parameters(), lr=args.learning_rate)
@@ -264,7 +244,7 @@ def main() -> None:
         print(f"    {dtype:<12}{measure.mib(byte_count):>10,.1f} MiB")
 
     environment = report.environment(device, memory_in_use_bytes=memory_at_start)
-    run = {k: v for k, v in vars(args).items() if k != "json_out"}
+    run = cli.run_args(args)
     path = report.record(
         STEP,
         preset=model_lib.preset_dict(preset),

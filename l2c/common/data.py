@@ -35,7 +35,7 @@ In accelerate, the dataloader is the most heavily rewritten object of the four t
 from collections.abc import Iterable, Iterator
 
 import torch
-from torch.utils.data import TensorDataset
+from torch.utils.data import DataLoader, TensorDataset
 from transformers import AutoTokenizer
 
 from l2c.paths import cache_dir
@@ -56,6 +56,36 @@ def batch_generator(seed: int) -> torch.Generator:
     This is the same problem `accelerate.data_loader.SeedableRandomSampler` solves.
     """
     return torch.Generator().manual_seed(seed)
+
+
+def build_loader(dataset: TensorDataset, *, batch_size: int, seed: int) -> DataLoader:
+    """The loader every step uses, with the settings the measurements depend on.
+
+    Each choice here would move a number if it changed, which is why they are fixed
+    once rather than restated per step:
+
+    * `num_workers=0` keeps loading in-process, so step time measures the model and
+      not the input pipeline. Workers would overlap loading with compute and make the
+      timed loop report something faster than the model can do.
+    * `pin_memory=True` allows the host-to-device copy to be asynchronous, which is
+      what makes `non_blocking=True` on the transfer mean anything.
+    * `drop_last=True` keeps every batch the same size, so tokens per step is a
+      constant and activation memory is a function of `batch_size * seq_len` alone.
+    * `generator=` draws the shuffle from a dedicated generator rather than the global
+      RNG — see `batch_generator`.
+
+    accelerate rebuilds all of this in `prepare()`; `DataLoaderShard` (data_loader.py:510)
+    keeps the same knobs and adds the sharding.
+    """
+    return DataLoader(
+        dataset,
+        batch_size=batch_size,
+        shuffle=True,
+        drop_last=True,
+        num_workers=0,
+        pin_memory=True,
+        generator=batch_generator(seed),
+    )
 
 
 def endless[T](loader: Iterable[T]) -> Iterator[T]:
