@@ -134,8 +134,13 @@ reason step 1's FLOP estimate was optimistic. Without the tf32 arm this would ha
 "bf16 gives 1.89×" with no way to see which half of the change earned it.
 
 **fp16 needed the scaler and never used it.** Scale settled at 65,536 — the initial value,
-never lowered — with 0 of 36 updates skipped. So this model's gradients at this learning
-rate never reach fp16's 6.1e-5 floor, and fp16 is as safe as bf16 here while being very
+never lowered — with 0 of 36 updates skipped. Note what that does and does not evidence: a
+skipped update means a scaled gradient reached inf, so zero skips proves nothing
+*overflowed* at a scale of 65,536. Underflow is the failure the scaler exists to prevent,
+and it is silent — it zeros small gradients rather than triggering a skip, so this run says
+nothing about it. Testing the floor needs a histogram of gradient magnitudes against
+fp16's smallest normal (6.1e-5) and subnormal (5.96e-8), which is not yet built. On the
+evidence actually collected, fp16 merely did not fail over 36 updates while being very
 slightly worse on final loss (7.3378 against bf16's 7.3277, and a mean curve divergence of
 0.0278 against 0.0006 — 46× larger, though still inside the noise floor). fp16's 11
 significand bits beat bf16's 8; the reason to prefer bf16 is that it needs no scaler
