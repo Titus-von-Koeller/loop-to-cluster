@@ -1,5 +1,33 @@
 # CLAUDE.md — loop-to-cluster
 
+## Whose work is whose
+
+| Claude writes | Titus writes |
+| --- | --- |
+| `l2c/`, `tests/`, step scaffolding | `prediction.toml` |
+| argparse, dataloaders, reporting, JSON | `NOTES.md` |
+| the ~80% of a step file that is plumbing | the 5–15 concept lines per step |
+
+The concept lines are the ones the lesson is named after — the autocast wrapper, the
+`GradScaler`, the unscale-before-clip ordering; later the microstep loop and `no_sync`.
+Scaffold them as `NotImplementedError` with a comment saying what belongs there, never
+the code itself.
+
+**Never fill in a prediction, and never write in `NOTES.md`.** Deriving the number *is*
+the exercise. If a number is already known, do not state it — not in prose, not in a
+commit message, not as a hint. Offer a fresh configuration to predict instead.
+
+## Depth ceiling
+
+Explain at the level of the public torch API and its documented behaviour. State *what*
+an API does and what it costs. Do not trace into torch or transformers source to explain
+*how* it is implemented.
+
+Exception: accelerate source is always in scope — file and line encouraged. That is the
+library being learned; torch internals are not.
+
+`NOTES.md` prose: 400 words per step, hard cap.
+
 ## Environment
 
 Python 3.14 + PyTorch 2.13 (CUDA 13) managed by pixi. There is no system Python on this
