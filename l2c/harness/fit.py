@@ -21,7 +21,7 @@ from dataclasses import dataclass
 
 import numpy as np
 
-from l2c.harness.report import load_results
+from l2c.harness.runs import load_all
 
 
 @dataclass(frozen=True, slots=True)
@@ -77,9 +77,16 @@ def main() -> None:
     parser.add_argument("--y", nargs="+", required=True)
     args = parser.parse_args()
 
-    entries = load_results(args.step)
+    entries = load_all(args.step)
     if not entries:
         raise SystemExit(f"no results recorded for step {args.step!r}")
+
+    revisions = {e.get("commit") for e in entries}
+    if len(revisions) > 1:
+        named = ", ".join(sorted(str(r) for r in revisions))
+        print(f"WARNING: fitting across {len(revisions)} revisions ({named}).")
+        print("A change to the training loop moves these points for reasons the fit")
+        print("cannot see. Re-run the sweep before trusting the residual.\n")
 
     print(f"{len(entries)} runs of {args.step}, fitting against {args.x}\n")
     header = f"{'quantity':<22}{'slope':>18}{'intercept':>18}{'R^2':>10}{'points':>8}"

@@ -6,10 +6,10 @@ matters because three different things launch this code from three different pla
 `python steps/step1_training_loop/train.py` from the repo root, a notebook whose
 kernel starts in `notebooks/`, and a subprocess spawned by a comparison driver.
 
-Resolving against `Path.cwd()` instead silently writes a *second* `results.jsonl` under
-whichever directory the process was launched from, splitting a sweep across two files
-with no error and leaving the fitted line missing half its points. Failing to find the
-root is loud; writing to the wrong root is not.
+Resolving against `Path.cwd()` instead silently writes a *second* `runs/` under whichever
+directory the process was launched from, splitting a sweep across two directories with no
+error and leaving the fitted line missing half its points. Failing to find the root is
+loud; writing to the wrong root is not.
 
 In accelerate the same concern is handled by asking rather than inferring:
 `ProjectConfiguration(project_dir=...)` (accelerate/utils/dataclasses.py:916) takes
@@ -37,21 +37,14 @@ ROOT = _find_root()
 #: Tokenized corpus. Written once, then every run is offline and instant.
 CACHE_DIR = Path(os.environ.get("L2C_CACHE") or ROOT / ".cache")
 
-#: One JSON object per run, appended. The substrate for cross-step plots.
-RESULTS_FILE = Path(os.environ.get("L2C_RESULTS") or ROOT / "results.jsonl")
-
-#: Per-run JSON written by worker processes, keyed by their flags.
+#: One JSON file per run, named by the configuration that produced it. Both the
+#: permanent record and the comparison cache — see `l2c.harness.runs`.
 RUNS_DIR = Path(os.environ.get("L2C_RUNS") or ROOT / "runs")
 
 
 def cache_dir() -> Path:
     CACHE_DIR.mkdir(parents=True, exist_ok=True)
     return CACHE_DIR
-
-
-def results_file() -> Path:
-    RESULTS_FILE.parent.mkdir(parents=True, exist_ok=True)
-    return RESULTS_FILE
 
 
 def runs_dir() -> Path:

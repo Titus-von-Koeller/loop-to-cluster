@@ -8,8 +8,9 @@ TOML rather than YAML so that `tomllib` from the standard library can read it �
 fewer dependency, and the "omit a value and the harness just reports the measurement"
 convention falls out naturally, since TOML has no null.
 
-Nothing here touches the GPU: everything reads a result dict and returns text or writes
-JSON. Measurement must never depend on presentation.
+Nothing here touches the GPU: everything reads a result dict and returns text.
+Measurement must never depend on presentation. Where results are stored is
+`l2c.harness.runs`.
 
 In accelerate: reporting lives in `accelerate.tracking`, which adapts a common
 `GeneralTracker` interface onto TensorBoard, W&B, MLflow and others, driven by
@@ -18,18 +19,15 @@ the main process writes — `@on_main_process` — which is the concern that rep
 `print` once step 4 introduces more than one rank.
 """
 
-import json
 import platform
 import tomllib
 from collections.abc import Sequence
 from dataclasses import dataclass
-from datetime import UTC, datetime
 from pathlib import Path
 
 import torch
 
 from l2c.harness.measure import describe_device, gib
-from l2c.paths import results_file
 
 
 @dataclass(frozen=True, slots=True)
@@ -104,40 +102,3 @@ def environment(
     return captured
 
 
-def record(
-    step: str,
-    *,
-    preset: dict[str, object],
-    run: dict[str, object],
-    environment: dict[str, object],
-    predicted: dict[str, float],
-    actual: dict[str, object],
-) -> Path:
-    """Append one run to `results.jsonl` for cross-step plotting.
-
-    `preset` and `run` stay in separate sub-objects. Flattening them into one dict makes
-    an unset CLI flag, which arrives as None, overwrite the real preset value it shadows;
-    the sweep's x axis then reads null for exactly the runs that used a default.
-    """
-    entry = {
-        "timestamp": datetime.now(UTC).isoformat(),
-        "step": step,
-        "preset": preset,
-        "run": run,
-        "environment": environment,
-        "predicted": predicted,
-        "actual": actual,
-    }
-    path = results_file()
-    with path.open("a") as handle:
-        handle.write(json.dumps(entry) + "\n")
-    return path
-
-
-def load_results(step: str | None = None) -> list[dict]:
-    """Every recorded run, optionally filtered to one step."""
-    path = results_file()
-    if not path.exists():
-        return []
-    entries = [json.loads(line) for line in path.read_text().splitlines() if line.strip()]
-    return [e for e in entries if step is None or e["step"] == step]

@@ -13,9 +13,11 @@ l2c/                     installable package — shared, never edited in a lesso
     ledger.py            what autograd actually saves, by category and dtype
     predict.py           model states, the autocast weight cache, ln(V)
     precision.py         the four precision arms
-    report.py            predicted-versus-measured tables, results.jsonl
+    report.py            predicted-versus-measured tables
+    runs.py              where a result is stored, keyed by its configuration
+    cli.py               the argument knobs every step shares
     fit.py               least squares over a sweep
-    runner.py            one subprocess per configuration, results cached by flags
+    runner.py            one subprocess per configuration, results cached by config
   common/                model construction, tokenized data
   paths.py               where caches and results land
 tests/                   the harness's own arithmetic, CPU-only where possible
@@ -23,7 +25,7 @@ steps/
   step1_training_loop/   train.py + prediction.toml + NOTES.md
   step2_mixed_precision/ train.py + compare.py + prediction.toml + NOTES.md
   sweep.sh
-results.jsonl            every run, appended (gitignored)
+runs/                    one JSON per run, named by its configuration (tracked)
 ```
 
 ## The one rule

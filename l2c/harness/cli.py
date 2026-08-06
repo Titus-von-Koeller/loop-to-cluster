@@ -4,8 +4,9 @@ A step's argument list should read as its subject. When each file repeats the sa
 eight knobs, the one flag that belongs to the lesson is buried among them; declared
 here, a step adds only what it is about and `--precision` stands out as step 2's.
 
-`run_args` defines what is recorded alongside a measurement: everything that steers
-the run, and nothing that only says where to put the output.
+`run_args` defines what is recorded alongside a measurement. Every argument a step
+takes steers the run, so every one of them is recorded and every one of them is part
+of the key a result is stored under.
 
 In accelerate the counterpart is `accelerate.commands.launch`, whose parser is
 assembled from argument groups shared across `launch`, `estimate-memory` and the
@@ -14,9 +15,6 @@ config commands.
 
 import argparse
 from typing import Any
-
-#: Arguments that direct output rather than steer the measurement.
-NOT_RECORDED = frozenset({"json_out", "force"})
 
 
 def common_args(parser: argparse.ArgumentParser) -> argparse.ArgumentParser:
@@ -39,7 +37,6 @@ def run_args(args: argparse.Namespace) -> dict[str, Any]:
     return {
         name: value if _is_native(value) else str(value)
         for name, value in sorted(vars(args).items())
-        if name not in NOT_RECORDED
     }
 
 

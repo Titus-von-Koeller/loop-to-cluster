@@ -34,14 +34,13 @@ In accelerate this whole file collapses to `Accelerator(mixed_precision="bf16")`
 """
 
 import argparse
-import json
 from pathlib import Path
 
 import torch
 
 from l2c.common import data
 from l2c.common import model as model_lib
-from l2c.harness import cli, ledger, measure, predict, report
+from l2c.harness import cli, ledger, measure, predict, report, runs
 from l2c.harness.precision import Precision
 
 STEP = "step2_mixed_precision"
@@ -52,7 +51,6 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--precision", type=Precision, choices=list(Precision), required=True)
     cli.common_args(parser)
-    parser.add_argument("--json-out", type=Path, default=None)
     return parser
 
 
@@ -261,29 +259,15 @@ def main() -> None:
     for dtype, byte_count in inventory.by_dtype().items():
         print(f"    {dtype:<12}{measure.mib(byte_count):>10,.1f} MiB")
 
-    environment = report.environment(device, memory_in_use_bytes=memory_at_start)
-    run = cli.run_args(args)
-    payload = {
-        "step": STEP,
-        "preset": model_lib.preset_dict(preset),
-        "run": run,
-        "environment": environment,
-        "predicted": prediction,
-        "actual": actual,
-    }
-    path = report.record(
+    path = runs.save(
         STEP,
-        preset=payload["preset"],
-        run=run,
-        environment=environment,
+        preset=model_lib.preset_dict(preset),
+        run=cli.run_args(args),
+        environment=report.environment(device, memory_in_use_bytes=memory_at_start),
         predicted=prediction,
         actual=actual,
     )
-    print(f"\nappended to {path}")
-
-    if args.json_out is not None:
-        args.json_out.parent.mkdir(parents=True, exist_ok=True)
-        args.json_out.write_text(json.dumps(payload, indent=2))
+    print(f"\nrecorded to {path}")
 
 
 if __name__ == "__main__":
