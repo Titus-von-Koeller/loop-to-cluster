@@ -18,6 +18,7 @@ l2c/                     installable package — shared, never edited in a lesso
     runner.py            one subprocess per configuration, results cached by flags
   common/                model construction, tokenized data
   paths.py               where caches and results land
+tests/                   the harness's own arithmetic, CPU-only where possible
 steps/
   step1_training_loop/   train.py + prediction.toml + NOTES.md
   step2_mixed_precision/ train.py + compare.py + prediction.toml + NOTES.md
@@ -86,7 +87,14 @@ the harness just reports the measurement.
 python steps/step1_training_loop/train.py       # the fp32 baseline
 ./steps/sweep.sh                                # six depths, then fit the line
 python steps/step2_mixed_precision/compare.py   # fp32 / tf32 / bf16 / fp16
+pytest tests/                                   # the harness's own arithmetic
 ```
+
+The tests cover the bookkeeping every measurement rests on — byte accounting, ledger
+categorization, the least-squares fit, the precision arms — not the measurements
+themselves. Whether a 4090 takes 56 ms for a step is not a testable proposition; whether
+`requested_bytes` deduplicates a tied weight is, and getting it wrong would move every
+memory number at once.
 
 The first run tokenizes wikitext-2 into `.cache/` (a minute or two). Every run after that
 is offline and instant.

@@ -28,7 +28,7 @@ from pathlib import Path
 
 import torch
 
-from l2c.harness.measure import describe_device
+from l2c.harness.measure import describe_device, gib
 from l2c.paths import results_file
 
 
@@ -78,7 +78,9 @@ def load_prediction(step_dir: str | Path) -> dict[str, float]:
         return tomllib.load(handle)
 
 
-def environment(device: torch.device) -> dict[str, object]:
+def environment(
+    device: torch.device, *, memory_in_use_bytes: int | None = None
+) -> dict[str, object]:
     """Everything needed to reproduce a number, recorded with the number.
 
     The precision knobs are here for a specific reason. `float32_matmul_precision`
@@ -88,7 +90,7 @@ def environment(device: torch.device) -> dict[str, object]:
     global default that has changed across torch releases, so a run that does not record
     it cannot be compared with a run from six months later.
     """
-    return {
+    captured = {
         "python": platform.python_version(),
         "torch": torch.__version__,
         "cuda": torch.version.cuda,
@@ -97,6 +99,9 @@ def environment(device: torch.device) -> dict[str, object]:
         "matmul_allow_tf32": torch.backends.cuda.matmul.allow_tf32,
         "cudnn_allow_tf32": torch.backends.cudnn.allow_tf32,
     }
+    if memory_in_use_bytes is not None:
+        captured["device_used_gib_at_start"] = round(gib(memory_in_use_bytes), 2)
+    return captured
 
 
 def record(

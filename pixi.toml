@@ -8,9 +8,10 @@ platforms = ["linux-64"]
 # torch ships cp314 wheels, triton has cp314 and caps itself at <3.15, numpy has
 # cp314, and tokenizers/safetensors are abi3 so they are version-agnostic.
 python = "3.14.*"
-# Linter/formatter. From conda-forge rather than PyPI because it is a standalone
-# binary with no link to the torch ABI, so the PyPI-only rule below does not apply.
+# Linter/formatter and test runner. From conda-forge rather than PyPI: neither links
+# against the torch ABI, so the PyPI-only rule below does not apply to them.
 ruff = ">=0.6"
+pytest = ">=8.0"
 
 [pypi-dependencies]
 # From PyPI rather than conda-forge. conda-forge builds trail for brand-new CPython

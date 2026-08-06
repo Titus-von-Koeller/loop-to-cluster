@@ -15,10 +15,10 @@ Each entry is classified:
 
     parameters    the storage belongs to a model parameter — a weight, not an
                   activation. In fp32 these are the weights autograd saved directly.
-    weight_casts  a reduced-precision tensor whose shape matches a Linear weight.
-                  Under autocast these are the cast cache: bf16 copies held alongside
-                  the fp32 masters, which is why model states *grow* under mixed
-                  precision instead of shrinking.
+    weight_casts  a reduced-precision tensor reachable from an autocast-eligible weight
+                  through dtype and view operations alone. Under autocast these are the
+                  cast cache: bf16 copies held alongside the fp32 masters, which is why
+                  model states *grow* under mixed precision instead of shrinking.
     logits        trailing dimension equal to vocab_size. Broken out because it is one
                   tensor big enough to dominate the total, and because the loss path
                   upcasts it — transformers' `ForCausalLMLoss` does `logits = logits.float()`
@@ -53,9 +53,47 @@ ACTIVATIONS = "activations"
 CATEGORIES = (PARAMETERS, WEIGHT_CASTS, LOGITS, ACTIVATIONS)
 
 
-def _shape_key(tensor: torch.Tensor) -> tuple[int, ...]:
-    """A transpose-insensitive shape, for matching a saved view against its parameter."""
-    return tuple(sorted(tensor.shape))
+#: Backward nodes that reshape or retype data without combining it with anything else.
+#: A tensor reachable from a parameter through only these *is* a copy of that parameter.
+#: Anything else — MmBackward0, AddBackward0 — has mixed in other data, so it is an
+#: activation even though the parameter is still reachable further up the graph.
+_VIEW_OR_CAST_NODES = frozenset(
+    {
+        "ToCopyBackward0",
+        "TBackward0",
+        "ViewBackward0",
+        "ReshapeAliasBackward0",
+        "PermuteBackward0",
+        "ExpandBackward0",
+        "DetachBackward0",
+        "AsStridedBackward0",
+    }
+)
+
+#: Autograd saves a Linear's weight as a transposed view of its cast, so the walk needs a
+#: couple of hops. Bounded so a pathological graph cannot make classification expensive.
+_MAX_WALK_HOPS = 6
+
+
+def _casts_of(tensor: torch.Tensor, sources: set[int]) -> bool:
+    """Whether `tensor` is a dtype/view copy of one of the storages in `sources`.
+
+    Walks the backward graph from the saved tensor towards its leaf, refusing to pass
+    through any node that combines data. An `AccumulateGrad` node carries the leaf itself
+    on `.variable`, which is where the comparison happens.
+    """
+    node = tensor.grad_fn
+    for _ in range(_MAX_WALK_HOPS):
+        if node is None or type(node).__name__ not in _VIEW_OR_CAST_NODES:
+            return False
+        if not node.next_functions:
+            return False
+        parent = node.next_functions[0][0]
+        leaf = getattr(parent, "variable", None)
+        if leaf is not None:
+            return leaf.untyped_storage().data_ptr() in sources
+        node = parent
+    return False
 
 
 @dataclass(frozen=True, slots=True)
@@ -121,20 +159,16 @@ def record(model: nn.Module, *, vocab_size: int) -> Iterator[Ledger]:
     inventory = Ledger()
 
     param_storages = {p.untyped_storage().data_ptr() for p in model.parameters()}
-    # Keyed on the sorted shape, because autograd saves a linear's weight *transposed*:
-    # a (192, 576) k_proj weight is saved as a (576, 192) view. Matching the shape as
-    # written would recognize only the square projections, plus any pair that happen to
-    # be each other's transpose, and silently file the rest as activations.
-    cast_shapes_source = autocast_eligible_weights(model)
-    cast_shapes = {_shape_key(w) for w in cast_shapes_source}
+    eligible = autocast_eligible_weights(model)
+    eligible_storages = {w.untyped_storage().data_ptr() for w in eligible}
     seen: set[int] = set()
 
     def classify(tensor: torch.Tensor, storage_ptr: int) -> str:
         if storage_ptr in param_storages:
             return PARAMETERS
-        # Before the logits test: a transposed cast of a tied lm_head weight is
-        # (hidden, vocab), whose trailing dimension is also vocab_size.
-        if tensor.dtype is not torch.float32 and _shape_key(tensor) in cast_shapes:
+        # Ahead of the logits test, because a transposed cast of a tied lm_head weight is
+        # (hidden, vocab) and would otherwise be caught by the trailing-dimension check.
+        if tensor.dtype is not torch.float32 and _casts_of(tensor, eligible_storages):
             return WEIGHT_CASTS
         if tensor.dim() > 0 and tensor.shape[-1] == vocab_size:
             return LOGITS
@@ -161,15 +195,13 @@ def record(model: nn.Module, *, vocab_size: int) -> Iterator[Ledger]:
     with torch.autograd.graph.saved_tensors_hooks(pack, unpack):
         yield inventory
 
-    # A hard invariant, not a prediction: there cannot be more reduced-precision copies of
-    # eligible weights than there are eligible weights. Exceeding the count proves the
-    # shape heuristic has captured something that is not a weight cast, which would inflate
-    # that category and deflate activations by the same amount. Equality is *not* asserted,
-    # since a weight a given forward never uses is legitimately absent.
+    # A hard invariant, not a prediction: with the autocast cache enabled each eligible
+    # weight is cast at most once, so the classification cannot find more casts than there
+    # are castable weights. Equality is deliberately *not* asserted — a weight a given
+    # forward never uses is legitimately absent — so `==` stays a reported row.
     cast_count = inventory.count_in(WEIGHT_CASTS)
-    if cast_count > len(cast_shapes_source):
+    if cast_count > len(eligible):
         raise AssertionError(
-            f"ledger classified {cast_count} weight casts but the model has only "
-            f"{len(cast_shapes_source)} autocast-eligible weights; the shape heuristic "
-            "has misfiled a tensor whose sorted shape collides with a weight's"
+            f"ledger classified {cast_count} weight casts, but the model has only "
+            f"{len(eligible)} autocast-eligible weights"
         )

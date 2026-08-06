@@ -91,7 +91,7 @@ def main() -> None:
             f"{y_key:<22}{fit.slope:>18,.2f}{fit.intercept:>18,.2f}"
             f"{fit.r_squared:>10.5f}{fit.num_points:>8}"
         )
-    print(f"\nslope = per-{args.x[:-1] if args.x.endswith('s') else args.x} cost, ")
+    print(f"\nslope = marginal cost per unit of {args.x}")
     print("intercept = everything that does not scale with it")
 
 

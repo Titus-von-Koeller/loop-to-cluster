@@ -29,13 +29,12 @@
     "device": {
       "name": "NVIDIA GeForce RTX 4090",
       "capability": "8.9",
-      "total_gib": 23.52,
-      "free_gib_at_start": 16.14,
-      "used_by_others_gib": 7.38
+      "total_gib": 23.52
     },
     "float32_matmul_precision": "highest",
     "matmul_allow_tf32": false,
-    "cudnn_allow_tf32": true
+    "cudnn_allow_tf32": true,
+    "device_used_gib_at_start": 0.4
   },
   "predicted": {
     "model_states_mib": 2052.5,
@@ -71,11 +70,11 @@
     "saved_still_fp32_mib": 4781.360599517822,
     "peak_mib": 6621.91064453125,
     "peak_reserved_mib": 7062.0,
-    "median_step_ms": 106.27021026611328,
-    "p10_step_ms": 104.98694381713867,
-    "p90_step_ms": 107.66265258789062,
-    "steps_per_second": 9.399635993580377,
-    "tokens_per_second": 19250.454514852612,
+    "median_step_ms": 106.2103042602539,
+    "p10_step_ms": 105.28102188110351,
+    "p90_step_ms": 107.85006561279297,
+    "steps_per_second": 9.39944581431548,
+    "tokens_per_second": 19250.065027718105,
     "final_grad_scale": 1.0,
     "steps_attempted": 36,
     "steps_applied": 36,

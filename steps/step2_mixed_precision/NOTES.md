@@ -114,6 +114,13 @@ Separately the logits test, keyed on a trailing dimension of `vocab_size`, was s
 the transposed lm_head cast. A prediction precise enough to decompose its own error is
 worth more than a prediction that is merely close.
 
+Matching on shape got the right answer here but only by luck, and it would have misfiled a
+`(576, 576)` activation as a cast at `batch_size=1, seq_len=576`. The ledger now identifies
+casts by **provenance** instead: it walks the backward graph from each saved tensor and
+accepts it only if the path to a parameter passes through dtype and view nodes alone.
+`MmBackward0` also reaches a weight further up, so refusing to traverse any node that
+combines data is what separates a copy of a weight from a product of one.
+
 **38% of saved bytes are still fp32 under autocast.** 936.0 MiB of the 2432.3 MiB the graph
 holds in the bf16 arm. RMSNorm is the reason: its fp32 weight multiplies the bf16 hidden
 states and type promotion pushes the result back to fp32, so `last_hidden_state` is fp32

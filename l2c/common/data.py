@@ -40,8 +40,6 @@ from transformers import AutoTokenizer
 
 from l2c.paths import cache_dir
 
-type T = tuple[torch.Tensor, ...]
-
 #: Bumped when the packing changes, so a stale cache cannot be silently reused.
 _CACHE_VERSION = 1
 
@@ -60,7 +58,7 @@ def batch_generator(seed: int) -> torch.Generator:
     return torch.Generator().manual_seed(seed)
 
 
-def endless(loader: Iterable[T]) -> Iterator[T]:
+def endless[T](loader: Iterable[T]) -> Iterator[T]:
     """Yield batches forever, restarting the loader at each epoch boundary.
 
     Steps are counted in optimizer updates, not epochs, so the loop should not have to

@@ -79,19 +79,33 @@ def require_cuda() -> torch.device:
 def describe_device(device: torch.device) -> dict[str, object]:
     """Identity of the GPU, recorded with every result.
 
-    Worth capturing because a second GPU driving a display starts several hundred MiB
-    down and its clocks move with whatever the compositor is doing. If a number looks
-    wrong, the first question is which card produced it.
+    Static facts only. If a number looks wrong, the first question is which card produced
+    it — see `foreign_memory_bytes` for whether that card was busy.
     """
     properties = torch.cuda.get_device_properties(device)
-    free, total = torch.cuda.mem_get_info(device)
     return {
         "name": properties.name,
         "capability": f"{properties.major}.{properties.minor}",
         "total_gib": round(gib(properties.total_memory), 2),
-        "free_gib_at_start": round(gib(free), 2),
-        "used_by_others_gib": round(gib(total - free), 2),
     }
+
+
+def memory_in_use(device: torch.device) -> int:
+    """Total memory resident on the device, sampled before this run allocates anything.
+
+    Not attributable to other processes, and deliberately not named as though it were:
+    querying it creates this process's CUDA primary context, which is itself a few hundred
+    MiB and is included in the reading. There is no way to separate the two through torch,
+    since the allocator does not account for the context.
+
+    It is still the reading worth recording, because the useful signal is the *excess* over
+    what an idle run reports. A card driving a display shows several GiB more, and its
+    clocks move with whatever the compositor is doing — which invalidates the timings.
+    Sample it first regardless: once a model is resident this is dominated by our own
+    allocations and says nothing at all.
+    """
+    free, total = torch.cuda.mem_get_info(device)
+    return total - free
 
 
 # --------------------------------------------------------------------------------
@@ -161,12 +175,25 @@ class StateInventory:
 
 
 def state_inventory(model: nn.Module, optimizer: torch.optim.Optimizer) -> StateInventory:
-    """Measure model states directly. Requires gradients and optimizer state to exist.
+    """Measure model states directly, as requested bytes.
 
-    Call after a first `optimizer.step()` and before `zero_grad`, since AdamW creates its
-    moments lazily on that first step and `set_to_none=True` discards the gradients.
+    Must be called after a first `optimizer.step()` and before `zero_grad()`: AdamW creates
+    its moments lazily on that first step, and `set_to_none=True` discards the gradients.
+    Both preconditions are checked, because outside that window this returns a plausible
+    number with a bucket silently missing — and a budget that is short by exactly
+    4 or 8 bytes per parameter is the hardest kind of wrong to notice.
     """
     parameters = list(model.parameters())
+    if not optimizer.state:
+        raise RuntimeError(
+            "optimizer state is empty, so its moments would count as zero. Call "
+            "state_inventory() after the first optimizer.step()."
+        )
+    if all(p.grad is None for p in parameters):
+        raise RuntimeError(
+            "no parameter has a gradient, so gradients would count as zero. Call "
+            "state_inventory() before optimizer.zero_grad(set_to_none=True)."
+        )
     return StateInventory(
         param_bytes=requested_bytes(parameters),
         grad_bytes=requested_bytes(p.grad for p in parameters),

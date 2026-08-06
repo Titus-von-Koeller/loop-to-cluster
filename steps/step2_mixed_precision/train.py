@@ -67,6 +67,9 @@ def parse_args() -> argparse.Namespace:
 def main() -> None:
     args = parse_args()
     device = measure.require_cuda()
+    # Sampled before anything is allocated. Includes this process's CUDA context, so the
+    # signal is the excess over an idle run: a busy GPU invalidates every timing below.
+    memory_at_start = measure.memory_in_use(device)
     precision: Precision = args.precision
     precision.apply()
 
@@ -276,7 +279,7 @@ def main() -> None:
     for dtype, byte_count in inventory.by_dtype().items():
         print(f"    {dtype:<12}{measure.mib(byte_count):>10,.1f} MiB")
 
-    environment = report.environment(device)
+    environment = report.environment(device, memory_in_use_bytes=memory_at_start)
     run = {
         k: str(v) if k == "precision" else v for k, v in vars(args).items() if k != "json_out"
     }
