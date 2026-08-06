@@ -16,8 +16,10 @@
 __pycache__/
 *.egg-info/
 
-# Lab output. Regenerable from the step scripts, and `.cache/` holds a tokenised
-# corpus that is far too large to version.
+# The tokenized corpus is regenerable from the step scripts and too large to version.
 .cache/
-results.jsonl
-runs/
+
+# `results.jsonl` and `runs/` are deliberately NOT ignored. They are the evidence behind
+# every table in a NOTES.md, and a measurement is only regenerable on the same GPU with
+# the same torch build — which makes it not regenerable. Committing the prediction and
+# withholding the result would leave half of each claim unversioned. A few KB per run.

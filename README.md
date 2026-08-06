@@ -168,9 +168,15 @@ The three that are doing more than they appear to:
   `GradientState.sync_gradients` and infers gradient overflow from whether the inner step
   ran, exposing it as `step_was_skipped()`.
 
-accelerate has no `tf32` setting — `float32_matmul_precision` is orthogonal to
-`mixed_precision` and left to the caller. Given the 1.36× measured for TF32 alone, that is
-the difference between reporting bf16 at 1.89× and at 1.39×.
+`mixed_precision` has no `tf32` value, and TF32 is not left to the caller either — it is
+coupled to torch.compile. `AcceleratorState` sets `allow_tf32 = True` exactly when a
+dynamo backend is requested *and* `mixed_precision == "no"`
+([`state.py:1023`](https://github.com/huggingface/accelerate/blob/main/src/accelerate/state.py)).
+So enabling compilation moves the fp32 baseline onto the tensor cores as a side effect.
+Given the 1.36× measured for TF32 alone on this box, the same unchanged bf16 change reads
+as 1.89× without a dynamo backend and 1.39× with one. transformers couples them
+identically, gated on `torch_compile` (`training_args.py:1604`), but does expose an
+explicit `tf32` flag.
 
 ## Environment
 

@@ -26,9 +26,14 @@ worth knowing:
 - accelerate wraps `model.forward` in the autocast context rather than asking the call
   site to. It also wraps the result in `convert_outputs_to_fp32`, which is why model
   outputs come back fp32 under accelerate but bf16 here.
-- there is no `tf32` option. `float32_matmul_precision` is orthogonal to accelerate's
-  `mixed_precision` setting and is left entirely to the caller, so an accelerate
-  benchmark that does not pin it is comparing against an unknown baseline.
+- `mixed_precision` has no `tf32` value, but TF32 is not left to the caller either: it is
+  coupled to torch.compile. `AcceleratorState` sets
+  `torch.backends.cuda.matmul.allow_tf32 = True` exactly when a dynamo backend is
+  requested *and* `mixed_precision == "no"` (accelerate/state.py:1023). So requesting
+  compilation silently changes what the fp32 arm computes and how fast it runs, which
+  entangles two comparisons that look independent: compiled-versus-eager, and
+  fp32-versus-bf16. transformers couples them the same way, gated on `torch_compile`
+  (training_args.py:1604), though it at least exposes an explicit `tf32` flag to override.
 """
 
 from enum import StrEnum

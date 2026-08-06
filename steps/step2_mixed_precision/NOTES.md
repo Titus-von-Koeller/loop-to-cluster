@@ -160,10 +160,14 @@ Three things worth carrying forward:
 - accelerate wraps the **model's forward**, not the call site, and wraps the output in
   `convert_outputs_to_fp32`. So model outputs come back fp32 under accelerate and bf16
   here — a real behavioral difference, not just a syntactic one.
-- there is **no `tf32` option**. `float32_matmul_precision` is orthogonal to
-  `mixed_precision` and left entirely to the caller, so an accelerate benchmark that does
-  not pin it is comparing against an unknown baseline. Given the 1.36× measured above,
-  that is the difference between reporting 1.89× and reporting 1.39×.
+- `mixed_precision` has **no `tf32` value**, and TF32 is not left to the caller either —
+  it is coupled to torch.compile. `AcceleratorState` sets `allow_tf32 = True` exactly when
+  a dynamo backend is requested *and* `mixed_precision == "no"` (`state.py:1023`). So
+  requesting compilation moves the fp32 baseline onto the tensor cores as a side effect,
+  and the same unchanged bf16 change reads as 1.89× with no dynamo backend or 1.39× with
+  one. Two comparisons that look independent — compiled-versus-eager and fp32-versus-bf16 —
+  are entangled through one flag. transformers couples them the same way, gated on
+  `torch_compile` (`training_args.py:1604`), but exposes an explicit `tf32` override.
 - `Accelerator.backward` divides the loss by `gradient_accumulation_steps`
   (`accelerator.py:2840`). At 1 that is a no-op, which is why swapping it in looks harmless
   here and stops being harmless at step 3.

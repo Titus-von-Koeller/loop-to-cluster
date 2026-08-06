@@ -125,7 +125,8 @@ def record(model: nn.Module, *, vocab_size: int) -> Iterator[Ledger]:
     # a (192, 576) k_proj weight is saved as a (576, 192) view. Matching the shape as
     # written would recognize only the square projections, plus any pair that happen to
     # be each other's transpose, and silently file the rest as activations.
-    cast_shapes = {_shape_key(w) for w in autocast_eligible_weights(model)}
+    cast_shapes_source = autocast_eligible_weights(model)
+    cast_shapes = {_shape_key(w) for w in cast_shapes_source}
     seen: set[int] = set()
 
     def classify(tensor: torch.Tensor, storage_ptr: int) -> str:
@@ -159,3 +160,16 @@ def record(model: nn.Module, *, vocab_size: int) -> Iterator[Ledger]:
 
     with torch.autograd.graph.saved_tensors_hooks(pack, unpack):
         yield inventory
+
+    # A hard invariant, not a prediction: there cannot be more reduced-precision copies of
+    # eligible weights than there are eligible weights. Exceeding the count proves the
+    # shape heuristic has captured something that is not a weight cast, which would inflate
+    # that category and deflate activations by the same amount. Equality is *not* asserted,
+    # since a weight a given forward never uses is legitimately absent.
+    cast_count = inventory.count_in(WEIGHT_CASTS)
+    if cast_count > len(cast_shapes_source):
+        raise AssertionError(
+            f"ledger classified {cast_count} weight casts but the model has only "
+            f"{len(cast_shapes_source)} autocast-eligible weights; the shape heuristic "
+            "has misfiled a tensor whose sorted shape collides with a weight's"
+        )
