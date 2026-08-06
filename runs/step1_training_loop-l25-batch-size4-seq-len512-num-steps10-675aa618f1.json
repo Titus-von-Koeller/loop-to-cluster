@@ -1,0 +1,95 @@
+{
+  "step": "step1_training_loop",
+  "timestamp": "2026-08-06T06:56:11.265505+00:00",
+  "commit": "7922b28",
+  "preset": {
+    "vocab_size": 49152,
+    "hidden_size": 576,
+    "intermediate_size": 1536,
+    "num_hidden_layers": 25,
+    "num_attention_heads": 9,
+    "num_key_value_heads": 3,
+    "max_position_embeddings": 2048,
+    "tie_word_embeddings": true,
+    "attn_implementation": "sdpa"
+  },
+  "run": {
+    "seq_len": 512,
+    "batch_size": 4,
+    "num_steps": 10,
+    "warmup_steps": 5,
+    "learning_rate": 0.0003,
+    "max_grad_norm": 1.0,
+    "seed": 42,
+    "num_layers": 25
+  },
+  "environment": {
+    "python": "3.14.6",
+    "torch": "2.13.0+cu130",
+    "cuda": "13.0",
+    "device": {
+      "name": "NVIDIA GeForce RTX 4090",
+      "capability": "8.9",
+      "total_gib": 23.52
+    },
+    "float32_matmul_precision": "highest",
+    "matmul_allow_tf32": false,
+    "cudnn_allow_tf32": true,
+    "device_used_gib_at_start": 0.4
+  },
+  "predicted": {
+    "num_params": 134515008,
+    "bytes_per_param": 16.0,
+    "activations_mib": 3840.0,
+    "peak_mib": 6000.0,
+    "steps_per_second": 12.0
+  },
+  "actual": {
+    "num_params": 116814528,
+    "bytes_per_param": 16.0,
+    "initial_loss": 10.923566818237305,
+    "final_loss": 8.268895149230957,
+    "params_mib": 445.612060546875,
+    "gradients_mib": 445.612060546875,
+    "optimizer_states_mib": 891.22412109375,
+    "model_states_mib": 1782.4482421875,
+    "model_states_allocated_mib": 1862.4208984375,
+    "block_padding_mib": 79.97265625,
+    "activations_mib": 3631.3056640625,
+    "peak_mib": 5772.11865234375,
+    "peak_reserved_mib": 6294.0,
+    "allocator_overhead_mib": 521.88134765625,
+    "median_step_ms": 91.0668830871582,
+    "p10_step_ms": 90.6429428100586,
+    "p90_step_ms": 91.68865203857422,
+    "steps_per_second": 10.978026906097442,
+    "tokens_per_second": 22482.99910368756,
+    "saved_tensors": {
+      "total_bytes": 4266437380,
+      "num_tensors": 662,
+      "bytes_by_category": {
+        "parameters": 467258112,
+        "weight_casts": 0,
+        "logits": 402653184,
+        "activations": 3396526084
+      },
+      "bytes_by_dtype": {
+        "float32": 4266404612,
+        "int64": 32768
+      },
+      "num_weight_cast_tensors": 0
+    },
+    "loss_curve": [
+      9.376524925231934,
+      9.30999755859375,
+      9.173001289367676,
+      8.984025955200195,
+      8.920235633850098,
+      8.623695373535156,
+      8.839665412902832,
+      8.525882720947266,
+      8.394049644470215,
+      8.268895149230957
+    ]
+  }
+}
