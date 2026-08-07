@@ -1,0 +1,90 @@
+"""Ground-truth every claim the wiki makes about optimizers, init and norms.
+
+Run: cd /home/titus/src/loop-to-cluster && pixi run python docs/_wiki_build/verify_facts.py
+"""
+
+import inspect
+import math
+
+import torch
+from torch import nn
+
+from l2c.common.model import SMOLLM2_135M, build_model, causal_lm_loss
+
+print("=" * 62)
+print(f"torch {torch.__version__}")
+import transformers
+
+print(f"transformers {transformers.__version__}")
+print("=" * 62)
+
+model = build_model(SMOLLM2_135M, seed=0)
+
+# ---------------------------------------------------------------- norms
+print("\n### Normalization layer type")
+norm_types = {type(m).__name__ for n, m in model.named_modules() if "norm" in n.lower()}
+print(f"norm module types: {sorted(norm_types)}")
+has_bias = {
+    n: (m.bias is not None) for n, m in model.named_modules() if isinstance(m, nn.Linear)
+}
+print(f"nn.Linear count: {len(has_bias)}")
+print(f"any Linear with bias: {any(has_bias.values())}")
+
+# ---------------------------------------------------------------- init
+print("\n### Initialization")
+print(f"config.initializer_range: {model.config.initializer_range}")
+for name in ("model.embed_tokens.weight", "model.layers.0.self_attn.q_proj.weight",
+             "model.layers.0.mlp.down_proj.weight", "model.layers.29.mlp.down_proj.weight"):
+    t = dict(model.named_parameters())[name]
+    print(f"  {name:<44} std={t.std().item():.5f} mean={t.mean().item():+.6f}")
+norm_w = dict(model.named_parameters())["model.layers.0.input_layernorm.weight"]
+print(f"  RMSNorm weight: all ones? {bool((norm_w == 1).all())}")
+
+# ------------------------------------------------------- ln(V) empirical
+print("\n### The ln(V) check, measured")
+V = SMOLLM2_135M.vocab_size
+torch.manual_seed(0)
+ids = torch.randint(0, V, (2, 128))
+with torch.no_grad():
+    logits = model(input_ids=ids).logits
+loss = causal_lm_loss(logits, ids)
+print(f"  ln(V) = ln({V}) = {math.log(V):.4f}")
+print(f"  measured initial loss = {loss.item():.4f}")
+print(f"  absolute error        = {abs(loss.item() - math.log(V)):.4f}")
+
+# ------------------------------------------------------ param groups
+print("\n### Parameter groups (the standard no-decay split)")
+decay, no_decay = [], []
+for n, p in model.named_parameters():
+    (no_decay if p.ndim < 2 else decay).append((n, p.numel()))
+print(f"  decay    : {len(decay):>4} tensors, {sum(c for _, c in decay):>12,} params")
+print(f"  no_decay : {len(no_decay):>4} tensors, {sum(c for _, c in no_decay):>12,} params")
+print(f"  no_decay share: {sum(c for _, c in no_decay) / sum(p.numel() for p in model.parameters()):.4%}")
+print(f"  no_decay examples: {[n for n, _ in no_decay[:3]]}")
+
+# ------------------------------------------------- optimizer defaults
+print("\n### AdamW defaults (signature)")
+sig = inspect.signature(torch.optim.AdamW.__init__)
+for k in ("lr", "betas", "eps", "weight_decay", "foreach", "fused", "capturable"):
+    if k in sig.parameters:
+        print(f"  {k:<14} default={sig.parameters[k].default}")
+
+# --------------------------------------------- state_dict structure
+print("\n### optimizer.state_dict() structure")
+opt = torch.optim.AdamW(model.parameters(), lr=1e-3)
+print(f"  before any step -> state entries: {len(opt.state_dict()['state'])}  (lazy allocation)")
+loss2 = causal_lm_loss(model(input_ids=ids).logits, ids)
+loss2.backward()
+opt.step()
+sd = opt.state_dict()
+print(f"  after one step  -> state entries: {len(sd['state'])}")
+print(f"  top-level keys  : {list(sd.keys())}")
+print(f"  state key type  : {type(next(iter(sd['state']))).__name__}  (index, NOT name)")
+first = sd["state"][next(iter(sd["state"]))]
+print(f"  per-param keys  : {list(first.keys())}")
+for k, v in first.items():
+    print(f"      {k:<12} {type(v).__name__:<8} {tuple(v.shape) if hasattr(v, 'shape') else v}")
+pg = sd["param_groups"][0]
+print(f"  param_group keys: {sorted(pg.keys())}")
+print(f"  params field    : list of {len(pg['params'])} int indices")
+print("=" * 62)
