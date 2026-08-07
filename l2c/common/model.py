@@ -30,6 +30,9 @@ from transformers import LlamaConfig, LlamaForCausalLM
 #: Only the tokenizer is fetched from the Hub; weights are never downloaded.
 TOKENIZER = "HuggingFaceTB/SmolLM2-135M"
 
+#: Positions cross-entropy skips. torch's default, and what transformers uses.
+IGNORE_INDEX = -100
+
 
 @dataclass(frozen=True, slots=True)
 class Preset:
@@ -86,6 +89,30 @@ def build_model(preset: Preset = SMOLLM2_135M, *, seed: int) -> LlamaForCausalLM
         use_cache=False,  # a KV cache is for inference; in training it is dead weight
     )
     return LlamaForCausalLM(config)
+
+
+def causal_lm_loss(logits: torch.Tensor, input_ids: torch.Tensor) -> torch.Tensor:
+    """Cross-entropy for next-token prediction, with the shift written out.
+
+    A causal LM predicts token i+1 from everything up to i, so position i of the logits
+    is scored against token i+1 of the input. `LlamaForCausalLM` does this internally
+    when handed `labels=`, which fuses the forward and the scoring into one call. Doing
+    it here keeps them two visible steps, which is the shape every later step's loop is
+    a diff against.
+
+    Shared rather than duplicated per step: no lesson in this lab is about the shift.
+
+    The shift is applied to the labels, not to the logits, and that choice is worth a
+    measurement. `logits` is contiguous, so flattening it is a view; slicing it to
+    `[:, :-1]` first is not, and flattening the result copies a whole vocabulary-sized
+    tensor — a few hundred MiB at this vocabulary, appearing in peak memory for no
+    reason the lesson can explain. Padding the labels instead costs a few KiB of int64.
+    This is also what `LlamaForCausalLM` does internally.
+    """
+    targets = nn.functional.pad(input_ids, (0, 1), value=IGNORE_INDEX)[:, 1:]
+    return nn.functional.cross_entropy(
+        logits.flatten(0, 1), targets.flatten(), ignore_index=IGNORE_INDEX
+    )
 
 
 def count_parameters(model: nn.Module) -> int:
