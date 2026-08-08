@@ -63,5 +63,11 @@ checked against source.
 US spelling. Ruff-clean (`E,F,I,UP,B,SIM,RUF`, line length 95). Code documents itself and
 never references the conversation that produced it.
 
+**Commit straight to `main`, and never open a branch.** More than one agent works in this
+repo at once; a branch only diverges from whatever the other one is committing. Stage your
+own paths explicitly — `git add <paths>`, never `git add -A` from the root — or a
+whole-worktree commit sweeps another session's in-flight work into your commit under an
+unrelated subject.
+
 `docs/_wiki_build/` is owned by a separate effort and imports `l2c.common.model`. Leave
 both alone unless asked. Jupyter setup lives in `docs/JUPYTER.md`.
