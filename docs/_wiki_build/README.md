@@ -9,6 +9,29 @@ someone who mistakes it for the source. This directory holds what can be *verifi
 *regenerated* — the scripts that check the numbers the wiki quotes, and the figures it
 embeds.
 
+## Before you edit
+
+Rules earned the hard way. Each one cost a real mistake.
+
+- **Titus edits this wiki too.** Never restore, move, or delete anything you did not add
+  yourself. A page that differs from what you expected has been *edited*, not damaged — say
+  "this changed" and ask, rather than "this broke" and revert. Phrasing you think is clumsy
+  may be a deliberate cut.
+- **Who writes what.** Prose, structure, figures and corrections are Claude's. Retrieval
+  questions and *Interrogate this section* blocks are Titus's — producing those is the
+  exercise, so leave the gaps flagged rather than filling them.
+- **Open the figures; do not read their captions.** The PNGs are in `figures/`. Two shipped
+  with text collisions that no caption could reveal, and three judgements made from captions
+  alone turned out backwards.
+- **The wiki documents SmolLM2-135M, not whatever `build_model` happens to return.** A field
+  that changes no shape is invisible to a parameter count, which is how `initializer_range`
+  reached the wiki as 0.02 while the released config says 0.041666… `verify_facts.py` now
+  diffs the preset against the released config for exactly this reason. Never source a wiki
+  number from the lab's own code.
+- **Every number is derived from the config, measured, or absent.** Do not import a
+  coefficient from a paper written against a different implementation — activation memory in
+  particular has no constant that survives a change of attention kernel.
+
 | File | What it is |
 | --- | --- |
 | `verify_params.py` | Derives the parameter count analytically and checks it against `sum(p.numel())`. |
