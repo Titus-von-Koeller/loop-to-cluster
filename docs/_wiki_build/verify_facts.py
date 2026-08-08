@@ -3,17 +3,20 @@
 Run: cd /home/titus/src/loop-to-cluster && pixi run python docs/_wiki_build/verify_facts.py
 """
 
+import glob
 import inspect
+import json
 import math
+import os
 
 import torch
 from torch import nn
 
-from l2c.common.model import SMOLLM2_135M, build_model, causal_lm_loss
+from l2c.common.model import SMOLLM2_135M, build_model, causal_lm_loss, preset_dict
 
 print("=" * 62)
 print(f"torch {torch.__version__}")
-import transformers
+import transformers  # noqa: E402 -- after the torch banner, so versions print together
 
 print(f"transformers {transformers.__version__}")
 print("=" * 62)
@@ -29,6 +32,29 @@ has_bias = {
 }
 print(f"nn.Linear count: {len(has_bias)}")
 print(f"any Linear with bias: {any(has_bias.values())}")
+
+# ------------------------------------------------------- released config
+# The parameter count below is blind to any field that changes no shape, which is
+# exactly where a preset drifts from the model it claims to be. Compare field by
+# field instead.
+print("\n### Preset vs the released config")
+_snapshots = glob.glob(
+    os.path.expanduser(
+        "~/.cache/huggingface/hub/models--HuggingFaceTB--SmolLM2-135M/snapshots/*/config.json"
+    )
+)
+if not _snapshots:
+    print("  released config not in the local HF cache — skipped")
+else:
+    with open(_snapshots[0]) as fh:
+        released = json.load(fh)
+    for field, ours in sorted(preset_dict(SMOLLM2_135M).items()):
+        if field not in released:
+            print(f"  {field:<28}{ours!s:>24}  (not in the released config)")
+            continue
+        theirs = released[field]
+        verdict = "match" if ours == theirs else f"DIFFERS — released is {theirs}"
+        print(f"  {field:<28}{ours!s:>24}  {verdict}")
 
 # ---------------------------------------------------------------- init
 print("\n### Initialization")

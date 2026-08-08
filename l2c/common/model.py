@@ -38,8 +38,14 @@ IGNORE_INDEX = -100
 class Preset:
     """Architecture knobs.
 
-    Defaults mirror SmolLM2-135M. Verified against the released config: this yields
+    Defaults mirror SmolLM2-135M's released config, and need verifying two ways,
+    because a parameter count is blind to half of them. The shape fields reproduce
     134,515,008 parameters, and transformers derives ``head_dim = 576 // 9 = 64``.
+    ``initializer_range`` and ``max_position_embeddings`` change no shape at all, so
+    that count cannot see them: both are pinned here to the released values rather
+    than inherited. Left to transformers, ``initializer_range`` falls back to 0.02
+    against the released 0.041666..., which moves the initial loss by a third of a
+    nat without moving a single tensor.
 
     `attn_implementation` is pinned rather than left to transformers' own default
     (which is `None`, meaning "pick one"). The choice changes *which tensors are
@@ -54,7 +60,8 @@ class Preset:
     num_hidden_layers: int = 30
     num_attention_heads: int = 9
     num_key_value_heads: int = 3  # GQA: K and V are a third of Q's width
-    max_position_embeddings: int = 2048
+    max_position_embeddings: int = 8192
+    initializer_range: float = 0.041666666666666664  # 1/sqrt(576); transformers' is 0.02
     tie_word_embeddings: bool = True
     attn_implementation: str = "sdpa"
 
@@ -84,6 +91,7 @@ def build_model(preset: Preset = SMOLLM2_135M, *, seed: int) -> LlamaForCausalLM
         num_attention_heads=preset.num_attention_heads,
         num_key_value_heads=preset.num_key_value_heads,
         max_position_embeddings=preset.max_position_embeddings,
+        initializer_range=preset.initializer_range,
         tie_word_embeddings=preset.tie_word_embeddings,
         attn_implementation=preset.attn_implementation,
         use_cache=False,  # a KV cache is for inference; in training it is dead weight
