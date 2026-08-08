@@ -340,6 +340,14 @@ def fig_memory_over_step():
                 fontsize=9.8, color=ROSE, fontweight="bold", ha="right",
                 arrowprops=dict(arrowstyle="->", color=ROSE, lw=1.6,
                                 connectionstyle="arc3,rad=-0.2"))
+    # foreach optimizers batch elementwise ops across every parameter, allocating
+    # intermediate buffers, so the step phase is not flat. Labelled directly rather
+    # than as a fourth legend entry, which the three-hue palette has no room for.
+    transient = np.where(x >= 2, 0.45 * np.exp(-(((x - 2.5) / 0.30) ** 2)), 0.0)
+    top = states + grads + act
+    ax.fill_between(x, top, top + transient, color=BLUE_ORDINAL[0], linewidth=0)
+    ax.text(2.5, states + 2.0 + 0.62, "foreach transients", ha="center",
+            fontsize=9.3, color=INK_2, fontweight="bold")
     for xpos, lab in ((0.5, "FORWARD"), (1.5, "BACKWARD"), (2.5, "OPTIMIZER STEP")):
         ax.text(xpos, -0.55, lab, ha="center", fontsize=9.5,
                 color=INK_2, fontweight="bold")
@@ -354,9 +362,11 @@ def fig_memory_over_step():
     ax.grid(False)
     despine(ax, keep=("bottom",))
     title(ax, "Memory over one training step",
-          "Activations accumulate through forward and are consumed during backward. The peak is at the boundary.")
+          "Activations accumulate through forward and are consumed during backward. The peak is usually at the boundary.")
     note(fig, "Schematic: the shape of one steady-state iteration. Not to scale, and not the first iteration — "
-              "Adam's moments do not exist until the first step() completes.")
+              "Adam's moments do not exist until the first step() completes.\n"
+              "The bump in the step phase is foreach's intermediate buffers, which can exceed the boundary peak "
+              "when activations are small.")
     save(fig, f"{OUT}/08_memory_over_step.png")
 
 
