@@ -18,8 +18,6 @@ import torch
 from torch import nn
 
 from l2c.harness import ledger, measure, predict, report
-from l2c.harness.fit import Fit, least_squares, pluck
-from l2c.harness.precision import Precision
 
 requires_cuda = pytest.mark.skipif(
     not torch.cuda.is_available(), reason="measures CUDA allocator state"
@@ -231,91 +229,6 @@ def test_ledger_records_no_casts_without_autocast():
 
 
 # --------------------------------------------------------------------------------
-# precision — the four arms
-# --------------------------------------------------------------------------------
-
-
-@pytest.mark.parametrize(
-    ("arm", "matmul", "dtype", "scaler"),
-    [
-        (Precision.FP32, "highest", None, False),
-        (Precision.TF32, "high", None, False),
-        (Precision.BF16, "highest", torch.bfloat16, False),
-        (Precision.FP16, "highest", torch.float16, True),
-    ],
-)
-def test_precision_arms(arm, matmul, dtype, scaler):
-    assert arm.matmul_precision == matmul
-    assert arm.autocast_dtype is dtype
-    assert arm.uses_autocast is (dtype is not None)
-    assert arm.needs_scaler is scaler
-
-
-def test_only_tf32_relaxes_fp32_matmuls():
-    relaxed = [arm for arm in Precision if arm.matmul_precision != "highest"]
-    assert relaxed == [Precision.TF32]
-
-
-def test_precision_is_usable_as_a_cli_value():
-    assert Precision("bf16") is Precision.BF16
-    assert str(Precision.BF16) == "bf16"
-
-
-# --------------------------------------------------------------------------------
-# fit — the sweep
-# --------------------------------------------------------------------------------
-
-
-def test_least_squares_recovers_an_exact_line():
-    slope, intercept = 3_540_096, 28_312_128
-    xs = [5, 10, 15, 20, 25, 30]
-    ys = [slope * x + intercept for x in xs]
-    fit = least_squares(xs, ys)
-    assert fit.slope == pytest.approx(slope)
-    assert fit.intercept == pytest.approx(intercept)
-    assert fit.r_squared == pytest.approx(1.0)
-    assert fit.num_points == 6
-    assert fit.predict(7) == pytest.approx(slope * 7 + intercept)
-
-
-def test_least_squares_reports_a_poor_fit_as_poor():
-    fit = least_squares([1, 2, 3, 4], [1.0, 9.0, 2.0, 8.0])
-    assert fit.r_squared < 0.5
-
-
-def test_least_squares_needs_two_points():
-    with pytest.raises(ValueError, match="at least two points"):
-        least_squares([1], [1.0])
-
-
-def test_least_squares_handles_a_flat_line():
-    """Zero variance in y would divide by zero in the R^2 denominator."""
-    fit = least_squares([1, 2, 3], [5.0, 5.0, 5.0])
-    assert fit.slope == pytest.approx(0.0)
-    assert fit.r_squared == 1.0
-
-
-def test_pluck_searches_config_before_measurements():
-    entry = {
-        "preset": {"num_hidden_layers": 30},
-        "run": {"batch_size": 4},
-        "actual": {"peak_mib": 6621.9, "num_hidden_layers": 999},
-    }
-    assert pluck(entry, "num_hidden_layers") == 30.0, "preset outranks actual"
-    assert pluck(entry, "batch_size") == 4.0
-    assert pluck(entry, "peak_mib") == pytest.approx(6621.9)
-    assert pluck(entry, "absent") is None
-
-
-def test_pluck_ignores_non_numeric_values():
-    assert pluck({"run": {"precision": "bf16"}}, "precision") is None
-
-
-def test_pluck_tolerates_a_missing_section():
-    assert pluck({}, "anything") is None
-
-
-# --------------------------------------------------------------------------------
 # report — the table
 # --------------------------------------------------------------------------------
 
@@ -344,23 +257,3 @@ def test_table_reports_a_measurement_with_no_prediction():
 def test_table_does_not_divide_by_a_zero_prediction():
     text = report.table([report.Row("weight cache", 0.0, 0.0, ",.1f")])
     assert "n/a" in text
-
-
-def test_load_prediction_is_empty_when_absent(tmp_path):
-    assert report.load_prediction(tmp_path) == {}
-
-
-def test_load_prediction_reads_toml(tmp_path):
-    (tmp_path / "prediction.toml").write_text(
-        "num_params = 134515008\nbytes_per_param = 16.0\n"
-    )
-    prediction = report.load_prediction(tmp_path)
-    assert prediction["num_params"] == 134515008
-    assert prediction["bytes_per_param"] == 16.0
-    assert prediction.get("activations_mib") is None, "an omitted key is just absent"
-
-
-def test_fit_dataclass_is_immutable():
-    fit = Fit(1.0, 2.0, 1.0, 3)
-    with pytest.raises(AttributeError):
-        fit.slope = 5.0

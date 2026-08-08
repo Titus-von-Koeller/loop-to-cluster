@@ -1,20 +1,12 @@
-"""Where the lab writes its cache and its results.
+"""Where benchmark output lands.
 
 The root is the directory containing `pyproject.toml`, found by walking up from this
-file. That is independent of both the package layout and the working directory, which
-matters because three different things launch this code from three different places:
-`python steps/step1_training_loop/train.py` from the repo root, a notebook whose
-kernel starts in `notebooks/`, and a subprocess spawned by a comparison driver.
+file. That is independent of the working directory, which matters because a profiled
+script may be launched from the repo root or from its own directory.
 
-Resolving against `Path.cwd()` instead silently writes a *second* `runs/` under whichever
-directory the process was launched from, splitting a sweep across two directories with no
-error and leaving the fitted line missing half its points. Failing to find the root is
-loud; writing to the wrong root is not.
-
-In accelerate the same concern is handled by asking rather than inferring:
-`ProjectConfiguration(project_dir=...)` (accelerate/utils/dataclasses.py:916) takes
-the directory explicitly, and `Accelerator` places checkpoints and tracker logs
-under it. Inference is only safe here because this repo is the project.
+Resolving against `Path.cwd()` instead would silently write a second `bench/` under
+whichever directory the process started in, splitting a comparison across two places
+with no error. Failing to find the root is loud; writing to the wrong root is not.
 """
 
 import os
@@ -27,26 +19,22 @@ def _find_root() -> Path:
     for directory in Path(__file__).resolve().parents:
         if (directory / "pyproject.toml").is_file():
             return directory
-    # Installed non-editable: there is no repo to find. The cwd is a guess, but an
-    # explicit L2C_ROOT is the documented answer for that case.
     return Path.cwd()
 
 
 ROOT = _find_root()
 
-#: Tokenized corpus. Written once, then every run is offline and instant.
-CACHE_DIR = Path(os.environ.get("L2C_CACHE") or ROOT / ".cache")
-
-#: One JSON file per run, named by the configuration that produced it. Both the
-#: permanent record and the comparison cache — see `l2c.harness.runs`.
-RUNS_DIR = Path(os.environ.get("L2C_RUNS") or ROOT / "runs")
+#: One JSON file per run, plus the figures generated from them.
+BENCH_DIR = Path(os.environ.get("L2C_BENCH") or ROOT / "bench")
 
 
-def cache_dir() -> Path:
-    CACHE_DIR.mkdir(parents=True, exist_ok=True)
-    return CACHE_DIR
+def results_dir() -> Path:
+    path = BENCH_DIR / "results"
+    path.mkdir(parents=True, exist_ok=True)
+    return path
 
 
-def runs_dir() -> Path:
-    RUNS_DIR.mkdir(parents=True, exist_ok=True)
-    return RUNS_DIR
+def figures_dir() -> Path:
+    path = BENCH_DIR / "figures"
+    path.mkdir(parents=True, exist_ok=True)
+    return path

@@ -13,8 +13,7 @@ Predicting them analytically would turn a check into a curve fit. `l2c.harness.l
 measures them instead, and the interesting work is explaining the gap.
 
 What is deliberately *not* here: deriving the parameter count from the config. That
-derivation is the exercise. Write it by hand in the step's NOTES.md and prediction.toml,
-and the harness checks it against `sum(p.numel())`.
+derivation is the exercise, and the harness only checks it against `sum(p.numel())`.
 
 In accelerate: there is no predictive counterpart. Mixed precision is configured
 declaratively — `Accelerator(mixed_precision="bf16")` — and what that *costs* is left
@@ -25,8 +24,7 @@ model's `forward` in an autocast context rather than converting any parameter:
     model.forward = convert_outputs_to_fp32(autocast_context(model_forward_func))
 
 Parameters stay in fp32 and autocast casts op *inputs* on the fly. Predicting that
-`mixed_precision="bf16"` halves your optimizer state is a prediction that should fail,
-and watching it fail is the point of step 2.
+`mixed_precision="bf16"` halves your optimizer state is a prediction that should fail.
 """
 
 import math
@@ -134,9 +132,8 @@ def autocast_weight_cache(model: nn.Module, dtype: torch.dtype) -> WeightCache:
     rather than replacing them.
 
     For a model whose parameters are essentially all in Linear layers, this is
-    2 bytes added to 16, so peak model states rise by almost exactly **one eighth**.
-    That is the sharpest prediction in step 2, and it is the one people get backwards:
-    mixed precision is widely assumed to shrink model states, and it does the opposite.
+    2 bytes added to 16, so peak model states rise by almost exactly **one eighth** —
+    the opposite of the usual assumption that mixed precision shrinks model states.
 
     Whether *total* memory rises or falls then depends on the regime, because
     activations do shrink. Below roughly a few hundred tokens per step the cache
@@ -151,32 +148,13 @@ def autocast_weight_cache(model: nn.Module, dtype: torch.dtype) -> WeightCache:
     )
 
 
-def exact(num_params: int, vocab_size: int, *, optimizer: str = "adamw") -> dict[str, float]:
-    """The bucket arithmetic, keyed as a report compares it.
-
-    Deliberately narrow. These distribute a *measured* parameter count across the three
-    buckets, so they check the 4/4/8 rule rather than anything a step asks for. Anything
-    the exercise is to derive — the parameter count itself, bytes per parameter,
-    activations, peak — is absent on purpose: a prediction the harness supplies would
-    confirm itself. A hand-written `prediction.toml` overrides any key here.
-    """
-    states = model_states(num_params, optimizer=optimizer)
-    return {
-        "params_mib": states.param_bytes / 1024**2,
-        "gradients_mib": states.grad_bytes / 1024**2,
-        "optimizer_states_mib": states.optimizer_bytes / 1024**2,
-        "model_states_mib": states.total_bytes / 1024**2,
-        "initial_loss": expected_initial_loss(vocab_size),
-    }
-
-
 def expected_initial_loss(vocab_size: int) -> float:
     """ln(V): a randomly initialized LM is uniform over the vocabulary.
 
     The cheapest correctness check in the lab. Cross-entropy against a uniform
-    distribution over V classes is ln(V), so a fresh model must start there — 10.8027
-    for SmolLM2's 49,152-token vocabulary. If step 1 does not begin near it, the loss
-    computation is wrong and every downstream number is noise.
+    distribution over V classes is ln(V), so a fresh model must start there. A script
+    that does not begin near it has its model, tokenizer or loss miswired, and every
+    number downstream of that is noise.
 
     It must be read from a forward pass on *pristine* weights. One AdamW step moves
     every parameter by roughly the learning rate, which is small enough that a

@@ -1,6 +1,8 @@
-"""Measurement, prediction and reporting. Shared by every step; never edited in a lesson.
+"""Measurement primitives, shared so that numbers stay comparable across scripts.
 
-If measurement changes between steps, earlier results stop being comparable to later
-ones and the whole exercise collapses. That invariant is the reason this package
-exists separately from `steps/`.
+Consistency is the whole reason this exists. A benchmark of mixed precision against a
+baseline means nothing unless both were measured the same way, so the measurement code
+is deliberately shared even though the scripts it measures are deliberately not.
+
+`PROFILING.md` is the contract: what to measure, in what order, and the schema to emit.
 """

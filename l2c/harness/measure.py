@@ -1,4 +1,4 @@
-"""Measurement primitives. Shared by every step so that numbers stay comparable.
+"""Measurement primitives. Shared by every script so that numbers stay comparable.
 
 Three rules this module exists to enforce.
 
