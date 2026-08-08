@@ -1,4 +1,4 @@
-"""Ground-truth every claim the wiki makes about optimizers, init and norms.
+"""Ground-truth every claim the wiki makes about the model, its optimizer and its memory.
 
 Run: cd /home/titus/src/loop-to-cluster && pixi run python docs/_wiki_build/verify_facts.py
 """
@@ -113,4 +113,38 @@ for k, v in first.items():
 pg = sd["param_groups"][0]
 print(f"  param_group keys: {sorted(pg.keys())}")
 print(f"  params field    : list of {len(pg['params'])} int indices")
+
+# ------------------------------------------------- the logits reference
+# Cross-entropy's backward needs its internal log-softmax output, not the logits
+# passed in, so a Python name is the only thing keeping the largest tensor in the
+# step alive across backward(). Needs a CUDA device to measure.
+print("\n### Holding a reference to the logits through backward()")
+if not torch.cuda.is_available():
+    print("  no CUDA device — skipped")
+else:
+    B, S, MIB = 4, 1024, 1024**2
+    cuda_model = build_model(SMOLLM2_135M, seed=0).cuda()
+    cuda_ids = torch.randint(0, V, (B, S), device="cuda")
+
+    def _peak(*, hold: bool) -> float:
+        cuda_model.zero_grad(set_to_none=True)
+        torch.cuda.empty_cache()
+        torch.cuda.reset_peak_memory_stats()
+        out = cuda_model(input_ids=cuda_ids)
+        step_loss = causal_lm_loss(out.logits, cuda_ids)
+        if not hold:
+            del out
+        step_loss.backward()
+        torch.cuda.synchronize()
+        return torch.cuda.max_memory_allocated() / MIB
+
+    _peak(hold=True)  # settle the allocator before measuring
+    held, freed = _peak(hold=True), _peak(hold=False)
+    nominal = B * S * V * 4 / MIB
+    print(f"  logits {B} x {S} x {V} x 4 B   = {nominal:>9,.0f} MiB")
+    print(f"  peak, reference held        = {held:>9,.1f} MiB")
+    print(f"  peak, reference dropped     = {freed:>9,.1f} MiB")
+    print(f"  cost of the reference       = {held - freed:>9,.1f} MiB"
+          f"  ({(held - freed) / nominal:.2f} x the tensor)")
+
 print("=" * 62)
