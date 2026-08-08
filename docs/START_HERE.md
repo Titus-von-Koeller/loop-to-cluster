@@ -27,10 +27,19 @@ green, and there is no work in progress.
    under ~50 lines, self-contained. If he asks for help, act as a documentation lookup —
    name the torch APIs, describe the shape, link the docs. Do not write it for him.
 
-2. **Build the skill** at `.claude/skills/profile-script/SKILL.md`. It takes a
-   `scripts/NN_topic.py` and produces `scripts/NN_topic_profiled.py` following
-   `PROFILING.md` exactly, runs it, and writes JSON to `bench/results/` plus a figure to
-   `bench/figures/`. The twin is regenerated, never hand-edited.
+2. **Build the skill** at `.claude/skills/profile-script/SKILL.md` — project scope, so it
+   is committed with the repo. It takes a `scripts/NN_topic.py` and produces
+   `scripts/NN_topic_profiled.py` following `PROFILING.md` exactly, runs it, and writes
+   JSON to `bench/results/` plus a figure to `bench/figures/`. The twin is regenerated,
+   never hand-edited.
+
+   A skill directory may hold supporting files beside `SKILL.md`. Put the profiled-twin
+   template there, so generating one is filling in slots rather than following prose from
+   memory — that is what keeps the measurement identical across topics.
+
+   `.claude/skills/` does not exist yet. Claude Code watches an existing skills directory
+   live, but creating the top-level one mid-session needs a restart before `/profile-script`
+   is available.
 
 3. **Run it on the baseline** and check the signals in `PROFILING.md`: parameter count,
    initial loss against `ln(V)`, loss decreasing, peak memory against the prediction.
