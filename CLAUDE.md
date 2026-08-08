@@ -1,122 +1,67 @@
 # CLAUDE.md — loop-to-cluster
 
-## Whose work is whose
+Titus is learning distributed training to onboard onto HuggingFace **accelerate**. The
+method is *predict the numbers, then measure them, then explain the gap.* One concept per
+script, from a single-GPU loop to a sharded multi-GPU one.
 
-| Claude writes | Titus writes |
+**The scripts are for reading, not for shipping.** Abstraction that would be a virtue in
+library code is a defect here: it turns one linear read into a jump-and-return, and it
+couples experiments that must be independently modifiable.
+
+## Who writes what
+
+| Titus | Claude |
 | --- | --- |
-| `l2c/`, `tests/`, step scaffolding | `prediction.toml` |
-| argparse, dataloaders, reporting, JSON | `NOTES.md` |
-| the ~80% of a step file that is plumbing | the 5–15 concept lines per step |
+| `scripts/NN_topic.py` — the training loop, by hand | `scripts/NN_topic_profiled.py` — the measured twin |
+| each topic's modification to the loop | `l2c/` harness, plots, JSON, README, repo hygiene |
 
-The concept lines are the ones the lesson is named after — the autocast wrapper, the
-`GradScaler`, the unscale-before-clip ordering; later the microstep loop and `no_sync`.
-Scaffold them as `NotImplementedError` with a comment saying what belongs there, never
-the code itself.
+**If asked to write or complete a training loop, don't.** Hand-writing it is the exercise,
+not an inefficiency to remove. Offer the documentation-lookup form instead: name the torch
+APIs, link the docs, describe the shape. Never fill in a skeleton left deliberately blank.
 
-**Never fill in a prediction, and never write in `NOTES.md`.** Deriving the number *is*
-the exercise. If a number is already known, do not state it — not in prose, not in a
-commit message, not as a hint. Offer a fresh configuration to predict instead.
+Never one-shot a whole script. Work incrementally and explain each change.
+
+## The structural rule
+
+A script in `scripts/` imports nothing from this repo — not `l2c`, not another script.
+Duplication between scripts is correct: it is what lets one change without disturbing the
+baseline it is compared against. `tests/test_boundary.py` enforces this.
+
+Generated `*_profiled.py` twins are exempt, and share `l2c/` deliberately — identical
+measurement is the only thing that makes two topics comparable. See `PROFILING.md`.
 
 ## Depth ceiling
 
-Explain at the level of the public torch API and its documented behaviour. State *what*
-an API does and what it costs. Do not trace into torch or transformers source to explain
-*how* it is implemented.
+Explain at the level of the public torch API and its documented behaviour: what a call
+does and what it costs, not how it is implemented.
 
-Exception: accelerate source is always in scope — file and line encouraged. That is the
-library being learned; torch internals are not.
-
-`NOTES.md` prose: 400 words per step, hard cap.
+**accelerate source is always in scope, and is the exception that matters.** Read it
+before claiming anything about it — file and line, or do not say it. The same goes for
+FSDP, DeepSpeed and NCCL semantics: cite the source or flag it as unverified.
 
 ## Environment
 
-Python 3.14 + PyTorch 2.13 (CUDA 13) managed by pixi. There is no system Python on this
-host, so a bare `python3` fails.
+Two GPUs. **Always `CUDA_VISIBLE_DEVICES=0`** — GPU 1 drives a display, so its clocks move
+with the compositor and its memory starts several GiB down.
 
-**Name the project directory explicitly, in the same command:**
-
-```bash
-cd /home/titus/src/loop-to-cluster && pixi run python -c '...'
-```
-
-- **Never bare `pixi run`** from a parent directory: manifest lookup walks *upward* and
-  will silently bind a different workspace rather than erroring. `--manifest-path <abs>`
-  is the alternative when you cannot `cd`.
-- **Do not rely on ambient direnv activation.** It is applied at shell-init, so
-  `cd X && cmd` activates for the shell's *starting* directory, and an agent's cwd can
-  reset between commands. Both fail silently with a working-but-wrong environment.
-- The inline `cd` above is safe because `pixi run` resolves its manifest at exec time.
-- Need `nvcc`, `CUDA_PATH` or nix's `libstdc++` as well? Use
-  `direnv exec <abs-dir> <cmd>`, which supplies both layers from any cwd. Plain
-  torch/CUDA work does not need it — the wheels bundle their CUDA userspace and
-  `libcuda.so.1` comes from the system driver.
-
-`.envrc` is untracked (machine-local) and carries a `PATH_add "$CONDA_PREFIX/bin"` line
-after the pixi hook. That works around `use flake` clobbering the bin directory
-`pixi shell-hook` prepends; see ADR 003 in `~/dotfiles/docs/adr/`. It is a convenience
-only — the explicit invocations above are the dependable path.
-
-## Jupyter notebooks
-
-- Use the **Jupyter MCP** for all `.ipynb` operations: read, edit, insert, delete,
-  execute.
-- Do **not** use the built-in `NotebookEdit` tool. It writes cell source as a single JSON
-  string, which produces whole-cell git diffs, and it edits the file behind JupyterLab's
-  back — conflicting with the collaborative ydoc session the MCP server operates on.
-- `.claude/settings.json` denies `NotebookEdit`, so this is enforced rather than merely
-  requested. Configuration beats instruction: an instruction has to be noticed on every
-  call, a deny rule does not.
-
-### Running the stack
-
-JupyterLab must be running for the MCP server to reach anything:
+**Always name the project directory in the same command:**
 
 ```bash
-pixi run jupyter lab --no-browser --port 8888 \
-  --ServerApp.ip 127.0.0.1 \
-  --IdentityProvider.token "$(cat .jupyter-token)"
+cd /home/titus/src/loop-to-cluster && pixi run python ...
 ```
 
-Bound to `127.0.0.1` on purpose. Upstream docs use `--ip 0.0.0.0`, which is only needed
-when the MCP server runs in Docker; running it locally means Lab never has to listen on
-the network.
+Never a bare `pixi run` from a parent directory: manifest lookup walks *upward* and will
+silently bind a different workspace rather than erroring. Do not rely on ambient direnv
+activation either — it applies at shell-init, so an agent's cwd can reset between commands.
+Both fail silently with a working-but-wrong environment. Use `direnv exec <abs-dir> <cmd>`
+if you also need `nvcc` or nix's `libstdc++`.
 
-`.jupyter-token` is a throwaway local token and is gitignored. The MCP server is
-registered at **user** scope, so the token lives in `~/.claude.json` and is never
-committed. If Lab restarts with a new token, re-register:
+Python 3.14, torch 2.13 (CUDA 13 wheels from PyPI), transformers 5.x, accelerate 1.14.
+`accelerate` is installed but imported by nothing — it is there so claims about it can be
+checked against source.
 
-```bash
-claude mcp remove jupyter
-claude mcp add jupyter --scope user \
-  -e JUPYTER_URL=http://127.0.0.1:8888 \
-  -e JUPYTER_TOKEN="$(cat .jupyter-token)" \
-  -- "$PWD/.pixi/envs/default/bin/jupyter-mcp-server" start --transport stdio
-```
+US spelling. Ruff-clean (`E,F,I,UP,B,SIM,RUF`, line length 95). Code documents itself and
+never references the conversation that produced it.
 
-The MCP command points at the environment's binary directly rather than going through
-`pixi run`, so nothing can write to stdout and corrupt the stdio protocol channel.
-
-`DOCUMENT_ID` is deliberately unset: with it omitted, notebooks can be listed and chosen
-per request. When set, it is a path relative to Lab's `root_dir`, which is this
-directory.
-
-### Corrections to older setup guides
-
-Verified on 2026-08-04 against `jupyter-mcp-server` 1.2.0:
-
-- **A subcommand is required**: `start --transport stdio`. A bare `jupyter-mcp-server`
-  prints help and exits, so it never starts a server.
-- **Do not swap `pycrdt` for `datalayer_pycrdt`.** That step is stale and actively
-  harmful: `datalayer_pycrdt` is frozen at 0.12.17 while `jupyter-nbmodel-client`
-  requires `pycrdt>=0.12.50`. Datalayer's own current quick start installs upstream
-  `pycrdt`.
-- **Upstream version pins are stale** (jupyterlab 4.4.1, jupyter-collaboration 4.0.2).
-  Unpinned resolves to 4.6.2 / 5.0.0, which works — `jupyter-mcp-server` itself depends
-  on `jupyter-collaboration` unpinned.
-- **`ALLOW_IMG_OUTPUT` is not in the 1.2 interface.** Setting it does nothing.
-- `jupyter-collaboration` does not need installing separately; `jupyter-mcp-server`
-  depends on it.
-
-To confirm the collaboration extension is live, check that
-`/api/collaboration/session/x` returns **405** (route registered, wrong method) rather
-than 404.
+`docs/_wiki_build/` is owned by a separate effort and imports `l2c.common.model`. Leave
+both alone unless asked. Jupyter setup lives in `docs/JUPYTER.md`.

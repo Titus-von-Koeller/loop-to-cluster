@@ -68,11 +68,13 @@ def fig_textbook_error():
     for b, v in zip(bars, vals):
         ax.text(b.get_x() + b.get_width() / 2, v + 2.6e6, f"{v:,}",
                 ha="center", fontsize=11, color=INK, fontweight="bold")
-    ax.annotate("", xy=(1, P_TOTAL), xytext=(1, P_TEXTBOOK),
+    # Gap arrow and caption sit to the right of the bars, clear of the value labels.
+    ax.annotate("", xy=(1.26, P_TOTAL), xytext=(1.26, P_TEXTBOOK),
                 arrowprops=dict(arrowstyle="<->", color=ROSE, lw=2))
-    ax.text(1.09, (P_TOTAL + P_TEXTBOOK) / 2,
+    ax.text(1.34, (P_TOTAL + P_TEXTBOOK) / 2,
             f"+9.84%\n{P_TEXTBOOK - P_TOTAL:,} too many\n← entirely GQA",
-            fontsize=10, color=ROSE, va="center", fontweight="bold")
+            fontsize=10, color=ROSE, va="center", ha="left", fontweight="bold")
+    ax.set_xlim(-0.55, 2.25)
     ax.set_ylim(0, P_TEXTBOOK * 1.16)
     ax.set_yticks([])
     ax.grid(False)
@@ -189,7 +191,7 @@ def fig_fp16_underflow():
     ax.hist(g, bins=bins, color=BLUE_ORDINAL[1], edgecolor="none")
     fp16_normal, fp16_sub = 6.1e-5, 5.96e-8
     top = ax.get_ylim()[1]
-    ax.set_ylim(0, top * 1.02)
+    ax.set_ylim(0, top * 1.42)  # headroom so the threshold labels stay inside the axes
     ax.axvline(fp16_normal, color=ROSE, lw=2)
     ax.axvline(fp16_sub, color=ROSE, lw=2, ls=(0, (4, 3)))
     ax.axvspan(1e-12, fp16_sub, color=ROSE, alpha=0.11)
