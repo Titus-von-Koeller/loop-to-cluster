@@ -10,15 +10,28 @@ figures illustrate a shape and carry no data claim.
 import os
 
 import matplotlib
+
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
-from matplotlib.patches import Rectangle
-
 from figstyle import (
-    BASELINE, BLUE, BLUE_ORDINAL, GOLD, GRID, INK, INK_2, MUTED, NEUTRAL,
-    ROSE, SURFACE, despine, note, save, title, use_house_style,
+    BASELINE,
+    BLUE,
+    BLUE_ORDINAL,
+    GOLD,
+    INK,
+    INK_2,
+    MUTED,
+    NEUTRAL,
+    ROSE,
+    SURFACE,
+    despine,
+    note,
+    save,
+    title,
+    use_house_style,
 )
+from matplotlib.patches import Rectangle
 
 use_house_style()
 OUT = os.path.dirname(os.path.abspath(__file__)) + "/figures"
@@ -65,16 +78,17 @@ def fig_textbook_error():
     vals = [P_TEXTBOOK, P_TOTAL]
     bars = ax.bar(names, vals, color=[NEUTRAL, BLUE], width=0.44,
                   edgecolor=SURFACE, linewidth=2)
-    for b, v in zip(bars, vals):
-        ax.text(b.get_x() + b.get_width() / 2, v + 2.6e6, f"{v:,}",
+    for b, v in zip(bars, vals, strict=True):
+        ax.text(b.get_x() + b.get_width() / 2, v + 5.0e6, f"{v:,}",
                 ha="center", fontsize=11, color=INK, fontweight="bold")
-    # Gap arrow and caption sit to the right of the bars, clear of the value labels.
-    ax.annotate("", xy=(1.26, P_TOTAL), xytext=(1.26, P_TEXTBOOK),
-                arrowprops=dict(arrowstyle="<->", color=ROSE, lw=2))
-    ax.text(1.34, (P_TOTAL + P_TEXTBOOK) / 2,
+    # Dashed guides at both bar tops bound the gap the caption quantifies. The span is
+    # too short for arrowheads, which would overlap each other at this scale.
+    for y in (P_TOTAL, P_TEXTBOOK):
+        ax.plot([0.24, 1.30], [y, y], color=ROSE, lw=0.9, ls=(0, (3, 3)), zorder=1)
+    ax.text(1.38, (P_TOTAL + P_TEXTBOOK) / 2,
             f"+9.84%\n{P_TEXTBOOK - P_TOTAL:,} too many\n← entirely GQA",
             fontsize=10, color=ROSE, va="center", ha="left", fontweight="bold")
-    ax.set_xlim(-0.55, 2.25)
+    ax.set_xlim(-0.55, 2.6)
     ax.set_ylim(0, P_TEXTBOOK * 1.16)
     ax.set_yticks([])
     ax.grid(False)
@@ -261,7 +275,7 @@ def fig_loss_anatomy():
          "A spike that never recovers.\nLR too high, or fp16 overflow."),
     ]
 
-    for ax, (name, yv, color, flag, caption) in zip(axes, panels):
+    for ax, (name, yv, color, flag, _) in zip(axes, panels, strict=True):
         ax.axhline(lnV, color=BASELINE, lw=1.0, ls=(0, (4, 3)), zorder=1)
         ax.plot(x, yv, color=color, lw=2.3, zorder=3)
         if name == "Divergence":
@@ -282,7 +296,7 @@ def fig_loss_anatomy():
     axes[0].set_yticks([2, lnV], ["2", "ln(V) = 10.80"])
     axes[0].set_ylabel("loss")
 
-    for ax, (_, _, _, _, caption) in zip(axes, panels):
+    for ax, (_, _, _, _, caption) in zip(axes, panels, strict=True):
         box = ax.get_position()
         fig.text(box.x0, box.y0 - 0.055, caption, fontsize=9.3,
                  color=INK_2, va="top", ha="left")
@@ -354,8 +368,10 @@ def fig_zero_stages():
     params = [4, 4, 4, 4 / N]
     grads = [4, 4, 4 / N, 4 / N]
     optim = [8, 8 / N, 8 / N, 8 / N]
-    b1 = ax.bar(stages, params, color=BLUE_ORDINAL[3], width=0.5, edgecolor=SURFACE, linewidth=2, label="parameters")
-    b2 = ax.bar(stages, grads, bottom=params, color=BLUE_ORDINAL[1], width=0.5, edgecolor=SURFACE, linewidth=2, label="gradients")
+    ax.bar(stages, params, color=BLUE_ORDINAL[3], width=0.5,
+           edgecolor=SURFACE, linewidth=2, label="parameters")
+    ax.bar(stages, grads, bottom=params, color=BLUE_ORDINAL[1], width=0.5,
+           edgecolor=SURFACE, linewidth=2, label="gradients")
     ax.bar(stages, optim, bottom=np.add(params, grads), color=GOLD, width=0.5,
            edgecolor=SURFACE, linewidth=2, label="optimizer state (m, v)")
     for i in range(4):

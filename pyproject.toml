@@ -30,3 +30,9 @@ target-version = "py314"
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B", "SIM", "RUF"]
+
+[tool.ruff.lint.per-file-ignores]
+# The wiki figures carry their titles, subtitles and footnotes as literal strings, and
+# the verification scripts print aligned tables. Wrapping either to 95 columns splits
+# sentences mid-clause for no reader's benefit.
+"docs/_wiki_build/*.py" = ["E501"]
