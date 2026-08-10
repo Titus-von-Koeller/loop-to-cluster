@@ -145,13 +145,11 @@ form. United States spelling. Never reference the conversation that produced the
 start to — a second copy drifts, and a stale one eventually gets published over the live
 wiki by someone who mistakes it for the source. `docs/BOOK.md` holds invariants, never text.
 
-**Titus edits the wiki too.** Never restore, move or delete anything you did not add
-yourself. A page that differs from what you expected has been *edited*, not damaged: say
-"this changed" and ask. Phrasing that looks clumsy may be a deliberate cut.
-
-**Retrieval questions and *Interrogate this section* blocks are Titus's.** Producing them is
-the exercise. Leave the block present with its gaps flagged; never fill one in. Prose,
-structure, figures and corrections are yours.
+**Titus edits the wiki too.** A page that differs from what you expected has been *edited*,
+not damaged — never revert on that basis. Replacing a chapter wholesale is fine and expected;
+what needs surfacing first is any passage that reads as *his* edit rather than earlier Claude
+prose. Name it, say why you think he wrote it, and confirm before dropping it. Phrasing that
+looks clumsy may be a deliberate cut.
 
 **Draft, show the draft, publish only on approval.** Never overwrite an existing page without
 reading its current state first.
