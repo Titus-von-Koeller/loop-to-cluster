@@ -133,11 +133,14 @@ rather than out of restraint.
 
 ## Voice and mechanics
 
-Textbook register: general, unhurried, model-agnostic. Never name this repo's files, never
-quote a measurement taken here, never address the reader as someone mid-task.
+**`docs/BOOK.md` has a `## Prose` section. It is binding, and it is specific** — sentence
+construction, banned hedges, emphasis rationing, the failure register, and five specimens from
+the existing book to match. Read it before drafting, not after.
 
-Expand every acronym on first use — "Fully Sharded Data Parallel (FSDP)" — then use the short
-form. United States spelling. Never reference the conversation that produced the chapter.
+Beyond it: never name this repo's files, never quote a measurement taken here, never address
+the reader as someone mid-task. Expand every acronym on first use — "Fully Sharded Data
+Parallel (FSDP)" — then use the short form. United States spelling. Never reference the
+conversation that produced the chapter.
 
 ## Notion mechanics
 
@@ -150,6 +153,11 @@ not damaged — never revert on that basis. Replacing a chapter wholesale is fin
 what needs surfacing first is any passage that reads as *his* edit rather than earlier Claude
 prose. Name it, say why you think he wrote it, and confirm before dropping it. Phrasing that
 looks clumsy may be a deliberate cut.
+
+**Who writes what.** Prose, structure, figures, corrections and the *Interrogate this section*
+blocks are yours. **Retrieval questions are Titus's** — producing an answer cold is what
+consolidates, and a pre-written answer converts recall into recognition. Write the heading,
+flag the gaps, and leave them.
 
 **Draft, show the draft, publish only on approval.** Never overwrite an existing page without
 reading its current state first.

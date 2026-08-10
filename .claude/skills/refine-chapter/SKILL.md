@@ -22,9 +22,9 @@ before removing it. Everything else you cut on your own judgment. A page that di
 what you expected has been *edited*, not damaged — "this broke" is the wrong reading and
 reverting is the wrong reflex. Phrasing that looks clumsy may be a deliberate cut.
 
-Note that `docs/_wiki_build/README.md` states a stricter rule — never move or delete anything
-you did not add. That file is owned by a separate effort and has not been updated; this skill
-carries the current instruction.
+**Retrieval questions are Titus's.** Producing an answer cold is the mechanism that
+consolidates, so never write or complete one — leave the heading with its gaps flagged. The
+*Interrogate this section* blocks are yours, along with the prose.
 
 ## Read before you judge. All of it.
 
@@ -94,8 +94,11 @@ real later chapter?
 
 ### 5. Prose
 
-Last, and least. Roadmap openings, terminal deflation, arguing with its own centerpiece,
-unexpanded acronyms, United States spelling, conversational residue.
+Last, and least — but against a specific standard, not taste. `docs/BOOK.md`'s `## Prose`
+section is binding: sentence construction, banned hedges, unquantified comparatives, emphasis
+rationing, the failure register, and specimens to match. Also roadmap openings, terminal
+deflation, arguing with its own centerpiece, unexpanded acronyms, United States spelling,
+conversational residue.
 
 ## Rules
 

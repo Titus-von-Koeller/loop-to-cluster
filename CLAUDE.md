@@ -69,5 +69,16 @@ own paths explicitly — `git add <paths>`, never `git add -A` from the root —
 whole-worktree commit sweeps another session's in-flight work into your commit under an
 unrelated subject.
 
-`docs/_wiki_build/` is owned by a separate effort and imports `l2c.common.model`. Leave
-both alone unless asked. Jupyter setup lives in `docs/JUPYTER.md`.
+## The book
+
+The textbook is the Notion wiki; this repo is its exercises. `docs/BOOK.md` holds the
+invariants both depend on — the controlling idea, the ledger every chapter modifies, the
+chapter contract, the prose style. Notion is the source of truth for the book: nothing here
+mirrors page text and nothing may start to. `docs/_wiki_build/` holds the verifiers and
+figure generators, and imports `l2c.common.model`, so that module must keep working.
+
+Three authoring modes, three skills, and confusing them is expensive: `write-chapter` and
+`refine-chapter` for the book, `explain` for unblocking Titus mid-exercise, `profile-script`
+for measurement. `docs/BOOK.md` has the table.
+
+Jupyter setup lives in `docs/JUPYTER.md`.

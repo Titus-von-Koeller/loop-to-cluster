@@ -13,13 +13,18 @@ embeds.
 
 Rules earned the hard way. Each one cost a real mistake.
 
-- **Titus edits this wiki too.** Never restore, move, or delete anything you did not add
-  yourself. A page that differs from what you expected has been *edited*, not damaged — say
-  "this changed" and ask, rather than "this broke" and revert. Phrasing you think is clumsy
-  may be a deliberate cut.
-- **Who writes what.** Prose, structure, figures and corrections are Claude's. Retrieval
-  questions and *Interrogate this section* blocks are Titus's — producing those is the
-  exercise, so leave the gaps flagged rather than filling them.
+- **Titus edits this wiki too.** A page that differs from what you expected has been
+  *edited*, not damaged — say "this changed", never "this broke", and never revert on that
+  basis. Cutting and rewriting are wanted; the one gate is that before removing a passage you
+  ask whether it reads as *his* edit rather than as earlier Claude prose, and if so name it,
+  say why you think he wrote it, and confirm before dropping that passage. Phrasing you think
+  is clumsy may be a deliberate cut.
+- **Who writes what.** Prose, structure, figures, corrections and the *Interrogate this
+  section* blocks are Claude's — those blocks are dense factual reference (what a thing costs,
+  who owns it, how it fails silently) that requires reading source, so splitting authorship
+  mid-page would leave a visible seam. **Retrieval questions are Titus's.** Producing an
+  answer cold is the mechanism that consolidates; a pre-written answer converts recall into
+  recognition, which does almost nothing. Leave the heading with its gaps flagged.
 - **Open the figures; do not read their captions.** The PNGs are in `figures/`. Two shipped
   with text collisions that no caption could reveal, and three judgements made from captions
   alone turned out backwards.

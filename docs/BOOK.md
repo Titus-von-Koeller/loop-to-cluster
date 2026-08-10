@@ -9,9 +9,16 @@ one eventually gets published over the live wiki by someone who mistakes it for 
 Build artifacts — verifiers and figures — live in `docs/_wiki_build/`, whose README carries
 the editing rules.
 
-**Titus edits the wiki too.** Prose, structure, figures and corrections are Claude's.
-Retrieval questions and *Interrogate this section* blocks are Titus's — producing those is
-the exercise, so leave the gaps flagged rather than filling them.
+**Titus edits the wiki too.** A page that differs from what was expected has been *edited*,
+not damaged. Cutting and rewriting are wanted; the gate is that a passage which reads as his
+edit rather than as earlier Claude prose gets named and confirmed before removal.
+
+**Who writes what.** Prose, structure, figures, corrections and the *Interrogate this section*
+blocks are Claude's — those blocks are dense factual reference requiring source reading, and
+splitting authorship mid-page leaves a visible seam. **Retrieval questions are Titus's.**
+Producing an answer cold is the mechanism that consolidates; a pre-written answer converts
+recall into recognition, which does almost nothing. Write the heading, flag the gaps, leave
+them.
 
 Chapters are authored with the `write-chapter` skill and revised with `refine-chapter`.
 Neither may re-derive what is written here; if an invariant is wrong, change this file first
@@ -160,6 +167,95 @@ Every chapter has exactly:
 
 A chapter missing any of these is unfinished. A chapter with two of any of them is two
 chapters.
+
+Plus a *Retrieval practice* heading with its questions left to Titus, and an *Interrogate this
+section* fold per major section, written by Claude.
+
+## Prose
+
+### Register
+
+The anchor is *Designing Data-Intensive Applications*: a competent engineer reading about an
+unfamiliar system, taught through mechanisms, tradeoffs and failure modes, written to still be
+true in five years. Not a tutorial — no hand-holding, no "now let's try". Not a paper — no
+density for its own sake. Not a blog post — no personality, no anecdote, no first person.
+
+### Sentences
+
+**Plain and declarative.** Complexity belongs in the ideas, not the syntax. If a sentence must
+be re-read to be parsed, rewrite it. Default short; vary length for rhythm, not for weight.
+
+**Present tense, active voice.** Passive only when the actor is genuinely unknown or
+irrelevant. "Autograd retains the input", not "the input is retained".
+
+**Second person for what the reader does, third for what the machine does.** "You call
+`backward()`; autograd walks the graph." Never "we" — there is no we.
+
+**The sentence doing the most work goes first in its paragraph.**
+
+**One claim per paragraph.** Two claims is two paragraphs.
+
+### Words
+
+**Name a thing once and never vary it.** If it is the ledger, it is never "the state table"
+four paragraphs later. Elegant variation is a bug in technical prose: the reader cannot tell
+whether a new name means a new thing.
+
+**Delete metadiscourse.** "In this section", "as mentioned above", "it is important to note
+that", "it is worth noting". If it is important, its presence says so.
+
+**Hedges must carry information.** "Generally", "typically", "usually" are permitted only when
+the next clause says when the exception applies. "Somewhat", "arguably", "relatively" are
+banned outright.
+
+**No unquantified comparatives.** "Cheaper", "faster", "more stable" are unfinished sentences.
+Attach the quantity, name the axis, or cut the claim.
+
+**Ration emphasis.** Bold marks the one sentence in a section a reader must not miss. Italic
+marks a term at first definition. If everything is bold, nothing is.
+
+**Analogies are load-bearing and disposable.** One per concept, cashed out into mechanism in
+the same breath, then dropped. Never extended across paragraphs, never returned to.
+
+**Numbers as digits, units always, precision matched to what is known.** "About three forward
+passes", not "3.02 forward passes".
+
+**No jokes, no exclamation marks.** Rhetorical questions only where the question is real — the
+hole a chapter closes on is a real question.
+
+### Registers that are already right
+
+From the existing book. Match these.
+
+Analogy, cashed and dropped in one clause:
+
+> Read it as *surprise*: confident and right scores near 0, confident and wrong scores
+> arbitrarily high.
+
+Compression — one sentence carrying the whole insight:
+
+> The feature and the footgun are the same line of code.
+
+A claim, not a description of a claim:
+
+> A falling loss is evidence that the plumbing runs, not that it is correct.
+
+A rule the reader carries out of the chapter:
+
+> Averages of averages are not averages.
+
+**The failure register** — second person, present tense, ordered events, closing on what the
+reader will wrongly blame. Use this shape every time a silent failure is described:
+
+> Nothing errors and the training is correct — you simply need a gigabyte you should not, and
+> the first thing you will doubt is the arithmetic on *Memory and compute*.
+
+### The anti-specimen
+
+> Cheaper, one fewer reduction, and empirically just as stable.
+
+Three unquantified comparatives, no actor, no failure, nothing the reader can check. Every rule
+above exists to prevent that sentence.
 
 ## The disclosure rule
 
