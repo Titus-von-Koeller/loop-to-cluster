@@ -43,9 +43,31 @@ explanations attach to fear, which is why they survive.
 stable, significant, cheaper — are unfinished sentences. If you can't produce a number, say
 so in those words: *"I believe this is bandwidth-bound; I haven't measured it here."*
 
-**Prefer measuring to asserting.** The environment is right there. A config load, a
-`numel()` sum, or a ten-line probe beats a recalled figure, and it models the method the
-whole project is built on: predict, measure, explain the gap.
+**Prefer the derived number to the measured one.** Two kinds of quantity, and they are not
+interchangeable:
+
+- *Analytic* — derivable from shapes, dtypes and arithmetic. `ln(V)`. Backward is about
+  2x forward, so a step is about 3 forward passes. AdamW in fp32 costs 16 bytes per
+  parameter. A live logits reference costs one `(batch x sequence x vocab)` tensor. These
+  generalize, never expire, and are the actual content.
+- *Specimen* — one model, one config, one afternoon. These are evidence that something was
+  run. They are not understanding.
+
+Reach for the analytic form first. Use a specimen measurement when the derivation is
+unavailable, or when the *gap* between predicted and measured is itself the lesson.
+
+**A measurement with no prediction in front of it is decoration.** The method is predict,
+measure, explain the gap. A number produced without a prior expectation performs rigor
+rather than doing it — and a figure that needs "re-measure if your config differs" attached
+is reporting a run, not teaching a concept.
+
+**The deletion test.** Remove the digits from the sentence. If it still teaches, the number
+was supporting a general claim: keep it. If it collapses to something you already knew
+("normalization parameters are negligible"), the measurement was never load-bearing.
+
+**Prefer handing the measurement to the reader.** "Your initial loss should sit just above
+ln(V) — go run it and see what you get" beats a table of someone else's readings. It
+generalizes to whatever model they brought, and it converts reading into doing.
 
 **Smallest example that isn't trivial.** A 2x2 matmul with actual integers beats three
 paragraphs of index notation. Abstraction comes after the concrete instance, as a
