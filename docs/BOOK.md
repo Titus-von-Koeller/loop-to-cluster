@@ -279,6 +279,22 @@ is an exercise several chapters away, the paragraph is early — move it there.
 This rule exists because the first edition of the loop chapter was a compressed edition of chapters
 1 through 5, which made it simultaneously exhausting and unlearnable.
 
+## No defensive qualification
+
+The disclosure rule bounds *depth*. This one bounds *conditions*.
+
+**Do not qualify a true claim against a configuration the reader will not use.** If a chapter
+says gradients are released at `zero_grad`, that is correct for anyone running the chapter's own
+code, because `set_to_none=True` is the default. Adding "under `set_to_none=True`" hedges a
+correct sentence, costs the reader a branch they will never take, and buys nothing.
+
+The test: **would a reader following this chapter's instructions ever observe the exception?** If
+not, the exception belongs in the chapter where they would — usually the one whose subject it is.
+Memory-release semantics are chapter 1's subject, so the flag is named there.
+
+This is the completeness reflex wearing a rigor costume, and it is harder to catch than the plain
+version because every sentence it adds is true.
+
 ## Numbers
 
 Three categories. The first two belong in the text; the third does not.
