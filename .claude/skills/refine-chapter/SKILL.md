@@ -1,0 +1,105 @@
+---
+name: refine-chapter
+description: Revise an existing textbook chapter in a separate later pass — cut, move material to its correct chapter, verify claims, and enforce the book's invariants. Use when asked to review, refine, tighten or fix a chapter or wiki page. Not for authoring a new one (use write-chapter) and not for answering a question mid-exercise (use explain).
+---
+
+# Refine a chapter
+
+A second pass, deliberately separated from authoring. Writing a chapter and judging it are
+different jobs and the same session does both badly — an author defends structure, an editor
+tests it.
+
+You are an editor with the authority to cut. **Your main lever is removal and relocation, not
+rewording.** Most defects in this book are material that is correct, well written, and in the
+wrong chapter.
+
+## Read before you judge. All of it.
+
+Non-negotiable, in this order:
+
+1. **`BOOK.md`** — the controlling idea, ledger, equivalence spine, structure, chapter
+   contract, disclosure rule, numbers policy, out-of-scope list. These are the standard you
+   are enforcing.
+2. **The table of contents** in Notion.
+3. **The chapter under review, in full.**
+4. **The chapters immediately before and after it, in full.**
+5. **The exercise it maps to**, if it exists.
+
+A chapter's worst defects live in its relationship to its neighbors and are invisible from
+inside it. The first edition of chapter 1 read as merely dense; against the table of contents
+it was a compressed edition of chapters 2 through 6. That diagnosis was unavailable without
+step 2.
+
+## The passes, in order
+
+Run them separately. Combining them means the cheap fixes hide the structural ones.
+
+### 1. Placement
+
+For every paragraph: *which exercise makes the reader feel this?* An answer several chapters
+away means the paragraph is early — name its destination chapter. This pass usually removes
+more than all the others combined.
+
+Then: does the chapter still satisfy the contract after the cuts, or has removing borrowed
+material revealed that it never had its own prediction, equivalence claim or hole?
+
+### 2. Correctness
+
+Every mechanism claim gets checked, not skimmed. Two classes have actually occurred here:
+
+- **Imprecise mechanism claims.** "The scales start at 1.0, so normalization begins as an
+  identity operation" — the learned affine is the identity; the normalization is fully active.
+  Wrong in a way that breaks the arithmetic two sections later.
+- **Summary rows contradicting their own prose.** A fold asserting "the initial loss equals
+  ln(V)" beside a callout explaining that it never does and that asserting equality fails.
+  **Check every fold, table and callout against the text next to it** — these drift because
+  they are written last and read first.
+
+Framework behavior claims — `accelerate`, FSDP, DeepSpeed, NCCL — are verified against
+installed source with file and line, or marked unverified in the text.
+
+### 3. Numbers
+
+Apply the deletion test to each figure: remove the digits. If the sentence still teaches, the
+number supported a general claim — keep it. If it collapses to something already known, the
+number was performing rigor. Specimen measurements go to `bench/results/` or become an
+instruction to the reader.
+
+### 4. Altitude and continuity
+
+Does the chapter hold one level throughout, or does a section drop below the book's register
+and fail to return? Does it open with the ledger, row marked? Does the closing hole point at a
+real later chapter?
+
+### 5. Prose
+
+Last, and least. Roadmap openings, terminal deflation, arguing with its own centerpiece,
+unexpanded acronyms, United States spelling, conversational residue.
+
+## Rules
+
+**Cut without ceremony.** You do not need a replacement to justify a deletion. "This is
+chapter 4's material" is a complete argument.
+
+**Say where it goes.** A cut with no destination is a loss. Every relocation names its target
+chapter, so the material survives the edit.
+
+**Do not rewrite what is merely different from your preference.** The standard is `BOOK.md`,
+not taste. If a passage satisfies the contract and the disclosure rule, leave it.
+
+**Report as a diff, not a rewrite.** Default output is an ordered list of changes — cut, move,
+fix, verify — each with its reason and the invariant it serves, most structural first. Edit
+the page in place only when asked, and never overwrite without reading the current version.
+
+**Rank by structure, not by count.** One misplaced section outweighs twenty prose nits. Lead
+with placement findings.
+
+**Decide.** Where a defect admits two fixes, recommend one.
+
+## Before reporting
+
+- Is the top finding structural?
+- Does every cut name its destination?
+- Did I check every fold and table against its adjacent prose?
+- Did I verify the framework claims, or flag them?
+- Am I enforcing `BOOK.md`, or my preferences?
