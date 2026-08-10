@@ -3,6 +3,16 @@
 The textbook lives in Notion. This repo holds the exercises. This file holds the invariants
 both depend on, so that a chapter and a script cannot drift apart.
 
+**Notion is the source of truth for the book.** This file holds invariants, never prose. No
+file in this repo mirrors page text and none may start to: a second copy drifts, and a stale
+one eventually gets published over the live wiki by someone who mistakes it for the source.
+Build artifacts — verifiers and figures — live in `docs/_wiki_build/`, whose README carries
+the editing rules.
+
+**Titus edits the wiki too.** Prose, structure, figures and corrections are Claude's.
+Retrieval questions and *Interrogate this section* blocks are Titus's — producing those is
+the exercise, so leave the gaps flagged rather than filling them.
+
 Chapters are authored with the `write-chapter` skill and revised with `refine-chapter`.
 Neither may re-derive what is written here; if an invariant is wrong, change this file first
 and say so.
@@ -164,18 +174,32 @@ This rule exists because the first edition of chapter 1 was a compressed edition
 
 ## Numbers
 
-**Analytic quantities belong in the text.** Derivable from shapes, dtypes and arithmetic:
-`ln(V)`, 16 bytes per parameter, backward is about twice forward so a step is about three
-forward passes, a live logits reference costs one batch-by-sequence-by-vocabulary tensor.
-These generalize and never expire.
+Three categories. The first two belong in the text; the third does not.
 
-**Specimen measurements do not belong in the text.** One model, one config, one afternoon. A
-figure that needs "re-measure if your config differs" attached is reporting a run, not
-teaching a concept. Hand the measurement to the reader instead: *"your initial loss should
-sit just above ln(V) — run it and see."* Measured results live in `bench/results/`.
+**Analytic** — derivable from shapes, dtypes and arithmetic. `ln(V)`. 16 bytes per parameter.
+Backward is about twice forward, so a step is about three forward passes. A live logits
+reference costs one batch-by-sequence-by-vocabulary tensor. These generalize and never expire.
+
+**Worked instance** — the same arithmetic carried out on one concrete configuration, so the
+abstraction lands. The book's convention is SmolLM2-135M, declared once on the parent page.
+`ln(49152) = 10.8027` is a worked instance, not a measurement: a reader with a different
+vocabulary substitutes their V and the sentence still holds. Every worked number is derived
+from the *released* config, never from this repo's code — a field that changes no shape is
+invisible to a parameter count, which is how `initializer_range` reached the wiki as 0.02
+when the released config says 0.041666…. `docs/_wiki_build/verify_facts.py` exists to catch
+exactly that.
+
+**Specimen measurement** — a reading from one run on one machine. `11.2744`. A peak-memory
+figure in mebibytes. These are evidence that something was run, not understanding, and a
+figure needing "re-measure if your config differs" attached is reporting a run rather than
+teaching a concept. They live in `bench/results/`. In the text, hand the measurement to the
+reader instead: *"your initial loss should sit just above ln(V) — run it and see."*
+
+Figures marked *schematic* illustrate a shape and carry no data claim.
 
 Exactly one full predict-measure-explain demonstration belongs in the book, at the `ln(V)`
-check in chapter 1, as a worked instance of the method.
+check in chapter 1, as a worked instance of the method — and its measured half is the
+reader's to produce.
 
 ## Out of scope
 

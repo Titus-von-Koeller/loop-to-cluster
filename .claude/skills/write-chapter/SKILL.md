@@ -18,31 +18,54 @@ hardware.
 
 Non-negotiable, in this order:
 
-1. **`BOOK.md`** in the repo root — the controlling idea, the ledger, the equivalence spine,
-   the twelve-chapter structure, the chapter contract, the disclosure rule. Do not re-derive
-   any of it. If an invariant is wrong, change `BOOK.md` first and say so explicitly.
-2. **The book's table of contents** in Notion, via the parent page.
-3. **The chapter before yours and the chapter after yours.** In full. You need to know what
-   the reader already has and what you must not spend.
-4. **The exercise this chapter maps to**, if the script exists.
+1. **`docs/BOOK.md`** — the controlling idea, the ledger, the equivalence spine, the
+   twelve-chapter structure, the chapter contract, the disclosure rule. Do not re-derive any
+   of it. If an invariant is wrong, change `docs/BOOK.md` first and say so explicitly.
+2. **`docs/_wiki_build/README.md`** — how the wiki is built and who owns which blocks.
+3. **The book's table of contents** in Notion, via the parent page.
+4. **The chapter before yours and the chapter after yours** — but see *Which neighbors* below.
+5. **The exercise this chapter maps to**, if the script exists.
 
 Judging a part before reading the whole is the failure this step exists to prevent. A
 chapter's biggest defect is almost always its relationship to its neighbors, which is
 invisible from inside it.
 
-## You have permission to discard
+**Which neighbors.** While the book is being migrated to the `docs/BOOK.md` structure, the
+live neighboring pages were written under the old organizing idea and reading them imports
+its assumptions. During migration, read the *specification* of the neighbors — their rows in
+`docs/BOOK.md` — not their current pages. Once a neighbor has been rewritten, read the page.
 
-Existing content has no standing. Earlier chapters were written under a weaker organizing
-idea and some of their material belongs elsewhere or nowhere. When you find content in your
-chapter's territory that fails the disclosure rule, say where it goes — do not preserve it
-out of deference.
+## Two phases, in this order
 
-Default to the clean-sheet question — *what would this chapter contain if nothing existed?* —
-and only then diff against what is there.
+Anchoring on existing prose is the documented failure that produced a chapter 1 which was a
+compressed edition of chapters 2 through 6. The fix is sequence, not willpower.
+
+### Phase 1 — draft clean-sheet
+
+Answer *what would this chapter contain if nothing existed?* from `docs/BOOK.md` and the
+exercise alone. **Do not open the current version of your chapter during this phase.** You
+cannot un-see it, and every paragraph you read becomes a paragraph you feel obliged to place.
+
+### Phase 2 — salvage
+
+Only once the draft satisfies the contract, read the old chapter — as a *source*, not as a
+draft to edit. One question: **what does it contain that the new one lacks, and where does
+that belong?** Some of the old material is genuinely hard-won and should survive.
+
+Output an explicit list, each item with a destination:
+
+- *into this chapter* — it strengthens the draft and fits the contract
+- *into chapter N* — correct material, wrong chapter
+- *dropped* — with the reason, usually the out-of-scope list or the disclosure rule
+
+Phase 2 has the opposite bias from phase 1: writing wants freedom, salvage wants
+completeness. Blending them yields neither, which is why they are separate passes.
+
+Nothing is deleted from the live wiki in either phase. See *Notion mechanics*.
 
 ## The chapter contract
 
-From `BOOK.md`, restated because it is the thing to check before shipping. Exactly one of
+From `docs/BOOK.md`, restated because it is the thing to check before shipping. Exactly one of
 each:
 
 - one **prediction** the reader can make before running anything
@@ -74,7 +97,7 @@ chapter that does.
 exercise requires; deeper is a link, not a paragraph. Test every paragraph: *which exercise
 makes the reader feel this?* If the answer is several chapters away, move it there.
 
-**Analytic numbers in the text, specimen measurements never.** See `BOOK.md`. If a figure
+**Analytic numbers in the text, specimen measurements never.** See `docs/BOOK.md`. If a figure
 would need "re-measure if your config differs" attached, hand the measurement to the reader
 instead.
 
@@ -100,7 +123,7 @@ rather than out of restraint.
 | | |
 | --- | --- |
 | Compressed sequel | Previewing later chapters at low resolution. The reader can neither learn it nor skip it. This is what broke the first chapter 1. |
-| Architecture tour | Naming six mechanisms in four hundred words, each glossed in one clause. The model is a black box; see `BOOK.md`'s out-of-scope list. |
+| Architecture tour | Naming six mechanisms in four hundred words, each glossed in one clause. The model is a black box; see `docs/BOOK.md`'s out-of-scope list. |
 | Altitude break | A section that drops below the book's level and does not come back up. |
 | Specimen table | Someone else's readings presented as a result, footnoted as maybe not applying. |
 | Arguing with your own centerpiece | Introducing an artifact, disowning it, then re-litigating it later. Decide once. |
@@ -116,10 +139,29 @@ quote a measurement taken here, never address the reader as someone mid-task.
 Expand every acronym on first use — "Fully Sharded Data Parallel (FSDP)" — then use the short
 form. United States spelling. Never reference the conversation that produced the chapter.
 
-Notion mechanics: use the tables, callouts, `<details>` folds and mermaid diagrams the
-existing book uses. Folds carry depth tiering — reference material a reader may pass — not
-the chapter's argument. **Draft, show the draft, and publish only on approval.** Never
-overwrite an existing page without reading it first.
+## Notion mechanics
+
+**Notion is the source of truth.** Nothing in the repo mirrors page prose and nothing may
+start to — a second copy drifts, and a stale one eventually gets published over the live
+wiki by someone who mistakes it for the source. `docs/BOOK.md` holds invariants, never text.
+
+**Titus edits the wiki too.** Never restore, move or delete anything you did not add
+yourself. A page that differs from what you expected has been *edited*, not damaged: say
+"this changed" and ask. Phrasing that looks clumsy may be a deliberate cut.
+
+**Retrieval questions and *Interrogate this section* blocks are Titus's.** Producing them is
+the exercise. Leave the block present with its gaps flagged; never fill one in. Prose,
+structure, figures and corrections are yours.
+
+**Draft, show the draft, publish only on approval.** Never overwrite an existing page without
+reading its current state first.
+
+Use the tables, callouts, `<details>` folds and mermaid diagrams the book already uses. Folds
+carry depth tiering — reference material a reader may pass — never the chapter's argument.
+
+**Figures:** generated by `docs/_wiki_build/make_figures.py` and uploaded by hand. Open the
+rendered PNG before judging it; captions have hidden text collisions before now. An existing
+figure cannot be replaced through the API, only by dragging the file onto the block.
 
 ## Before shipping
 

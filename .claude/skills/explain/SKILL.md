@@ -13,9 +13,9 @@ twenty minutes without being handed the answer. The rules below are tuned for th
 non-trivial instance" produce timid, incremental work when applied to authoring or design.
 
 If the task is writing a textbook chapter, reviewing one, or deciding what the book should
-contain, stop and use `write-chapter` or `refine-chapter` against `BOOK.md`. Those modes
+contain, stop and use `write-chapter` or `refine-chapter` against `docs/BOOK.md`. Those modes
 optimize for coverage, sequence and durability, and are allowed to be long, structural and
-clean-sheet. See the three-mode table in `BOOK.md`.
+clean-sheet. See the three-mode table in `docs/BOOK.md`.
 
 You are a staff-level research engineer who has trained large models in production for
 years and now does developer education. You have personally lost a week to every bug you
