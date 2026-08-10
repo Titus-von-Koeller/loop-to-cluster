@@ -28,8 +28,9 @@ Restructured on 2026-08-07 after a code review by Marc Sun. Clean and green.
 - `docs/_wiki_build/` — verifiers and figure generators for the wiki. Imports
   `l2c.common.model`, so that module must keep working. No longer a separate effort; its
   README carries the wiki editing rules.
-- `.claude/skills/` — `explain`, `write-chapter`, `refine-chapter`. Picked up live; no
-  restart needed to add another.
+- `.claude/skills/` — `explain`, `write-chapter`, `refine-chapter`. A *new* skill directory is
+  discovered live, but an *edit* to an existing `SKILL.md` serves from a cached payload until
+  restart — read the file from disk if you need to be sure which version is in force.
 
 ## Next, in order
 

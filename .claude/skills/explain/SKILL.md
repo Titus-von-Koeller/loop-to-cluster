@@ -79,18 +79,15 @@ explanations attach to fear, which is why they survive.
 stable, significant, cheaper — are unfinished sentences. If you can't produce a number, say
 so in those words: *"I believe this is bandwidth-bound; I haven't measured it here."*
 
-**Prefer the derived number to the measured one.** Two kinds of quantity, and they are not
-interchangeable:
+**Prefer the derived number to the measured one.** `docs/BOOK.md` defines three categories —
+*analytic*, *worked instance*, *specimen measurement* — and the ordering holds here. Reach for
+the analytic form, fall back to the same arithmetic on his actual config, and use a specimen
+measurement only when the derivation is unavailable or when the *gap* between predicted and
+measured is itself the lesson.
 
-- *Analytic* — derivable from shapes, dtypes and arithmetic. `ln(V)`. Backward is about
-  2x forward, so a step is about 3 forward passes. AdamW in fp32 costs 16 bytes per
-  parameter. A live logits reference costs one `(batch x sequence x vocab)` tensor. These
-  generalize, never expire, and are the actual content.
-- *Specimen* — one model, one config, one afternoon. These are evidence that something was
-  run. They are not understanding.
-
-Reach for the analytic form first. Use a specimen measurement when the derivation is
-unavailable, or when the *gap* between predicted and measured is itself the lesson.
+One difference from the book: a specimen measurement is often exactly right in this mode.
+Reading his config, timing his script, printing his parameter count — that is answering the
+question he asked, not decorating a general claim.
 
 **A measurement with no prediction in front of it is decoration.** The method is predict,
 measure, explain the gap. A number produced without a prior expectation performs rigor
@@ -126,6 +123,20 @@ when it does."
 | Completeness reflex | Including something because it is true and related, rather than because it is needed. The commonest way a good answer becomes a bad one. |
 | Terminal deflation | Ending on "but none of this matters yet." If true, that belonged in sentence one. |
 | Unearned confidence | Stating implementation behavior from memory when the source is on disk. |
+
+## Prose
+
+`docs/BOOK.md`'s `## Prose` section applies at the word level: no unquantified comparatives,
+no hedges that carry no information, no metadiscourse, one name per thing and never vary it,
+analogies cashed out in the same breath and dropped, numbers as digits with units. Its
+**failure register** — second person, present tense, ordered events, closing on what he will
+wrongly blame — is the strongest device available and applies here too.
+
+Its *register* rules do not. The book is textbook voice, model-agnostic, addressed to a
+stranger in five years. You are addressing Titus, about the file on his screen, right now.
+Second person about his specific script is correct here and wrong there. Bolded paragraph
+lead-ins are permitted as navigation, because chat is scanned rather than read linearly — the
+book's one-bold-per-section rationing is a book rule.
 
 See `worked-example.md` for a failed explanation and its rewrite. The failure modes above
 are far easier to recognize than to describe.
