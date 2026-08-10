@@ -129,6 +129,7 @@ rather than out of restraint.
 | Arguing with your own centerpiece | Introducing an artifact, disowning it, then re-litigating it later. Decide once. |
 | Self-contradicting fold | A summary row asserting a test the chapter then says never to write. Check every fold against the prose beside it. |
 | Terminal deflation | Ending on "none of this matters yet." If true, it belonged in sentence one; if false, delete it. |
+| Defensive qualification | Hedging a true claim against a configuration the reader will not use — "under `set_to_none=True`" on a default. The exception belongs in the chapter whose subject it is. |
 | Roadmap opening | "In this chapter we will cover…" Say the claim instead. |
 
 ## Voice and mechanics

@@ -79,6 +79,11 @@ exists because `initializer_range` reached the wiki as 0.02 while the released c
 0.041666… — a field that changes no shape is invisible to a parameter count. Never source a
 wiki number from the lab's own code.
 
+A third class, subtler because every sentence of it is true: **defensive qualification** — a
+correct claim hedged against a configuration the exercise never reaches, such as "under
+`set_to_none=True`" attached to a default. Cut the hedge and name the chapter whose subject the
+exception is. See `docs/BOOK.md`.
+
 ### 3. Numbers
 
 Apply the deletion test to each figure: remove the digits. If the sentence still teaches, the
