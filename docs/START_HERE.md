@@ -23,7 +23,7 @@ Restructured on 2026-08-07 after a code review by Marc Sun. Clean and green.
   nothing from this repo.
 - `bench/` — empty. Results and figures land here.
 - `docs/BOOK.md` — the textbook's design specification, added 2026-08-10. The controlling
-  idea, the four-row ledger every chapter modifies, the twelve-chapter structure, the chapter
+  idea, the four-row ledger every chapter modifies, the twelve-chapter structure (0 through 11), the chapter
   contract, the numbers policy, the binding prose style.
 - `docs/_wiki_build/` — verifiers and figure generators for the wiki. Imports
   `l2c.common.model`, so that module must keep working. No longer a separate effort; its
@@ -57,15 +57,19 @@ One modification per script — do not stack them.
 
 ## The book, in parallel
 
-The wiki predates `docs/BOOK.md` and was written under a weaker organizing idea: chapter 1 is
-a compressed edition of chapters 2 through 6, and the architecture material in it is out of
-scope. Migration is chapter by chapter with `write-chapter`, whose two phases are
-non-negotiable — draft clean-sheet without opening the old page, then salvage the old page as
-a source, emitting each item with a destination.
+The wiki predates `docs/BOOK.md`, was written under a weaker organizing idea, and is numbered
+from 1 where the spec now numbers from 0. Its loop chapter — published as page 1, now chapter
+0 — is a compressed edition of chapters 1 through 5, and the architecture material in it is
+out of scope. Migration is chapter by chapter with `write-chapter`, whose two phases are
+non-negotiable: draft clean-sheet without opening the old page, then salvage the old page as a
+source, emitting each item with a destination.
 
-**Chapter 2, *The four kinds of state*, comes first.** It carries the ledger that every later
-chapter modifies, and it is the furthest from where it needs to be. Drafting it is also the
-test of whether ledger-as-spine survives contact with prose.
+**Chapter 0, *The loop*, comes first**, because it is the chapter the baseline exercise needs.
+Chapter 1, *The four kinds of state*, comes second: it carries the ledger every later chapter
+modifies, and drafting it is the test of whether ledger-as-spine survives contact with prose.
+
+Renumbering means the live pages and the spec disagree by one until migration catches up. When
+citing a chapter, use the spec's number and say so if the live page differs.
 
 ## Do not resurrect
 

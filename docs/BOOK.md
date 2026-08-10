@@ -104,27 +104,35 @@ This table is what accelerate's test suite encodes. It is the reason this book e
 
 ## Structure
 
-Four parts, twelve chapters. Each part states what the reader can do at its end.
+Chapter 0, then four parts — twelve chapters numbered 0 through 11, so that a chapter number
+and its script number agree.
+
+**Chapter 0 — The loop.** Outside the parts, because it introduces no technique. It
+establishes the six lines, the vocabulary, and the reference run that every later equivalence
+claim is measured against. Read it first; everything else assumes it.
+
+| # | Chapter | Exercise |
+| --- | --- | --- |
+| 0 | The loop | the fp32 baseline |
 
 **Part I — One device, everything replicated.** *You can predict a training run's cost
 before you run it.*
 
 | # | Chapter | Exercise |
 | --- | --- | --- |
-| 1 | The loop | the fp32 baseline |
-| 2 | The four kinds of state | predict peak memory, then profile the baseline |
-| 3 | Numerics | mixed precision (TF32 belongs here too) |
-| 4 | The optimizer | optimizer swap; gradient clipping |
-| 5 | The data path | dataloader variations |
+| 1 | The four kinds of state | predict peak memory, then profile the chapter 0 script |
+| 2 | Numerics | mixed precision; TF32 belongs here too |
+| 3 | The optimizer | optimizer swap; gradient clipping |
+| 4 | The data path | dataloader variations |
 
 **Part II — The step stops being atomic.** *You can decouple the batch you compute from the
 batch you learn from.*
 
 | # | Chapter | Exercise |
 | --- | --- | --- |
-| 6 | Gradient accumulation | accumulation |
+| 5 | Gradient accumulation | accumulation |
 
-Chapter 6 is the hinge of the book and should be taught as the **single-device rehearsal for
+Chapter 5 is the hinge of the book and should be taught as the **single-device rehearsal for
 distributed training**: same arithmetic (sum, then divide), same failure mode (the wrong
 denominator), same test (does N micro-steps equal one large batch), with no network to hide
 behind. Part III is this chapter with a wire in the middle.
@@ -134,18 +142,18 @@ did not change.*
 
 | # | Chapter | Exercise |
 | --- | --- | --- |
-| 7 | Collectives and topology | a collectives probe |
-| 8 | Data parallelism (DDP) | DDP |
-| 9 | Sharding the ledger (ZeRO, FSDP) | FSDP |
-| 10 | DeepSpeed | DeepSpeed |
+| 6 | Collectives and topology | a collectives probe |
+| 7 | Data parallelism (DDP) | DDP |
+| 8 | Sharding the ledger (ZeRO, FSDP) | FSDP |
+| 9 | DeepSpeed | DeepSpeed |
 
 **Part IV — Making it trustworthy.** *You can review someone else's backend integration and
 know whether to trust it.*
 
 | # | Chapter | Exercise |
 | --- | --- | --- |
-| 11 | Checkpoint and resume | checkpoint, kill, resume, compare |
-| 12 | Proving equivalence | the test suite itself |
+| 10 | Checkpoint and resume | checkpoint, kill, resume, compare |
+| 11 | Proving equivalence | the test suite itself |
 
 Checkpointing is Part IV rather than Part I precisely because Part III sharded the state it
 has to save.
@@ -153,7 +161,10 @@ has to save.
 **Appendices.** A · Measurement protocol. B · Glossary. C · Question bank. D · accelerate
 source map — concept to file and line, the bridge from book to codebase.
 
-Script numbering is Titus's to assign; chapters name their topic, not a filename.
+**Chapter N's exercise is script NN.** Chapter 1 is the exception and the exception is
+informative: its exercise is the profiled twin of `00`, not a new loop, so `01` stays unused
+and the gap marks a chapter that measures rather than modifies. Final numbering is Titus's to
+assign.
 
 ## The chapter contract
 
@@ -265,8 +276,8 @@ is a forward reference, and forward references are links, not paragraphs.**
 The test, applied per paragraph: *which exercise makes the reader feel this?* If the answer
 is an exercise several chapters away, the paragraph is early — move it there.
 
-This rule exists because the first edition of chapter 1 was a compressed edition of chapters
-2 through 6, which made it simultaneously exhausting and unlearnable.
+This rule exists because the first edition of the loop chapter was a compressed edition of chapters
+1 through 5, which made it simultaneously exhausting and unlearnable.
 
 ## Numbers
 
@@ -294,15 +305,15 @@ reader instead: *"your initial loss should sit just above ln(V) — run it and s
 Figures marked *schematic* illustrate a shape and carry no data claim.
 
 Exactly one full predict-measure-explain demonstration belongs in the book, at the `ln(V)`
-check in chapter 1, as a worked instance of the method — and its measured half is the
+check in chapter 0, as a worked instance of the method — and its measured half is the
 reader's to produce.
 
 ## Out of scope
 
 - **The architecture tour.** RoPE, SwiGLU, grouped-query attention, RMSNorm versus
   LayerNorm. The model is a black box. Two facts about it matter downstream and are stated
-  where they are needed: reductions resist low precision (chapter 3), and the logits tensor
-  scales with vocabulary rather than hidden size (chapter 2).
+  where they are needed: reductions resist low precision (chapter 2), and the logits tensor
+  scales with vocabulary rather than hidden size (chapter 1).
 - **Initialization detail.** Chapter 1 needs one clause — the weights are random, so the
   model is maximally unsure. `initializer_range` comparisons and depth-scaled residual
   initialization are architecture trivia.

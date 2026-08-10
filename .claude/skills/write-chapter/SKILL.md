@@ -19,7 +19,7 @@ hardware.
 Non-negotiable, in this order:
 
 1. **`docs/BOOK.md`** — the controlling idea, the ledger, the equivalence spine, the
-   twelve-chapter structure, the chapter contract, the disclosure rule. Do not re-derive any
+   twelve-chapter structure (0 through 11), the chapter contract, the disclosure rule. Do not re-derive any
    of it. If an invariant is wrong, change `docs/BOOK.md` first and say so explicitly.
 2. **`docs/_wiki_build/README.md`** — how the wiki is built and who owns which blocks.
 3. **The book's table of contents** in Notion, via the parent page.
@@ -37,8 +37,8 @@ its assumptions. During migration, read the *specification* of the neighbors —
 
 ## Two phases, in this order
 
-Anchoring on existing prose is the documented failure that produced a chapter 1 which was a
-compressed edition of chapters 2 through 6. The fix is sequence, not willpower.
+Anchoring on existing prose is the documented failure that produced a loop chapter which was a
+compressed edition of chapters 1 through 5. The fix is sequence, not willpower.
 
 ### Phase 1 — draft clean-sheet
 
@@ -122,7 +122,7 @@ rather than out of restraint.
 
 | | |
 | --- | --- |
-| Compressed sequel | Previewing later chapters at low resolution. The reader can neither learn it nor skip it. This is what broke the first chapter 1. |
+| Compressed sequel | Previewing later chapters at low resolution. The reader can neither learn it nor skip it. This is what broke the first draft of chapter 0. |
 | Architecture tour | Naming six mechanisms in four hundred words, each glossed in one clause. The model is a black box; see `docs/BOOK.md`'s out-of-scope list. |
 | Altitude break | A section that drops below the book's level and does not come back up. |
 | Specimen table | Someone else's readings presented as a result, footnoted as maybe not applying. |
