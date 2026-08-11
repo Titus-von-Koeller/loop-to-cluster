@@ -1,14 +1,14 @@
 # Start here
 
 Read `CLAUDE.md` and `PROFILING.md` first. Read `docs/CONVENTIONS.md` as well if the task touches
-the textbook. Nothing else in `docs/`. This file tells you what state the repo is in and what
-to do next.
+the learning docs. Nothing else in `docs/`. This file tells you what state the repo is in and
+what to do next.
 
 ## What this is
 
 Titus is learning distributed training to onboard onto HuggingFace accelerate. Two products:
-the **textbook**, which is the Notion wiki, and the **exercises**, which are this repo. He
-writes the training loops by hand; you write the chapters, the profiling that measures the
+the **learning docs**, which are the Notion pages, and the **exercises**, which are this repo.
+He writes the training loops by hand; you write the pages, the profiling that measures the
 loops, and nothing in between. `CLAUDE.md` has the division of labour and it is not the usual
 one — **you do not write training loops here.**
 
@@ -22,9 +22,9 @@ Restructured on 2026-08-07 after a code review by Marc Sun. Clean and green.
   script: `test_boundary.py` parametrizes over `scripts/*.py` to enforce that each imports
   nothing from this repo.
 - `bench/` — empty. Results and figures land here.
-- `docs/CONVENTIONS.md` — the textbook's design specification, added 2026-08-10. The controlling
-  idea, the four-row ledger every chapter modifies, the twelve-chapter structure (0 through 11), the chapter
-  contract, the numbers policy, the binding prose style.
+- `docs/CONVENTIONS.md` — what the Notion pages are written to, added 2026-08-10. The
+  controlling idea, the four-row ledger every page modifies, the topic order, what a page
+  carries, the numbers policy, the binding prose style.
 - `docs/_wiki_build/` — verifiers and figure generators for the wiki. Imports
   `l2c.common.model`, so that module must keep working. No longer a separate effort; its
   README carries the wiki editing rules.
@@ -73,9 +73,6 @@ Authoring is one page at a time with `write-chapter`: state the argument in a se
 existing page against it, then write into whichever document has more surviving material. An
 earlier edition of that skill forbade reading the old page first; that rule is gone, and why is
 recorded in the skill.
-
-Renumbering means the live pages and the spec disagree by one until migration catches up. When
-citing a chapter, use the spec's number and say so if the live page differs.
 
 ## Do not resurrect
 

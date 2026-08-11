@@ -40,9 +40,9 @@ Non-negotiable, in this order:
 5. **The exercise it maps to**, if it exists.
 
 A chapter's worst defects live in its relationship to its neighbors and are invisible from
-inside it. The first edition of the loop chapter read as merely dense; against the table of contents
-it was a compressed edition of chapters 1 through 5. That diagnosis was unavailable without
-step 2.
+inside it. The first edition of the loop page read as merely dense; against the table of
+contents it was a compressed edition of the five topics after it. That diagnosis was
+unavailable without step 2.
 
 ## The passes, in order
 
