@@ -1,6 +1,6 @@
 ---
 name: refine-chapter
-description: Revise an existing textbook chapter in a separate later pass — cut, move material to its correct chapter, verify claims, and enforce the book's invariants. Use when asked to review, refine, tighten or fix a chapter or wiki page. Not for authoring a new one (use write-chapter) and not for answering a question mid-exercise (use explain).
+description: Revise an existing learning page in a separate later pass — cut, move material to the page it belongs on, verify claims, and enforce the conventions. Use when asked to review, refine, tighten or fix a page. Not for authoring a new one (use write-chapter) and not for answering a question mid-exercise (use explain).
 ---
 
 # Refine a chapter
@@ -10,7 +10,7 @@ different jobs and the same session does both badly — an author defends struct
 tests it.
 
 You are an editor whose main lever is **removal and relocation, not rewording** — most defects
-in this book are material that is correct, well written, and in the wrong chapter.
+here are material that is correct, well written, and on the wrong page.
 
 **Cut, but surface suspected edits first.** Removal is wanted, not merely tolerated. The one
 constraint is that Titus edits this wiki too, so before removing a passage, ask whether it
@@ -22,15 +22,16 @@ before removing it. Everything else you cut on your own judgment. A page that di
 what you expected has been *edited*, not damaged — "this broke" is the wrong reading and
 reverting is the wrong reflex. Phrasing that looks clumsy may be a deliberate cut.
 
-**Retrieval questions are Titus's.** Producing an answer cold is the mechanism that
-consolidates, so never write or complete one — leave the heading with its gaps flagged. The
-*Interrogate this section* blocks are yours, along with the prose.
+**Retrieval questions and their answers are yours**, each answer in a collapsed toggle so the
+reader produces it cold before checking. Judge them like any other content: a question whose
+answer is a definition tests recognition and should be replaced with one whose answer is a
+consequence.
 
 ## Read before you judge. All of it.
 
 Non-negotiable, in this order:
 
-1. **`docs/BOOK.md`** — the controlling idea, ledger, equivalence spine, structure, chapter
+1. **`docs/CONVENTIONS.md`** — the controlling idea, ledger, equivalence spine, structure, chapter
    contract, disclosure rule, numbers policy, out-of-scope list. These are the standard you
    are enforcing.
 2. **The table of contents** in Notion.
@@ -82,7 +83,7 @@ wiki number from the lab's own code.
 A third class, subtler because every sentence of it is true: **defensive qualification** — a
 correct claim hedged against a configuration the exercise never reaches, such as "under
 `set_to_none=True`" attached to a default. Cut the hedge and name the chapter whose subject the
-exception is. See `docs/BOOK.md`.
+exception is. See `docs/CONVENTIONS.md`.
 
 ### 3. Numbers
 
@@ -93,13 +94,13 @@ instruction to the reader.
 
 ### 4. Altitude and continuity
 
-Does the chapter hold one level throughout, or does a section drop below the book's register
+Does the chapter hold one level throughout, or does a section drop below the surrounding register
 and fail to return? Does it open with the ledger, row marked? Does the closing hole point at a
 real later chapter?
 
 ### 5. Prose
 
-Last, and least — but against a specific standard, not taste. `docs/BOOK.md`'s `## Prose`
+Last, and least — but against a specific standard, not taste. `docs/CONVENTIONS.md`'s `## Prose`
 section is binding: sentence construction, banned hedges, unquantified comparatives, emphasis
 rationing, the failure register, and specimens to match. Also roadmap openings, terminal
 deflation, arguing with its own centerpiece, unexpanded acronyms, United States spelling,
@@ -107,14 +108,14 @@ conversational residue.
 
 ## Rules
 
-**Cut without ceremony.** "This is chapter 4's material" is a complete argument. You do not
+**Cut without ceremony.** "This belongs on *The data path*" is a complete argument. You do not
 need a replacement to justify a deletion. The single exception is a passage you suspect Titus
 wrote — flag that one and confirm before removing it.
 
 **Say where it goes.** A cut with no destination is a loss. Every relocation names its target
 chapter, so the material survives the edit.
 
-**Do not rewrite what is merely different from your preference.** The standard is `docs/BOOK.md`,
+**Do not rewrite what is merely different from your preference.** The standard is `docs/CONVENTIONS.md`,
 not taste. If a passage satisfies the contract and the disclosure rule, leave it.
 
 **Report as a diff, not a rewrite.** Default output is an ordered list of changes — cut, move,
@@ -132,4 +133,4 @@ with placement findings.
 - Does every cut name its destination?
 - Did I check every fold and table against its adjacent prose?
 - Did I verify the framework claims, or flag them?
-- Am I enforcing `docs/BOOK.md`, or my preferences?
+- Am I enforcing `docs/CONVENTIONS.md`, or my preferences?

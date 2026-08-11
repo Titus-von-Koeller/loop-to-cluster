@@ -69,16 +69,21 @@ own paths explicitly — `git add <paths>`, never `git add -A` from the root —
 whole-worktree commit sweeps another session's in-flight work into your commit under an
 unrelated subject.
 
-## The book
+## The docs
 
-The textbook is the Notion wiki; this repo is its exercises. `docs/BOOK.md` holds the
-invariants both depend on — the controlling idea, the ledger every chapter modifies, the
-chapter contract, the prose style. Notion is the source of truth for the book: nothing here
-mirrors page text and nothing may start to. `docs/_wiki_build/` holds the verifiers and
-figure generators, and imports `l2c.common.model`, so that module must keep working.
+The learning pages are in Notion; this repo is their exercises. `docs/CONVENTIONS.md` holds the
+invariants both depend on — the controlling idea, the ledger every page modifies, what a page
+carries, the prose style. Notion is the source of truth: nothing here mirrors page text and
+nothing may start to. `docs/_wiki_build/` holds the verifiers and figure generators, and imports
+`l2c.common.model`, so that module must keep working.
+
+**The pages are documentation, not a book, and no page says what it is.** No "this book", no
+parts, no numbered chapters. Cross-references name the topic — a numbered reference breaks every
+other page when the order changes, and one stale count in the conventions file propagated into a
+code listing that no longer matched its own exercise.
 
 Three authoring modes, three skills, and confusing them is expensive: `write-chapter` and
-`refine-chapter` for the book, `explain` for unblocking Titus mid-exercise, `profile-script`
-for measurement. `docs/BOOK.md` has the table.
+`refine-chapter` for the pages, `explain` for unblocking Titus mid-exercise, `profile-script`
+for measurement. `docs/CONVENTIONS.md` has the table.
 
 Jupyter setup lives in `docs/JUPYTER.md`.

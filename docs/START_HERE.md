@@ -1,6 +1,6 @@
 # Start here
 
-Read `CLAUDE.md` and `PROFILING.md` first. Read `docs/BOOK.md` as well if the task touches
+Read `CLAUDE.md` and `PROFILING.md` first. Read `docs/CONVENTIONS.md` as well if the task touches
 the textbook. Nothing else in `docs/`. This file tells you what state the repo is in and what
 to do next.
 
@@ -22,7 +22,7 @@ Restructured on 2026-08-07 after a code review by Marc Sun. Clean and green.
   script: `test_boundary.py` parametrizes over `scripts/*.py` to enforce that each imports
   nothing from this repo.
 - `bench/` — empty. Results and figures land here.
-- `docs/BOOK.md` — the textbook's design specification, added 2026-08-10. The controlling
+- `docs/CONVENTIONS.md` — the textbook's design specification, added 2026-08-10. The controlling
   idea, the four-row ledger every chapter modifies, the twelve-chapter structure (0 through 11), the chapter
   contract, the numbers policy, the binding prose style.
 - `docs/_wiki_build/` — verifiers and figure generators for the wiki. Imports
@@ -55,18 +55,24 @@ Then topics, one per script, each a copy-and-modify of the baseline: mixed preci
 gradient accumulation, optimizer swap, dataloader variations, gradient clipping, TF32.
 One modification per script — do not stack them.
 
-## The book, in parallel
+## The docs, in parallel
 
-The wiki predates `docs/BOOK.md`, was written under a weaker organizing idea, and is numbered
-from 1 where the spec now numbers from 0. Its loop chapter — published as page 1, now chapter
-0 — is a compressed edition of chapters 1 through 5, and the architecture material in it is
-out of scope. Migration is chapter by chapter with `write-chapter`, whose two phases are
-non-negotiable: draft clean-sheet without opening the old page, then salvage the old page as a
-source, emitting each item with a destination.
+The pages predate `docs/CONVENTIONS.md` and most were written under a weaker organizing idea.
+They are documentation Titus learns from, not a book: **no page names itself or the collection**,
+and cross-references use topic names, never numbers. Numbered titles are being dropped as each
+page is rewritten; the reading order lives on the parent page.
 
-**Chapter 0, *The loop*, comes first**, because it is the chapter the baseline exercise needs.
-Chapter 1, *The four kinds of state*, comes second: it carries the ledger every later chapter
-modifies, and drafting it is the test of whether ledger-as-spine survives contact with prose.
+*The loop* has been rewritten and is the model to follow: the ledger opens it with the touched
+row marked, the argument is stated once, and every cross-reference is a topic name.
+
+**Next is *The four kinds of state*.** It carries the ledger every later page modifies, and it
+takes the material the loop page deliberately defers — activation arithmetic, peak memory,
+where the optimizer state appears.
+
+Authoring is one page at a time with `write-chapter`: state the argument in a sentence, sort the
+existing page against it, then write into whichever document has more surviving material. An
+earlier edition of that skill forbade reading the old page first; that rule is gone, and why is
+recorded in the skill.
 
 Renumbering means the live pages and the spec disagree by one until migration catches up. When
 citing a chapter, use the spec's number and say so if the live page differs.

@@ -22,9 +22,9 @@ Rules earned the hard way. Each one cost a real mistake.
 - **Who writes what.** Prose, structure, figures, corrections and the *Interrogate this
   section* blocks are Claude's — those blocks are dense factual reference (what a thing costs,
   who owns it, how it fails silently) that requires reading source, so splitting authorship
-  mid-page would leave a visible seam. **Retrieval questions are Titus's.** Producing an
-  answer cold is the mechanism that consolidates; a pre-written answer converts recall into
-  recognition, which does almost nothing. Leave the heading with its gaps flagged.
+  mid-page would leave a visible seam. **Retrieval questions and their answers are Claude's
+  too**, with each answer in a collapsed toggle: the reader produces it cold and then expands to
+  check, which is what consolidates. Only a *visible* answer converts recall into recognition.
 - **Open the figures; do not read their captions.** The PNGs are in `figures/`. Two shipped
   with text collisions that no caption could reveal, and three judgements made from captions
   alone turned out backwards.
