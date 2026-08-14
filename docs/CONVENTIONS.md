@@ -21,8 +21,17 @@ answer in a collapsed toggle, so the reader produces it cold and then expands to
 page as soon as the order changes.
 
 **Everything below serves the argument of the page being written. Where a rule and the argument
-conflict, the rule is wrong: change this file and say so.** Nothing here is a quota, and no
-count of anything — lines, sections, one-of-each — is ever a specification.
+conflict, the rule is wrong: change this file and say so.**
+
+**No rule goes in here without its overshoot named.** Every prohibition points one way and the
+page has nothing pointing back, so it gets followed until it fails on the far side: *delete
+metadiscourse* produced staccato, *keep the connectives* produced tangled sentences, *no
+specimen measurements* produced pages with no numbers at all. If you cannot say what
+over-applying a rule looks like, you do not understand it well enough to write it down.
+ Nothing here is a quota, and no
+count of anything — lines, sections, one-of-each — is ever a specification. That includes
+counts in prose: "five lines" reads as precision, is wrong the moment the listing changes, and
+tells the reader nothing that "the same operations, always in this order" does not.
 
 ## The frame
 
@@ -118,7 +127,9 @@ exhausting and unlearnable: too shallow to learn from, too present to skip.
 
 Likewise for conditions: **do not qualify a true claim against a configuration the reader will
 not use.** "Under `set_to_none=True`" attached to a default hedges a correct sentence for a
-branch nobody takes.
+branch nobody takes. *Overshoot:* stating as universal what holds only for one config — an
+activation coefficient that does not survive a change of attention kernel, a dtype that came
+from one released config. Where the reader could plausibly meet the other condition, say so.
 
 ## Numbers
 
@@ -179,7 +190,9 @@ say the first thing, stop, then say what follows from it.
 dashes, write it as two and keep whichever version is clearer. Often it is the original. The
 point is to have compared.
 
-Ask of a draft:
+**Ask these of a finished draft, not before writing one.** Read beforehand they become templates
+and shape what comes out. Read afterward they can only flag, which requires looking at what is
+actually on the page.
 
 - Which sentence is this paragraph's claim, and does it stand out from the ones supporting it?
 - Can a reader tell how each sentence relates to the one before it?

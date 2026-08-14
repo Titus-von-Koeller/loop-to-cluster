@@ -56,6 +56,10 @@ argument holds and the disclosure rule is not violated.
 | Terminal deflation | Ending on "none of this matters yet." If true it belonged in sentence one. |
 | Roadmap opening | "In this page we will cover…" State the claim instead. |
 
+Each points one way. Over-applied they produce their own inverse: a page with no forward
+connections, one that oversells its relevance, one that drops the reader in with no orientation.
+If avoiding an anti-pattern is making the page worse, you have hit the far wall — fix the rule.
+
 ## Notion mechanics
 
 Draft, show the draft, publish only on approval. Never overwrite a page without reading its
