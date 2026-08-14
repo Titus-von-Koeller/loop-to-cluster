@@ -1,6 +1,6 @@
 ---
 name: write-chapter
-description: Author a page of the accelerate learning docs in Notion — a general, durable, model-agnostic explanation of one training-loop concept. Use when asked to write, draft, or add a page. Not for reviewing an existing one (use refine-chapter) and not for measuring a script (use profile-script).
+description: Author a page of the accelerate learning docs in Notion — an explanation of one training-loop concept, for Titus and the next person onboarding. Use when asked to write, draft, or add a page. Not for reviewing an existing one (use refine-chapter) and not for measuring a script (use profile-script).
 ---
 
 # Write a page
@@ -8,9 +8,9 @@ description: Author a page of the accelerate learning docs in Notion — a gener
 The standard is `docs/CONVENTIONS.md`. Read it first and do not re-derive any of it; if an
 invariant there is wrong, change that file and say so. This skill is only the procedure.
 
-Someone who is not Titus should be able to learn from the page in a year, on different
-hardware. The hardest part is not explaining the concept — it is deciding what the page is
-*not* about.
+The reader is Titus, or the next person onboarding onto accelerate — someone with this repo and
+this machine, not a stranger in five years. The hardest part is not explaining the concept; it
+is deciding what the page is *not* about.
 
 ## Read first
 

@@ -53,8 +53,8 @@ by hand.
 **3. Numbers.** Delete the digits from each figure. If the sentence still teaches, the number
 supported a general claim; if it collapses to something already known, it was performing rigor.
 
-**4. Continuity.** Does the page hold one level throughout? Does it open with the ledger, row
-marked? Does the closing hole point at a real later topic?
+**4. Continuity.** Does the page hold one level throughout, or does a section drop below it and
+fail to come back up? Where it uses the ledger, is the row it moves the row it claims?
 
 **5. Prose.** Last and least, against `docs/CONVENTIONS.md`'s prose section — its diagnostic
 questions, not a filter pass.

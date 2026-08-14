@@ -32,6 +32,12 @@ is *The four kinds of state*, which carries the ledger and takes what the loop p
 activation arithmetic, peak memory, where the optimizer state appears. It also inherits three
 items routed to it — seeding and reproducibility, `set_to_none`, and the logits-reference cost.
 
+The topic list was cut from twelve to nine on 2026-08-11. Collectives, a separate sharding
+page, checkpoint-and-resume and proving-equivalence were inventions of mine rather than
+anything Marc or Titus asked for; they are now sections of the pages that need them. Model
+size returned as the exercise for *The four kinds of state*, since Marc named it and sweeping
+N is what makes the memory prediction falsifiable.
+
 ## Decided
 
 - **Random init** via `AutoConfig.from_pretrained` then `from_config`, because a pretrained
