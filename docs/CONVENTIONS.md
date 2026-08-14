@@ -130,9 +130,14 @@ numbers come from the *released* config, never from this repo's code: a field th
 shape is invisible to a parameter count, so a preset can disagree with the released config
 without any shape-based check failing. `docs/_wiki_build/verify_facts.py` diffs the two.
 
-**Specimen measurement** — one run on one machine. These live in `bench/results/`, not in the
-text. Hand the measurement to the reader instead: *"your initial loss should sit just above
-ln(V) — run it and see."* Figures marked *schematic* carry no data claim.
+**Specimen measurement** — one run on one machine, presented as though it were a general
+result. Those live in `bench/results/`. Figures marked *schematic* carry no data claim.
+
+**This is not a ban on numbers, and reading it as one drains a page.** Concrete quantities are
+what make an explanation land: 134,515,008 parameters, 2,053 MiB of model states, about 11.3
+against a floor of 10.8027. Say what to expect and say it in numbers. What to avoid is a figure
+presented as authoritative when it is one reading on one machine — "you will see 3,719 MiB"
+rather than "you should land near 2 GiB before activations; measure yours.".
 
 ## Prose
 
