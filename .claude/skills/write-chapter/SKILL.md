@@ -8,9 +8,9 @@ description: Author a page of the accelerate learning docs in Notion — an expl
 The standard is `docs/CONVENTIONS.md`. Read it first and do not re-derive any of it; if an
 invariant there is wrong, change that file and say so. This skill is only the procedure.
 
-The reader is Titus, or the next person onboarding onto accelerate — someone with this repo and
-this machine, not a stranger in five years. The hardest part is not explaining the concept; it
-is deciding what the page is *not* about.
+The reader is Titus, or the next person onboarding onto accelerate: someone with this repo and
+this machine. The hardest part is not explaining the concept; it is deciding what the page is
+*not* about.
 
 ## Read first
 
@@ -18,12 +18,10 @@ is deciding what the page is *not* about.
 either side of yours, then the exercise script if it exists. Read the current version of your
 page too.
 
-An earlier edition of this skill forbade opening the current page until a clean-sheet draft
-existed, on the theory that anchoring is what produced a loop page containing the five topics
-after it. Drafting blind cost more than it saved: it yields a page assembled from a salvage
-list rather than written, and it discards material that took real work to get right. The
-disclosure rule catches the compressed-sequel failure per paragraph, and does not require you
-to be ignorant of the page.
+Read the current page as well. Drafting blind to it yields a page assembled from a salvage list
+rather than written, and discards material that took real work to get right. Anchoring is the
+risk, and the disclosure rule handles it per paragraph — being ignorant of the page is not
+required and does not help.
 
 ## Then
 
@@ -56,7 +54,7 @@ argument holds and the disclosure rule is not violated.
 | Arguing with your own centerpiece | Introducing an artifact, disowning it, re-litigating it later. Decide once. |
 | Self-contradicting fold | A summary row asserting what the prose says never to do. Fix the row; keep the fold. |
 | Terminal deflation | Ending on "none of this matters yet." If true it belonged in sentence one. |
-| Roadmap opening | "In this chapter we will cover…" State the claim instead. |
+| Roadmap opening | "In this page we will cover…" State the claim instead. |
 
 ## Notion mechanics
 

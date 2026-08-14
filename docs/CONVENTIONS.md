@@ -7,9 +7,8 @@ depend on, so a page and a script cannot drift apart.
 this model and this machine. Worked numbers on SmolLM2-135M need no ceremony, and nothing here
 has to survive a change of hardware.
 
-**Notion is the source of truth.** Nothing in this repo mirrors page prose — a second copy
-drifts and then gets treated as authoritative, which has already happened once from a comment
-in `pixi.toml`.
+**Notion is the source of truth.** Nothing in this repo mirrors page prose. A second copy
+drifts, and a stale copy gets read as authoritative by whoever finds it first.
 
 **Titus edits the pages too.** A page that differs from what you expected has been *edited*,
 not damaged. Cut and rewrite freely; the one gate is that a passage reading as his edit rather
@@ -18,7 +17,8 @@ than as earlier Claude prose gets named and confirmed first.
 **Everything on a page is Claude's**, including retrieval questions and their answers — each
 answer in a collapsed toggle, so the reader produces it cold and then expands to check.
 
-**Refer to a topic by name, never by number.** Renumbering used to force edits across every page.
+**Refer to a topic by name, never by number.** A number in a cross-reference breaks every other
+page as soon as the order changes.
 
 **Everything below serves the argument of the page being written. Where a rule and the argument
 conflict, the rule is wrong: change this file and say so.** Nothing here is a quota, and no
@@ -113,8 +113,8 @@ question earns its place when getting it wrong would cost the reader something l
 
 **A page uses a concept only as deeply as its own exercise requires.** Deeper is a link, not a
 paragraph. Per paragraph: *which exercise makes the reader feel this?* If the answer is an
-exercise several topics away, move it there. The first loop page was a compressed edition of the
-five topics after it, which made it exhausting and unlearnable at once.
+exercise several topics away, move it there. A page that previews the topics after it is both
+exhausting and unlearnable: too shallow to learn from, too present to skip.
 
 Likewise for conditions: **do not qualify a true claim against a configuration the reader will
 not use.** "Under `set_to_none=True`" attached to a default hedges a correct sentence for a
@@ -126,9 +126,9 @@ branch nobody takes.
 step costing about three forward passes. These carry the explanation.
 
 **Worked instance** — the same arithmetic on SmolLM2-135M, so the abstraction lands. Worked
-numbers come from the *released* config and never from this repo's code: `initializer_range`
-reached the pages as 0.02 when the config says 0.041666..., which
-`docs/_wiki_build/verify_facts.py` now catches.
+numbers come from the *released* config, never from this repo's code: a field that changes no
+shape is invisible to a parameter count, so a preset can disagree with the released config
+without any shape-based check failing. `docs/_wiki_build/verify_facts.py` diffs the two.
 
 **Specimen measurement** — one run on one machine. These live in `bench/results/`, not in the
 text. Hand the measurement to the reader instead: *"your initial loss should sit just above
@@ -148,8 +148,7 @@ reader will wrongly blame. Use this shape whenever a silent failure is described
 > Nothing errors and the training is correct — you simply need a gigabyte you should not, and
 > the first thing you will doubt is the memory arithmetic.
 
-**Keep the connectives.** This is the defect the pages actually have — every sentence true, the
-argument gone:
+**Keep the connectives.** Every sentence true, the argument gone:
 
 > A logit is an unnormalized score. Softmax turns logits into probabilities. Cross-entropy is
 > the negative log of the probability given to the correct token. At initialization the weights

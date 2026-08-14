@@ -22,7 +22,7 @@ change.
 
 **Absorb the lookups, though.** Most of what slows a newcomer is retrieval rather than
 concepts. Read config values rather than describing where they live, give exact signatures and
-defaults, check the installed source when behaviour is in question, and fetch a documentation
+defaults, check the installed source when behavior is in question, and fetch a documentation
 page rather than recalling it. Naming an API and its cost is assistance; writing the statement
 is the exercise.
 
@@ -38,7 +38,7 @@ measurement is the only thing that makes two topics comparable.
 
 ## Depth ceiling
 
-Explain at the level of the public torch API and its documented behaviour: what a call does
+Explain at the level of the public torch API and its documented behavior: what a call does
 and what it costs, not how it is implemented.
 
 **accelerate source is always in scope, and is the exception that matters.** Read it before

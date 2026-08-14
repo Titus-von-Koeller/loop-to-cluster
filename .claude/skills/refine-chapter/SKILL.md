@@ -22,9 +22,8 @@ page that differs from what you expected has been edited, not damaged.
 
 `docs/CONVENTIONS.md`, the parent page for the topic order, the page under review in full, the
 topics either side of it, and its exercise script. A page's worst defects live in its relation
-to its neighbours and are invisible from inside it: the first loop page read as merely dense
-until it was set against the topic order, where it turned out to contain the five topics
-after it.
+to its neighbors and are invisible from inside it — a page that swallows the topics after it
+reads as merely dense until you set it against the topic order.
 
 ## The passes, in order
 
