@@ -27,10 +27,7 @@ Restructured 2026-08-07 after a code review by Marc Sun. Clean and green.
 2. **Run it on the baseline** and check the signals in `PROFILING.md`.
 3. **Topics**, one per script, each a copy-and-modify of the baseline.
 
-In parallel, the Notion pages. *The loop* has been rewritten and is the model to follow. Next
-is *The four kinds of state*, which carries the ledger and takes what the loop page defers:
-activation arithmetic, peak memory, where the optimizer state appears, seeding and
-reproducibility, `set_to_none`, and what a live reference to the logits costs.
+In parallel, the Notion pages. *The loop* and *Memory and compute* have been rewritten and are the model to follow. Next is *Mixed precision*, which is step one of the plan on the parent page.
 
 ## Decided
 

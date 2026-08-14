@@ -37,16 +37,16 @@ So a page answers *why would I go there*, not only *what changes*.
 | Topic | Exercise |
 | --- | --- |
 | The loop | the fp32 baseline |
-| The four kinds of state | predict peak memory, then sweep model size and check the prediction tracks |
+| Memory and compute | predict peak memory, then sweep model size and check the prediction tracks |
 | Mixed precision | autocast and the loss scaler |
 | The optimizer | swap the optimizer; gradient clipping |
-| The data path | dataloader variations |
+| The dataloader | dataloader variations |
 | Gradient accumulation | accumulation |
-| Data parallelism | DDP |
-| Sharding the ledger | FSDP |
-| DeepSpeed | DeepSpeed |
+| DDP | data parallelism across two ranks |
+| FSDP | sharding the model states |
+| DeepSpeed and ZeRO | the same bets, a different configuration surface |
 
-Collectives are introduced where data parallelism needs them, not as their own page.
+Collectives are introduced where DDP first needs them, not as their own page.
 Checkpoint and resume is a section of the FSDP page, because sharded state is what makes it
 hard. Equivalence is a section of each technique page rather than a page of its own.
 
@@ -167,9 +167,11 @@ Ask of a draft:
 
 ## Out of scope
 
-- **The architecture tour** — RoPE, SwiGLU, grouped-query attention, RMSNorm. The model is a
-  black box. Two facts matter downstream and are stated where needed: reductions resist low
-  precision, and the logits tensor scales with vocabulary rather than hidden size.
+- **The architecture tour** — RoPE, SwiGLU, RMSNorm as mechanisms. The model is a black box
+  *except where one of its shapes enters an arithmetic the reader performs*: grouped-query
+  attention, because it is why the textbook parameter formula overshoots; vocabulary, because
+  the logits term scales with it; and which operations are reductions, because those are the
+  ones that resist low precision.
 - **Initialization detail** beyond one clause: the weights are random, so the model is
   maximally unsure.
 - **Gradient checkpointing**, beyond one line in the ledger naming it as the trade.
