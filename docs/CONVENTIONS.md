@@ -158,6 +158,22 @@ Nothing states which claim depends on which, so the reader rebuilds the reasonin
 deleted. *So, which is why, but, the consequence is* — those carry the argument. Delete
 sentences about the document; keep the words that join one claim to the next.
 
+**And the opposite failure, which fixing the first one causes.** Every claim connected, none of
+them landing:
+
+> Two operations share one call, because passing `labels=` has the model compute the loss
+> itself — shifting the labels by one on the way, so that the score at position *i* is against
+> the token at *i+1* — which is why writing the score step by hand is where the shift can go
+> wrong.
+
+Four qualifications before the sentence finishes its first idea. Prose like this reads as
+careful and parses as work. The fix is not fewer connectives, it is fewer ideas per sentence:
+say the first thing, stop, then say what follows from it.
+
+**The check:** where a sentence carries more than one subordinate clause, or an aside set off by
+dashes, write it as two and keep whichever version is clearer. Often it is the original. The
+point is to have compared.
+
 Ask of a draft:
 
 - Which sentence is this paragraph's claim, and does it stand out from the ones supporting it?
