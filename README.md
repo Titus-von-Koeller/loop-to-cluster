@@ -8,8 +8,8 @@ one concept, written to be read top to bottom.
 
 ```text
 scripts/               study scripts. self-contained, hand-written, ~50 lines
-  NN_topic.py            trains and prints the loss
-  NN_topic_profiled.py   generated twin: same training, plus measurement
+  00-basic-loop.py       trains and prints the loss
+  <script>_profiled.py   generated twin: same training, plus measurement
 l2c/                   profiling harness. only the profiled twins import it
   harness/               timing, the memory staircase, the autograd ledger,
                          predictions, predicted-vs-measured tables, run JSON
