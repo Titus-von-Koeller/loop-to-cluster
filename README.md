@@ -7,22 +7,20 @@ This is a set of study scripts, not a codebase. Each one is a complete, runnable
 one concept, written to be read top to bottom.
 
 ```text
-scripts/           study scripts. self-contained, hand-written, ~50 lines
-  NN_topic.py        trains and prints the loss
+scripts/               study scripts. self-contained, hand-written, ~50 lines
+  NN_topic.py            trains and prints the loss
   NN_topic_profiled.py   generated twin: same training, plus measurement
-l2c/               profiling harness. only the profiled twins import it
-  harness/
-    measure.py       CUDA-event timing, the memory staircase, requested-vs-block bytes
-    ledger.py        what autograd actually saves, by category and dtype
-    predict.py       model states, the autocast weight cache, ln(V)
-    report.py        predicted-versus-measured tables
-    runs.py          one JSON per run, keyed by script and config
-  common/model.py  model construction, used by the wiki tooling
-  paths.py         where bench output lands
-bench/             generated: results/*.json and figures/*.png (tracked)
-tests/             harness arithmetic, and the script-boundary rule
-PROFILING.md       the measurement contract every profiled twin follows
-docs/              wiki build area, Jupyter setup
+l2c/                   profiling harness. only the profiled twins import it
+  harness/               timing, the memory staircase, the autograd ledger,
+                         predictions, predicted-vs-measured tables, run JSON
+  common/model.py        model construction, used by the docs tooling
+bench/                 generated: results/*.json and figures/*.png (tracked)
+tests/                 harness arithmetic, and the script-boundary rule
+CLAUDE.md              how to work in this repo
+PROFILING.md           the measurement contract every profiled twin follows
+docs/CONVENTIONS.md    the standard for the Notion learning pages
+docs/START_HERE.md     current state and decisions already taken
+docs/_wiki_build/      verifiers and figure generators for those pages
 ```
 
 ## The one rule

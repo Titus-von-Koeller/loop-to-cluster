@@ -28,23 +28,19 @@ torch = ">=2.13,<3"
 # against the same wheels as torch rather than mixing ABIs across sources.
 numpy = ">=2.5"
 
-# The lab itself, installed editable so `import l2c` resolves from any working
-# directory — notebooks under notebooks/ and step scripts under steps/ both need
-# that. Editable installs require a build system, which is why pyproject.toml
-# exists; it carries build metadata only, and dependencies stay here where the
-# lock file governs them.
+# The harness, installed editable so `import l2c` resolves from any working directory.
+# Editable installs require a build system, which is why pyproject.toml exists; it
+# carries build metadata only, and dependencies stay here where the lock file governs
+# them.
 l2c = { path = ".", editable = true }
 
-# Architecture and tokenizer come from transformers; the model is *constructed*
-# from a config rather than loaded from a checkpoint, so no weights are fetched.
-# datasets provides wikitext-2, tokenized once into .cache/.
+# Architecture, tokenizer and dataset. Both depend on torch, so both come from PyPI
+# under the rule above.
 transformers = ">=4.40"
 datasets = ">=2.14"
 
-# Not imported by any step — the lessons are deliberately bare torch. Installed so the
-# accelerate cross-references throughout the docstrings can be verified against its
-# source, and so a step can be diffed against the equivalent accelerate call when that
-# is the clearest way to show what the call does.
+# Imported by nothing. Installed so that claims about accelerate can be checked against
+# its source rather than recalled.
 accelerate = ">=1.0"
 
 # Notebooks. jupyterlab and ipykernel live in *this* environment on purpose: the kernel
