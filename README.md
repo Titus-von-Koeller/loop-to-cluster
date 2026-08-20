@@ -37,7 +37,13 @@ compared against. Self-contained scripts can be modified without touching each o
 ```bash
 pixi install
 CUDA_VISIBLE_DEVICES=0 pixi run python -c 'import torch; print(torch.cuda.is_available())'
+
+git config core.hooksPath .githooks              # ruff check + format on commit
+git config blame.ignoreRevsFile .git-blame-ignore-revs
 ```
+
+Both `git config` lines are per-clone. The hook is a plain script rather than a `pre-commit`
+install so that it cannot silently not exist; bypass it for one commit with `--no-verify`.
 
 Always `CUDA_VISIBLE_DEVICES=0`; GPU 1 drives a display. Always `cd` into this directory in the
 same command as `pixi run` — see `CLAUDE.md`.

@@ -1,0 +1,15 @@
+#!/usr/bin/env bash
+# Lint gate. Prose rules in CLAUDE.md get broken; this one cannot be.
+# Activate with: git config core.hooksPath .githooks
+# Bypass a single commit with: git commit --no-verify
+set -euo pipefail
+
+# git runs hooks from the repository root, so pixi resolves this project's manifest.
+if ! pixi run ruff check .; then
+    echo "pre-commit: ruff check failed" >&2
+    exit 1
+fi
+if ! pixi run ruff format --check .; then
+    echo "pre-commit: ruff format --check failed (run: pixi run ruff format .)" >&2
+    exit 1
+fi
