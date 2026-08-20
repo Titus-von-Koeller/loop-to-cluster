@@ -66,10 +66,8 @@ what the other is committing. Stage paths explicitly — `git add <paths>`, neve
 
 ## Style
 
-United States spelling. `ruff check` must pass under the configured rules. `ruff format` is not
-part of the standard here and has never been run across the repo — among other things it would
-collapse the aligned comment column in the training loop, which is deliberate. Expand every
-acronym on first use. Code and prose document themselves and never reference the conversation
+United States spelling. `.githooks/pre-commit` is the formatting standard and enforces itself; run
+it rather than trusting a description of what it checks. Expand every acronym on first use. Code and prose document themselves and never reference the conversation
 that produced them.
 
 ## Where to look

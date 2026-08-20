@@ -85,6 +85,19 @@ recording allocation history is studying-the-training rather than training. This
 generated `*_profiled.py` twin governed by a written contract: one runner works on every script
 present and future, needs no template, and cannot drift from what it measures.
 
+## Formatting
+
+*2026-08-20.*
+
+`ruff format` owns every file and `.githooks/pre-commit` enforces it. The training loop's aligned
+comment column was protected with `# fmt: off` markers first and then given up: two lines of
+tooling directive immediately above the four-line core cost the reader more than the alignment
+bought, and every later script would have inherited the pair.
+
+The standard is the hook, not a sentence describing the hook. `CLAUDE.md` carried such a sentence
+and it was flatly wrong within three commits — the same failure mode as a hand-copied version
+list, and the same fix: point at the thing that fails loudly.
+
 ## Do not resurrect
 
 Prescriptive, unlike the rest of this file. These were tried and cost something.
@@ -108,3 +121,6 @@ and let one experiment perturb another.
   it governed.
 - **Generated `*_profiled.py` twins** with a measurement contract, a template, and a
   regeneration rule. Replaced by inline logging plus one external runner.
+- **A list of the later techniques in the `00` docstring.** It reads as helpful and is a second
+  copy of the Notion path: the list that was there named four of seven topics and had already
+  lost DeepSpeed. Two techniques as examples carry the same meaning and cannot go stale.
