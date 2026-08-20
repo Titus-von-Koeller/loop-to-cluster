@@ -101,15 +101,13 @@ trackio.init(
 for step in range(max_steps):
     started = time.perf_counter()
 
-    # fmt: off
-    ids = next(batches).to(device)          # data
-    loss = model(ids, labels=ids).loss      # forward + score
-    loss.backward()                         # backward
+    ids = next(batches).to(device)  # data
+    loss = model(ids, labels=ids).loss  # forward + score
+    loss.backward()  # backward
     # read here: the update does not change it, but zero_grad erases it
     grad_norm = get_total_norm([p.grad for p in model.parameters() if p.grad is not None])
-    optimizer.step()                        # update
-    optimizer.zero_grad()                   # reset
-    # fmt: on
+    optimizer.step()  # update
+    optimizer.zero_grad()  # reset
 
     elapsed = time.perf_counter() - started
     trackio.log(
