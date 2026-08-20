@@ -1,6 +1,6 @@
 """Ground-truth every claim the wiki makes about the model, its optimizer and its memory.
 
-Run: cd /home/titus/src/loop-to-cluster && pixi run python docs/_wiki_build/verify_facts.py
+Run: cd /home/titus/src/loop-to-cluster && pixi run python figures/verify_facts.py
 """
 
 import glob

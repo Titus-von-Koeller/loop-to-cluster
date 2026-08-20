@@ -1,6 +1,6 @@
 """Generate the wiki figures.
 
-Run: cd /home/titus/src/loop-to-cluster && pixi run python docs/_wiki_build/make_figures.py
+Run: cd /home/titus/src/loop-to-cluster && pixi run python figures/make_figures.py
 
 Every figure is labelled measured or schematic in its footnote. Measured
 figures use numbers verified in verify_params.py / verify_facts.py; schematic
@@ -34,10 +34,10 @@ from figstyle import (
 from matplotlib.patches import Rectangle
 
 use_house_style()
-OUT = os.path.dirname(os.path.abspath(__file__)) + "/figures"
+OUT = os.path.dirname(os.path.abspath(__file__)) + "/out"
 os.makedirs(OUT, exist_ok=True)
 
-# Verified in docs/_wiki_build/verify_params.py
+# Verified in figures/verify_params.py
 P_TOTAL = 134_515_008
 P_MLP, P_EMBED, P_ATTN, P_NORM = 79_626_240, 28_311_552, 26_542_080, 35_136
 P_TEXTBOOK = 147_750_912

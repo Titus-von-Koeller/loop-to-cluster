@@ -1,6 +1,6 @@
 """Verify the analytic parameter count against the constructed model.
 
-Run: cd /home/titus/src/loop-to-cluster && pixi run python docs/_wiki_build/verify_params.py
+Run: cd /home/titus/src/loop-to-cluster && pixi run python figures/verify_params.py
 
 Nothing here is a step prediction: step 1 is a completed worked example, and its
 parameter count is already stated in l2c/common/model.py.

@@ -2,8 +2,8 @@
 
 **Nothing in `scripts/` may import this package.** A study script is written to be read
 top to bottom and modified by hand; an import it has to follow costs the reader the
-thing the script exists to give them. Only the generated `*_profiled.py` twins and the
-tooling under `docs/` import from here. `tests/test_boundary.py` enforces it.
+thing the script exists to give them. Only the figure tooling under
+`figures/` imports from here. `tests/test_boundary.py` enforces it.
 
 Submodules are not imported here on purpose, so that `import l2c` stays cheap and does
 not drag in torch or transformers:

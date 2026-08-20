@@ -1,8 +1,7 @@
-# Wiki build area
+# Figures for the Notion pages
 
 Source artifacts for the Notion pages at
-<https://app.notion.com/p/226810b52c0d4880b4d0fc8fa4f89012>. Editing rules and the standard for
-the pages themselves are in `docs/CONVENTIONS.md`; this directory holds only what can be
+<https://app.notion.com/p/226810b52c0d4880b4d0fc8fa4f89012>. This directory holds only what can be
 *verified* or *regenerated*.
 
 | File | What it is |
@@ -11,7 +10,7 @@ the pages themselves are in `docs/CONVENTIONS.md`; this directory holds only wha
 | `verify_facts.py` | Ground-truths the optimizer, initialization and norm claims, and diffs the preset field by field against SmolLM2-135M's released config. |
 | `figstyle.py` | House style for figures. |
 | `make_figures.py` | Generates every figure. |
-| `figures/` | Rendered PNGs, uploaded by hand. |
+|  `out/` | Rendered PNGs, uploaded by hand. |
 
 **Never source a number from this repo's own code.** A config field that changes no shape is
 invisible to a parameter count, so a preset can disagree with the released config while every
