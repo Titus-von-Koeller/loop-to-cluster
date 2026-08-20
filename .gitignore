@@ -31,3 +31,6 @@ __pycache__/
 
 # Memory snapshots: large, machine-specific, regenerable with snapshot.py.
 bench/snapshots/
+
+# Transient handoff notes for an in-flight refactor. Deleted when it lands.
+.handoff/
