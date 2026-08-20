@@ -23,3 +23,8 @@ __pycache__/
 # NOTES.md, and a measurement is only regenerable on the same GPU with the same torch
 # build — which makes it not regenerable. Committing the prediction and withholding the
 # result would leave half of each claim unversioned. A few KB per run.
+
+# Jupyter session state, not content. The notebooks themselves are tracked.
+.jupyter/
+.jupyter_ystore.db
+.ipynb_checkpoints/

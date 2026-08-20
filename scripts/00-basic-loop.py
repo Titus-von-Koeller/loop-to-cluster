@@ -6,11 +6,12 @@ accumulation, distributed data parallel (DDP), fully sharded data parallel
 this file is both a reference to read and the baseline the others are compared
 against, and every line serves one of those two roles.
 
-That comparison only means anything if two runs differ in one place, so the seed,
-the data order and the initial weights are fixed here, and stages are compared at
-equal global batch size. A stage that only relocates arithmetic — accumulation,
-DDP, FSDP — must reproduce this file's gradients; only mixed precision may change
-them, and by a bounded amount.
+A stage changes one topic and pins everything that topic does not require: the
+seed, the data order, the initial weights, the global batch size and the number of
+updates. Pinning the global batch is why a distributed stage divides batch_size by
+the world size rather than multiplying what the baseline saw. A stage that only
+relocates arithmetic — accumulation, DDP, FSDP — must reproduce this file's
+gradients; only mixed precision may change them, and by a bounded amount.
 
 Absent by design, each a stage of its own: learning-rate schedule, gradient
 clipping, validation, checkpointing, throughput and memory instrumentation.
