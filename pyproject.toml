@@ -29,7 +29,10 @@ line-length = 95
 target-version = "py314"
 
 [tool.ruff.lint]
-select = ["E", "F", "I", "UP", "B", "SIM", "RUF"]
+# W catches trailing whitespace and a missing final newline. Neither is caught by the
+# formatter on files it is told to skip, and a heredoc rewrite dropped a final newline
+# once without anything noticing.
+select = ["E", "F", "I", "UP", "B", "SIM", "RUF", "W"]
 
 [tool.ruff.lint.per-file-ignores]
 # The figures carry their titles, subtitles and footnotes as literal strings, and
