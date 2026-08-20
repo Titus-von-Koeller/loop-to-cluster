@@ -28,3 +28,6 @@ __pycache__/
 .jupyter/
 .jupyter_ystore.db
 .ipynb_checkpoints/
+
+# Memory snapshots: large, machine-specific, regenerable with snapshot.py.
+bench/snapshots/
