@@ -32,7 +32,7 @@ CATEGORICAL = [BLUE, GOLD, ROSE]
 BLUE_ORDINAL = ["#86b6ef", "#3987e5", "#256abf", "#184f95"]
 
 # --- semantic ---------------------------------------------------------
-GOOD = "#2166AC"      # deliberately not green
+GOOD = "#2166AC"  # deliberately not green
 BAD = "#BB5566"
 NEUTRAL = "#b9b7ae"
 
@@ -85,8 +85,14 @@ def title(ax, text: str, subtitle: str | None = None) -> None:
     ax.set_title(text, loc="left", pad=22 if subtitle else 14)
     if subtitle:
         ax.text(
-            0, 1.045, subtitle, transform=ax.transAxes,
-            fontsize=10, color=INK_2, va="bottom", ha="left",
+            0,
+            1.045,
+            subtitle,
+            transform=ax.transAxes,
+            fontsize=10,
+            color=INK_2,
+            va="bottom",
+            ha="left",
         )
 
 

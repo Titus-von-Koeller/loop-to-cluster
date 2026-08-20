@@ -59,8 +59,12 @@ else:
 # ---------------------------------------------------------------- init
 print("\n### Initialization")
 print(f"config.initializer_range: {model.config.initializer_range}")
-for name in ("model.embed_tokens.weight", "model.layers.0.self_attn.q_proj.weight",
-             "model.layers.0.mlp.down_proj.weight", "model.layers.29.mlp.down_proj.weight"):
+for name in (
+    "model.embed_tokens.weight",
+    "model.layers.0.self_attn.q_proj.weight",
+    "model.layers.0.mlp.down_proj.weight",
+    "model.layers.29.mlp.down_proj.weight",
+):
     t = dict(model.named_parameters())[name]
     print(f"  {name:<44} std={t.std().item():.5f} mean={t.mean().item():+.6f}")
 norm_w = dict(model.named_parameters())["model.layers.0.input_layernorm.weight"]
@@ -85,7 +89,9 @@ for n, p in model.named_parameters():
     (no_decay if p.ndim < 2 else decay).append((n, p.numel()))
 print(f"  decay    : {len(decay):>4} tensors, {sum(c for _, c in decay):>12,} params")
 print(f"  no_decay : {len(no_decay):>4} tensors, {sum(c for _, c in no_decay):>12,} params")
-print(f"  no_decay share: {sum(c for _, c in no_decay) / sum(p.numel() for p in model.parameters()):.4%}")
+print(
+    f"  no_decay share: {sum(c for _, c in no_decay) / sum(p.numel() for p in model.parameters()):.4%}"
+)
 print(f"  no_decay examples: {[n for n, _ in no_decay[:3]]}")
 
 # ------------------------------------------------- optimizer defaults
@@ -98,7 +104,9 @@ for k in ("lr", "betas", "eps", "weight_decay", "foreach", "fused", "capturable"
 # --------------------------------------------- state_dict structure
 print("\n### optimizer.state_dict() structure")
 opt = torch.optim.AdamW(model.parameters(), lr=1e-3)
-print(f"  before any step -> state entries: {len(opt.state_dict()['state'])}  (lazy allocation)")
+print(
+    f"  before any step -> state entries: {len(opt.state_dict()['state'])}  (lazy allocation)"
+)
 loss2 = causal_lm_loss(model(input_ids=ids).logits, ids)
 loss2.backward()
 opt.step()
@@ -109,7 +117,9 @@ print(f"  state key type  : {type(next(iter(sd['state']))).__name__}  (index, NO
 first = sd["state"][next(iter(sd["state"]))]
 print(f"  per-param keys  : {list(first.keys())}")
 for k, v in first.items():
-    print(f"      {k:<12} {type(v).__name__:<8} {tuple(v.shape) if hasattr(v, 'shape') else v}")
+    print(
+        f"      {k:<12} {type(v).__name__:<8} {tuple(v.shape) if hasattr(v, 'shape') else v}"
+    )
 pg = sd["param_groups"][0]
 print(f"  param_group keys: {sorted(pg.keys())}")
 print(f"  params field    : list of {len(pg['params'])} int indices")
@@ -144,7 +154,9 @@ else:
     print(f"  logits {B} x {S} x {V} x 4 B   = {nominal:>9,.0f} MiB")
     print(f"  peak, reference held        = {held:>9,.1f} MiB")
     print(f"  peak, reference dropped     = {freed:>9,.1f} MiB")
-    print(f"  cost of the reference       = {held - freed:>9,.1f} MiB"
-          f"  ({(held - freed) / nominal:.2f} x the tensor)")
+    print(
+        f"  cost of the reference       = {held - freed:>9,.1f} MiB"
+        f"  ({(held - freed) / nominal:.2f} x the tensor)"
+    )
 
 print("=" * 62)

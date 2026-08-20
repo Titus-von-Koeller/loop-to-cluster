@@ -19,10 +19,10 @@ q_width = p.num_attention_heads * head_dim
 
 embed = V * d
 attn = d * q_width + d * kv_width * 2 + q_width * d
-mlp = 3 * d * ffn          # gated: gate, up, down
-norms = 2 * d              # two RMSNorm weights per block
+mlp = 3 * d * ffn  # gated: gate, up, down
+norms = 2 * d  # two RMSNorm weights per block
 per_layer = attn + mlp + norms
-analytic = embed + L * per_layer + d   # + final norm; lm_head tied -> 0
+analytic = embed + L * per_layer + d  # + final norm; lm_head tied -> 0
 
 # The textbook heuristic, for comparison.
 textbook = 12 * L * d**2 + V * d

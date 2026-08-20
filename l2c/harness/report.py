@@ -78,5 +78,3 @@ def environment(
     if memory_in_use_bytes is not None:
         captured["device_used_gib_at_start"] = round(gib(memory_in_use_bytes), 2)
     return captured
-
-
