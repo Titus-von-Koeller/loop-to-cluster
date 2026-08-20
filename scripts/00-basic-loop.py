@@ -109,6 +109,9 @@ for step in range(max_steps):
     optimizer.step()  # update
     optimizer.zero_grad()  # reset
 
+    # CUDA is asynchronous, so without this the timer would stop when the last kernel was
+    # *queued* rather than when it finished, and every tokens/s number would be too high.
+    torch.cuda.synchronize(device)
     elapsed = time.perf_counter() - started
     trackio.log(
         {
@@ -121,6 +124,9 @@ for step in range(max_steps):
         },
         step=step,
     )
+    # Reset so the next step's peak is that step's own. Left running, this is a run-wide
+    # high-water mark that stops moving after the first update and logs a flat line.
+    torch.cuda.reset_peak_memory_stats(device)
 
     if step % log_every == 0:
         print(f"step {step:4d}  loss {loss.item():.4f}  grad_norm {grad_norm.item():.3f}")
