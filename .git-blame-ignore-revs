@@ -1,3 +1,4 @@
 # Commits that only move code around. Activate with:
 #   git config blame.ignoreRevsFile .git-blame-ignore-revs
 f5531a23955d891ffb98973097334a205f721828  # style: apply ruff format
+506d2bac8b1770fbce6206060afbaf825343f78b  # style: widen code to 119, hold prose at 95
