@@ -39,3 +39,19 @@ select = ["E", "F", "I", "UP", "B", "SIM", "RUF", "W"]
 # the verification scripts print aligned tables. Wrapping either to 95 columns splits
 # sentences mid-clause for no reader's benefit.
 "figures/*.py" = ["E501"]
+# A marimo cell renders its last expression, so a bare trailing name is the output rather
+# than dead code. Every other rule, and the formatter, still applies.
+"notebooks/*.py" = ["B018"]
+
+[tool.marimo.formatting]
+# Match ruff, so saving in the editor and the pre-commit hook cannot disagree.
+line_length = 95
+
+[tool.marimo.save]
+format_on_save = true
+
+[tool.marimo.runtime]
+# Lazy, because a dependent cell here can hold a model on the GPU: an edit upstream
+# would otherwise re-instantiate it, or re-run a training loop, as a side effect.
+on_cell_change = "lazy"
+auto_instantiate = false

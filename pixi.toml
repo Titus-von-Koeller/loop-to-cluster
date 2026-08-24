@@ -58,6 +58,10 @@ accelerate = ">=1.0"
 jupyterlab = ">=4.4"
 ipykernel = ">=6.29"
 jupyter-mcp-server = ">=1.2"
+# marimo notebooks are .py: the reactive graph forbids a name being bound in two cells,
+# so execution order cannot diverge from the file. Same environment for the same reason
+# as above -- cells run in this interpreter, which is the one that has torch.
+marimo = ">=0.24, <0.25"
 matplotlib = ">=3.11.1, <4"
 seaborn = ">=0.13.2, <0.14"
 trackio = ">=0.35.0, <0.36"
