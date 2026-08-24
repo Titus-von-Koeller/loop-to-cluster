@@ -25,27 +25,36 @@ requires-python = ">=3.14"
 packages = ["l2c"]
 
 [tool.ruff]
-line-length = 95
+# 119 is the width every repo this work targets uses -- accelerate, transformers,
+# diffusers, peft, trl, bitsandbytes -- so formatting habits carry across.
+line-length = 119
 target-version = "py314"
 
 [tool.ruff.lint]
 # W catches trailing whitespace and a missing final newline. Neither is caught by the
 # formatter on files it is told to skip, and a heredoc rewrite dropped a final newline
-# once without anything noticing.
+# once without anything noticing. W505 is the reason the two widths differ: it holds
+# standalone comments and docstrings to max-doc-length while code gets the full 119,
+# because prose past about 90 columns is measurably harder to read and this repo's
+# docstrings are long enough for that to matter.
 select = ["E", "F", "I", "UP", "B", "SIM", "RUF", "W"]
+
+[tool.ruff.lint.pycodestyle]
+# W505 is ignored entirely unless this is set, however it is selected above.
+max-doc-length = 95
 
 [tool.ruff.lint.per-file-ignores]
 # The figures carry their titles, subtitles and footnotes as literal strings, and
-# the verification scripts print aligned tables. Wrapping either to 95 columns splits
-# sentences mid-clause for no reader's benefit.
+# the verification scripts print aligned tables. Wrapping either splits sentences
+# mid-clause for no reader's benefit.
 "figures/*.py" = ["E501"]
 # A marimo cell renders its last expression, so a bare trailing name is the output rather
 # than dead code. Every other rule, and the formatter, still applies.
 "notebooks/*.py" = ["B018"]
 
 [tool.marimo.formatting]
-# Match ruff, so saving in the editor and the pre-commit hook cannot disagree.
-line_length = 95
+# Match ruff's line-length, so saving in the editor and the pre-commit hook cannot disagree.
+line_length = 119
 
 [tool.marimo.save]
 format_on_save = true

@@ -54,9 +54,7 @@ def table(rows: Sequence[Row]) -> str:
     return "\n".join(lines)
 
 
-def environment(
-    device: torch.device, *, memory_in_use_bytes: int | None = None
-) -> dict[str, object]:
+def environment(device: torch.device, *, memory_in_use_bytes: int | None = None) -> dict[str, object]:
     """Everything needed to reproduce a number, recorded with the number.
 
     The precision knobs are here for a specific reason. `float32_matmul_precision`

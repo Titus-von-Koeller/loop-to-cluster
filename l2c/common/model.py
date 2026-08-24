@@ -118,9 +118,7 @@ def causal_lm_loss(logits: torch.Tensor, input_ids: torch.Tensor) -> torch.Tenso
     This is also what `LlamaForCausalLM` does internally.
     """
     targets = nn.functional.pad(input_ids, (0, 1), value=IGNORE_INDEX)[:, 1:]
-    return nn.functional.cross_entropy(
-        logits.flatten(0, 1), targets.flatten(), ignore_index=IGNORE_INDEX
-    )
+    return nn.functional.cross_entropy(logits.flatten(0, 1), targets.flatten(), ignore_index=IGNORE_INDEX)
 
 
 def count_parameters(model: nn.Module) -> int:

@@ -70,9 +70,7 @@ def require_cuda() -> torch.device:
     selects which.
     """
     if not torch.cuda.is_available():
-        raise RuntimeError(
-            "This lab measures GPU memory and needs CUDA. torch.cuda.is_available() is False."
-        )
+        raise RuntimeError("This lab measures GPU memory and needs CUDA. torch.cuda.is_available() is False.")
     return torch.device("cuda")
 
 
@@ -198,10 +196,7 @@ def state_inventory(model: nn.Module, optimizer: torch.optim.Optimizer) -> State
         param_bytes=requested_bytes(parameters),
         grad_bytes=requested_bytes(p.grad for p in parameters),
         optimizer_bytes=requested_bytes(
-            value
-            for state in optimizer.state.values()
-            for value in state.values()
-            if isinstance(value, torch.Tensor)
+            value for state in optimizer.state.values() for value in state.values() if isinstance(value, torch.Tensor)
         ),
     )
 
@@ -349,10 +344,7 @@ class StepTimer:
     @contextmanager
     def step(self) -> Iterator[None]:
         if self._recorded >= self._capacity:
-            raise RuntimeError(
-                f"StepTimer was built for {self._capacity} steps and has recorded "
-                f"{self._recorded}."
-            )
+            raise RuntimeError(f"StepTimer was built for {self._capacity} steps and has recorded {self._recorded}.")
         if self._wall_start is None:
             # Begin the wall clock from a quiet GPU, so queued warmup work is not
             # billed to the first timed step.
@@ -374,8 +366,6 @@ class StepTimer:
         wall_seconds = time.perf_counter() - self._wall_start
         device_ms = [
             start.elapsed_time(end)
-            for start, end in zip(
-                self._starts[: self._recorded], self._ends[: self._recorded], strict=True
-            )
+            for start, end in zip(self._starts[: self._recorded], self._ends[: self._recorded], strict=True)
         ]
         return Timings(device_ms=device_ms, wall_seconds=wall_seconds)

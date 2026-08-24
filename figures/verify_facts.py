@@ -27,9 +27,7 @@ model = build_model(SMOLLM2_135M, seed=0)
 print("\n### Normalization layer type")
 norm_types = {type(m).__name__ for n, m in model.named_modules() if "norm" in n.lower()}
 print(f"norm module types: {sorted(norm_types)}")
-has_bias = {
-    n: (m.bias is not None) for n, m in model.named_modules() if isinstance(m, nn.Linear)
-}
+has_bias = {n: (m.bias is not None) for n, m in model.named_modules() if isinstance(m, nn.Linear)}
 print(f"nn.Linear count: {len(has_bias)}")
 print(f"any Linear with bias: {any(has_bias.values())}")
 
@@ -39,9 +37,7 @@ print(f"any Linear with bias: {any(has_bias.values())}")
 # field instead.
 print("\n### Preset vs the released config")
 _snapshots = glob.glob(
-    os.path.expanduser(
-        "~/.cache/huggingface/hub/models--HuggingFaceTB--SmolLM2-135M/snapshots/*/config.json"
-    )
+    os.path.expanduser("~/.cache/huggingface/hub/models--HuggingFaceTB--SmolLM2-135M/snapshots/*/config.json")
 )
 if not _snapshots:
     print("  released config not in the local HF cache — skipped")
@@ -89,9 +85,7 @@ for n, p in model.named_parameters():
     (no_decay if p.ndim < 2 else decay).append((n, p.numel()))
 print(f"  decay    : {len(decay):>4} tensors, {sum(c for _, c in decay):>12,} params")
 print(f"  no_decay : {len(no_decay):>4} tensors, {sum(c for _, c in no_decay):>12,} params")
-print(
-    f"  no_decay share: {sum(c for _, c in no_decay) / sum(p.numel() for p in model.parameters()):.4%}"
-)
+print(f"  no_decay share: {sum(c for _, c in no_decay) / sum(p.numel() for p in model.parameters()):.4%}")
 print(f"  no_decay examples: {[n for n, _ in no_decay[:3]]}")
 
 # ------------------------------------------------- optimizer defaults
@@ -104,9 +98,7 @@ for k in ("lr", "betas", "eps", "weight_decay", "foreach", "fused", "capturable"
 # --------------------------------------------- state_dict structure
 print("\n### optimizer.state_dict() structure")
 opt = torch.optim.AdamW(model.parameters(), lr=1e-3)
-print(
-    f"  before any step -> state entries: {len(opt.state_dict()['state'])}  (lazy allocation)"
-)
+print(f"  before any step -> state entries: {len(opt.state_dict()['state'])}  (lazy allocation)")
 loss2 = causal_lm_loss(model(input_ids=ids).logits, ids)
 loss2.backward()
 opt.step()
@@ -117,9 +109,7 @@ print(f"  state key type  : {type(next(iter(sd['state']))).__name__}  (index, NO
 first = sd["state"][next(iter(sd["state"]))]
 print(f"  per-param keys  : {list(first.keys())}")
 for k, v in first.items():
-    print(
-        f"      {k:<12} {type(v).__name__:<8} {tuple(v.shape) if hasattr(v, 'shape') else v}"
-    )
+    print(f"      {k:<12} {type(v).__name__:<8} {tuple(v.shape) if hasattr(v, 'shape') else v}")
 pg = sd["param_groups"][0]
 print(f"  param_group keys: {sorted(pg.keys())}")
 print(f"  params field    : list of {len(pg['params'])} int indices")
@@ -154,9 +144,6 @@ else:
     print(f"  logits {B} x {S} x {V} x 4 B   = {nominal:>9,.0f} MiB")
     print(f"  peak, reference held        = {held:>9,.1f} MiB")
     print(f"  peak, reference dropped     = {freed:>9,.1f} MiB")
-    print(
-        f"  cost of the reference       = {held - freed:>9,.1f} MiB"
-        f"  ({(held - freed) / nominal:.2f} x the tensor)"
-    )
+    print(f"  cost of the reference       = {held - freed:>9,.1f} MiB  ({(held - freed) / nominal:.2f} x the tensor)")
 
 print("=" * 62)

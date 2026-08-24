@@ -84,9 +84,7 @@ def fig_textbook_error():
     fig, ax = plt.subplots(figsize=(7.6, 3.2))
     names = ["Textbook formula\n12·L·d² + V·d", "Actual\nsum(p.numel())"]
     vals = [P_TEXTBOOK, P_TOTAL]
-    bars = ax.bar(
-        names, vals, color=[NEUTRAL, BLUE], width=0.44, edgecolor=SURFACE, linewidth=2
-    )
+    bars = ax.bar(names, vals, color=[NEUTRAL, BLUE], width=0.44, edgecolor=SURFACE, linewidth=2)
     for b, v in zip(bars, vals, strict=True):
         ax.text(
             b.get_x() + b.get_width() / 2,
@@ -121,9 +119,7 @@ def fig_textbook_error():
         "The textbook parameter formula is wrong for modern models",
         "It assumes multi-head attention. Grouped-query attention makes K and V a third as wide.",
     )
-    note(
-        fig, "Measured. The gated-MLP term happens to be exact here: 3·d·1536 = 8d² for d=576."
-    )
+    note(fig, "Measured. The gated-MLP term happens to be exact here: 3·d·1536 = 8d² for d=576.")
     save(fig, f"{OUT}/02_textbook_error.png")
 
 
@@ -230,9 +226,7 @@ def fig_optimizer_cost():
         "The optimizer is the cheapest memory lever you have",
         "Swapping AdamW for 8-bit AdamW removes six bytes per parameter without touching the model.",
     )
-    note(
-        fig, "fp32 parameters and gradients throughout. Adam's two moments are the difference."
-    )
+    note(fig, "fp32 parameters and gradients throughout. Adam's two moments are the difference.")
     save(fig, f"{OUT}/04_optimizer_cost.png")
 
 
@@ -275,9 +269,7 @@ def fig_float_formats():
                     fontweight="bold",
                 )
             x += width
-        ax.text(
-            -0.5, y, name, ha="right", va="center", fontsize=12.5, fontweight="bold", color=INK
-        )
+        ax.text(-0.5, y, name, ha="right", va="center", fontsize=12.5, fontweight="bold", color=INK)
         ax.text(x + 0.6, y, tot, ha="left", va="center", fontsize=10, color=MUTED)
 
     ax.annotate(
@@ -298,9 +290,7 @@ def fig_float_formats():
     for xv in (1, 9):
         ax.plot([xv, xv], [-0.05, 2.56], color=BLUE, lw=1.1, ls=(0, (3, 3)), zorder=0)
 
-    for i, (color, lab) in enumerate(
-        ((INK_2, "sign"), (BLUE, "exponent → range"), (GOLD, "mantissa → precision"))
-    ):
+    for i, (color, lab) in enumerate(((INK_2, "sign"), (BLUE, "exponent → range"), (GOLD, "mantissa → precision"))):
         lx = i * 12.0
         ax.add_patch(Rectangle((lx, -0.78), 1.1, 0.36, facecolor=color, edgecolor="none"))
         ax.text(lx + 1.7, -0.60, lab, ha="left", va="center", fontsize=10, color=INK_2)
@@ -495,9 +485,7 @@ def fig_loss_anatomy():
                 va="center",
             )
         elif flag:
-            ax.text(
-                0.5, lnV + 0.75, flag, fontsize=10, color=ROSE, fontweight="bold", ha="center"
-            )
+            ax.text(0.5, lnV + 0.75, flag, fontsize=10, color=ROSE, fontweight="bold", ha="center")
         ax.set_title(name, loc="left", fontsize=12, pad=10, color=INK)
         ax.set_xticks([])
         ax.set_ylim(0, 16.5)
@@ -510,9 +498,7 @@ def fig_loss_anatomy():
 
     for ax, (_, _, _, _, caption) in zip(axes, panels, strict=True):
         box = ax.get_position()
-        fig.text(
-            box.x0, box.y0 - 0.055, caption, fontsize=9.3, color=INK_2, va="top", ha="left"
-        )
+        fig.text(box.x0, box.y0 - 0.055, caption, fontsize=9.3, color=INK_2, va="top", ha="left")
 
     fig.text(
         0.008,
@@ -527,8 +513,7 @@ def fig_loss_anatomy():
     fig.text(
         0.008,
         0.885,
-        "Every run starts from the same place: a randomly initialized "
-        "language model must begin at ln(vocab_size).",
+        "Every run starts from the same place: a randomly initialized language model must begin at ln(vocab_size).",
         fontsize=10.3,
         color=INK_2,
         ha="left",
@@ -537,8 +522,7 @@ def fig_loss_anatomy():
     fig.text(
         0.008,
         0.045,
-        "Schematic: curve shapes, not measurements. "
-        "The ln(V) reference line is exact for V = 49,152.",
+        "Schematic: curve shapes, not measurements. The ln(V) reference line is exact for V = 49,152.",
         fontsize=8.8,
         color=MUTED,
         ha="left",
@@ -734,9 +718,7 @@ def fig_ragged_shard():
                             linestyle=(0, (3, 2)),
                         )
                     )
-                    ax.text(
-                        x + 0.46, y, "—", ha="center", va="center", fontsize=10, color=ROSE
-                    )
+                    ax.text(x + 0.46, y, "—", ha="center", va="center", fontsize=10, color=ROSE)
     ax.set_yticks(range(ranks), [f"rank {ranks - 1 - r}" for r in range(ranks)], fontsize=10)
     ax.set_xticks([])
     ax.set_xlim(-0.3, (per + 1) * (bs + 0.55))

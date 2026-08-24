@@ -19,9 +19,7 @@ from torch import nn
 
 from l2c.harness import ledger, measure, predict, report
 
-requires_cuda = pytest.mark.skipif(
-    not torch.cuda.is_available(), reason="measures CUDA allocator state"
-)
+requires_cuda = pytest.mark.skipif(not torch.cuda.is_available(), reason="measures CUDA allocator state")
 
 
 # --------------------------------------------------------------------------------
@@ -163,9 +161,7 @@ def test_ledger_totals_by_category_and_dtype():
 
 
 def test_ledger_bytes_in_with_no_argument_covers_everything():
-    inventory = ledger.Ledger(
-        entries=[_entry(ledger.ACTIVATIONS, 7), _entry(ledger.LOGITS, 3)]
-    )
+    inventory = ledger.Ledger(entries=[_entry(ledger.ACTIVATIONS, 7), _entry(ledger.LOGITS, 3)])
     assert inventory.bytes_in() == inventory.total_bytes == 10
 
 
@@ -178,14 +174,10 @@ def test_ledger_finds_every_weight_cast_at_a_colliding_shape():
     exact even when shapes collide.
     """
     width = 576
-    model = nn.Sequential(
-        nn.Linear(width, width, bias=False), nn.Linear(width, width, bias=False)
-    ).cuda()
+    model = nn.Sequential(nn.Linear(width, width, bias=False), nn.Linear(width, width, bias=False)).cuda()
     # Same shape as a projection weight, and requires grad so both layers need their
     # weight for the input gradient — otherwise the first cast is never saved at all.
-    activations_shaped_like_a_weight = torch.randn(
-        width, width, device="cuda", requires_grad=True
-    )
+    activations_shaped_like_a_weight = torch.randn(width, width, device="cuda", requires_grad=True)
 
     with (
         ledger.record(model, vocab_size=-1) as inventory,
