@@ -50,7 +50,13 @@ max-doc-length = 95
 "figures/*.py" = ["E501"]
 # A marimo cell renders its last expression, so a bare trailing name is the output rather
 # than dead code. Every other rule, and the formatter, still applies.
-"notebooks/*.py" = ["B018"]
+"notebooks/**/*.py" = ["B018"]
+# Converted upstream tutorials. Their prose carries typographic quotes and their code
+# assigns results it never reads, both on purpose; rewriting either would be editing
+# someone else's material to satisfy a linter. F821 deliberately still applies -- it
+# caught a conversion that renamed a reference shadowed by a function parameter, which
+# would otherwise have failed at runtime.
+"notebooks/pytorch-basics/*.py" = ["B018", "F841", "RUF001", "E501", "W505"]
 
 [tool.marimo.formatting]
 # Match ruff's line-length, so saving in the editor and the pre-commit hook cannot disagree.

@@ -27,6 +27,10 @@ torch = ">=2.13,<3"
 # tensor<->ndarray interop. Taken from PyPI, not conda-forge, so that it resolves
 # against the same wheels as torch rather than mixing ABIs across sources.
 numpy = ">=2.5"
+# The PyTorch tutorials under notebooks/ build on torchvision datasets, FashionMNIST
+# among them. It is ABI-coupled to torch, so it comes from PyPI for the same reason
+# and must resolve against the installed torch rather than pulling its own.
+torchvision = ">=0.28, <0.29"
 
 # The harness, installed editable so `import l2c` resolves from any working directory.
 # Editable installs require a build system, which is why pyproject.toml exists; it

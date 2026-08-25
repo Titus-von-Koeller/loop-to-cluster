@@ -29,6 +29,12 @@ conda-forge; the reason is the torch ABI and it still holds.
 A *new* skill directory is discovered live, but an *edit* to an existing `SKILL.md` serves from a
 cached payload until the session restarts.
 
+marimo reads `[tool.marimo]` from `pyproject.toml` only when started with this directory as its
+working directory; started elsewhere it silently falls back to 79 columns, eager re-execution and
+no format-on-save. It is young enough that its installed source under `.pixi/envs/` settles what
+its documentation does not — `--mcp` is hidden from `--help`, `custom_css` does not expand `~` —
+so check `marimo config describe`, then that source in a subagent, and only then the web.
+
 ## Claims
 
 Version-dependent behaviour, defaults and API semantics are where confident wrongness happens.

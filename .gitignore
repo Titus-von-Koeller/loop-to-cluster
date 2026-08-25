@@ -12,6 +12,9 @@
 # Throwaway local Jupyter token — never commit.
 .jupyter-token
 
+# marimo's per-notebook session cache, written beside the notebooks it serves.
+__marimo__/
+
 # Python build artefacts.
 __pycache__/
 *.egg-info/
