@@ -55,9 +55,7 @@ blocks = token_ids[: num_blocks * seq_len].view(num_blocks, seq_len)
 # A separate generator keeps shuffling independent of the RNG that weight
 # initialization consumed, so runs stay comparable despite different model cfg.
 generator = torch.Generator().manual_seed(0)
-dataloader = DataLoader(
-    blocks, batch_size=batch_size, shuffle=True, drop_last=True, generator=generator
-)
+dataloader = DataLoader(blocks, batch_size=batch_size, shuffle=True, drop_last=True, generator=generator)
 
 
 def cycle(loader):
