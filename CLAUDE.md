@@ -29,11 +29,19 @@ conda-forge; the reason is the torch ABI and it still holds.
 A *new* skill directory is discovered live, but an *edit* to an existing `SKILL.md` serves from a
 cached payload until the session restarts.
 
-marimo reads `[tool.marimo]` from `pyproject.toml` only when started with this directory as its
-working directory; started elsewhere it silently falls back to 79 columns, eager re-execution and
-no format-on-save. It is young enough that its installed source under `.pixi/envs/` settles what
+marimo finds `[tool.marimo]` with `find_nearest_pyproject_toml`, which walks *upward* from the
+working directory, so a kernel started in `notebooks/pytorch-basics/` still picks up this repo's
+settings; started outside the repo it silently falls back to 79 columns, eager re-execution and no
+format-on-save. That config is `lru_cache`d, so an edit to it needs a server restart, and in
+VSCode the extension owns the server -- reload the window, since restarting the kernel will not
+do it. It is young enough that its installed source under `.pixi/envs/` settles what
 its documentation does not — `--mcp` is hidden from `--help`, `custom_css` does not expand `~` —
 so check `marimo config describe`, then that source in a subagent, and only then the web.
+
+The VSCode extension contributes a *native* notebook rather than embedding marimo's web app,
+so anything routed through marimo's own HTML — `display.custom_css`, the `--marimo-*-font`
+variables — never reaches it. Cells there are governed by VSCode's `editor.*` and
+`notebook.*` settings instead.
 
 ## Claims
 
