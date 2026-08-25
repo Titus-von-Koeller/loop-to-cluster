@@ -13,3 +13,19 @@ if ! pixi run ruff format --check .; then
     echo "pre-commit: ruff format --check failed (run: pixi run ruff format .)" >&2
     exit 1
 fi
+
+# Datasets land beside the notebooks that download them, and a directory staged whole
+# takes them along. 82 MB of FashionMNIST reached origin that way once.
+max_kb=1024
+large=$(git diff --cached --name-only --diff-filter=A -z |
+    while IFS= read -r -d "" f; do
+        [ -f "$f" ] || continue
+        kb=$(( $(stat -c%s "$f") / 1024 ))
+        if [ "$kb" -gt "$max_kb" ]; then printf '%s (%s KB)\n' "$f" "$kb"; fi
+    done)
+if [ -n "$large" ]; then
+    echo "pre-commit: files larger than ${max_kb} KB are being added:" >&2
+    echo "$large" >&2
+    echo "ignore them, or commit with --no-verify if they belong here" >&2
+    exit 1
+fi

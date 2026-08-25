@@ -37,3 +37,6 @@ bench/snapshots/
 
 # Transient handoff notes for an in-flight refactor. Deleted when it lands.
 .handoff/
+
+# Datasets the tutorials download at runtime; torchvision re-fetches them on demand.
+notebooks/**/data/
