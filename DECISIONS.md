@@ -38,7 +38,11 @@ removed — 3,719.4 MiB either way, thirty steps, each variant run twice. A cach
 MiB at this batch and sequence length, but `model(ids, labels=ids).loss` drops the `ModelOutput`
 at the end of the statement, freeing it before the step's peak. The line stays for the reason its
 own comment gives, that a key-value cache belongs to generation; it is not defending a ledger
-row. Binding the output to a name would make that allocation visible again.
+row. Binding the output to a name would make that allocation visible again. It is also the
+canonical form: `Trainer` sets `config.use_cache` from `TrainingArguments.use_cache`, which
+defaults to `False`, so every `Trainer` run already trains this way, and the convention
+exists because caching and gradient checkpointing are incompatible — transformers resolves
+that by overriding the flag and warning rather than failing.
 
 **No eval loop for now.** Which makes this script a demonstration that the mechanics of a
 training loop run, not that training works: with no held-out split, a falling loss cannot
