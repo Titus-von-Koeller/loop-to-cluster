@@ -30,6 +30,16 @@ error: bfloat16 parameters would halve every ledger row, and a key-value cache b
 That cache is a memo between *consecutive* forward passes during incremental decoding — training
 runs one pass over all positions at once and has nothing to reuse it.
 
+*Corrected 2026-08-26.* Half of that reason is wrong, measured against this script rather than a
+synthetic loop. The `cfg.dtype` half holds: building the baseline in bfloat16 moves peak memory
+from 3,719 MiB to 2,119 MiB, so leaving it unset would distort every ledger row. The `use_cache`
+half does not: peak is identical to the tenth of a mebibyte whether the line is present or
+removed — 3,719.4 MiB either way, thirty steps, each variant run twice. A cache is allocated, 46
+MiB at this batch and sequence length, but `model(ids, labels=ids).loss` drops the `ModelOutput`
+at the end of the statement, freeing it before the step's peak. The line stays for the reason its
+own comment gives, that a key-value cache belongs to generation; it is not defending a ledger
+row. Binding the output to a name would make that allocation visible again.
+
 **No eval loop for now.** Which makes this script a demonstration that the mechanics of a
 training loop run, not that training works: with no held-out split, a falling loss cannot
 separate learning from memorizing.
