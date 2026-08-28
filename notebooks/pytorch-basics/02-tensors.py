@@ -191,7 +191,7 @@ def _(data, mo, np, show, torch):
         justify="start",
         gap=2,
     )
-    return np_array, x_np
+    return
 
 
 @app.cell(hide_code=True)
@@ -464,12 +464,6 @@ def _(mo):
     By default, tensors are created on the CPU. We need to explicitly move tensors to the
     accelerator using `.to` method (after checking for accelerator availability). Keep in mind that
     copying large tensors across devices can be expensive in terms of time and memory!
-
-    Worth a number to hold on to: this machine moves about 12 GB/s between host memory and
-    the card. One batch of 64 FashionMNIST images is 196 KB and costs a rounding error; the
-    669,706 parameters of the classifier in **Build Model** are 2.6 MB, and a second GPU has
-    to move all of them on every step. That ratio is what decides whether the second card
-    helps.
     """)
     return
 
