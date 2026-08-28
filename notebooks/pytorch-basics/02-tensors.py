@@ -178,6 +178,78 @@ def _(torch):
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
+    ## Explore — `dtype` is three decisions, not one
+
+    `torch.float32` is the default and the tutorial moves on. It is worth stopping,
+    because the choice of dtype decides how much memory a model needs, how fast it
+    trains, and what it can represent — and the two 16-bit formats below differ from each
+    other more than either differs from `float32`.
+
+    A floating point number is a sign, an exponent and a mantissa. The exponent sets the
+    *range*, the mantissa sets the *precision*, and 16 bits has to be split between them:
+
+    - **float16** spends its bits on mantissa. Finer steps than bfloat16, but the largest
+      number it can hold is 65,504 and the smallest normal one is 6.1e-05. Gradients
+      routinely fall below that and become zero — which is what a gradient scaler exists
+      to prevent, by multiplying the loss up before the backward pass and dividing it out
+      after.
+    - **bfloat16** spends them on exponent. It has the *identical* range to float32, so
+      nothing underflows that would not have underflowed anyway, and no scaler is needed.
+      The price is precision: its steps are eight times coarser than float16's.
+
+    Type a number and watch what each format does to it.
+    """)
+    return
+
+
+@app.cell
+def _(mo):
+    stored_value = mo.ui.text("0.1", label="store this number as")
+    stored_value
+    return (stored_value,)
+
+
+@app.cell
+def _(mo, stored_value, torch):
+    try:
+        _exact = float(stored_value.value)
+    except ValueError:
+        _exact = 0.1
+
+    _rows = []
+    for _dtype in (torch.float64, torch.float32, torch.bfloat16, torch.float16):
+        _info = torch.finfo(_dtype)
+        _kept = torch.tensor(_exact, dtype=_dtype).item()
+        _rows.append(
+            {
+                "dtype": str(_dtype).removeprefix("torch."),
+                "bytes": torch.empty(0, dtype=_dtype).element_size(),
+                "stored as": f"{_kept!r}",
+                "error": f"{abs(_kept - _exact):.3e}",
+                "step near 1.0 (eps)": f"{_info.eps:.3e}",
+                "largest": f"{_info.max:.3e}",
+                "smallest normal": f"{_info.tiny:.1e}",
+            }
+        )
+    mo.vstack(
+        [
+            mo.ui.table(_rows, selection=None),
+            mo.md(
+                "A 669,706-parameter model needs "
+                f"**{669706 * 4 / 1024**2:.1f} MB** in float32 and "
+                f"**{669706 * 2 / 1024**2:.1f} MB** in either 16-bit format. That halving is "
+                "why mixed precision exists; the two rows above are why it is *mixed* rather "
+                "than simply 16-bit, since the optimizer keeps a float32 copy of the weights "
+                "to accumulate into."
+            ),
+        ]
+    )
+    return
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
     -----------------------------------------------------------------------------------------------
     """)
     return
@@ -217,6 +289,87 @@ def _(tensor, torch):
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
+    ## Explore — "can be expensive" as a number
+
+    The paragraph above ends with a warning that copying large tensors across devices is
+    expensive, and gives no figure. Measure it: the slider allocates a tensor of that size
+    and times the copy to the accelerator, host to device, five times after a warm-up.
+
+    Two rows, because host memory comes in two kinds. *Pageable* is what `torch.empty`
+    gives you and the operating system may move it around, so the driver copies it into a
+    staging buffer first. *Pinned* memory is locked in place, which is what
+    `DataLoader(pin_memory=True)` allocates.
+
+    Read the measured numbers rather than the folklore. On this machine pinning buys
+    almost nothing in raw bandwidth — both land near the same GB/s — because the staging
+    copy is not the bottleneck here. What pinning actually buys is that the transfer can
+    be issued asynchronously, `non_blocking=True`, and overlap with computation already on
+    the device. That overlap is the reason it appears in every input pipeline, and it does
+    not show up in a benchmark that waits for the copy to finish, as this one does.
+    """)
+    return
+
+
+@app.cell
+def _(mo):
+    transfer_size = mo.ui.slider(steps=[1, 4, 16, 64, 256], value=64, label="megabytes", show_value=True)
+    transfer_size
+    return (transfer_size,)
+
+
+@app.cell
+def _(mo, torch, transfer_size):
+    import time
+
+    mo.stop(
+        not torch.accelerator.is_available(),
+        mo.callout(mo.md("No accelerator available, so there is nothing to time."), kind="neutral"),
+    )
+
+    def _time_copy(megabytes, pinned, repeats=5):
+        elements = megabytes * 1024 * 1024 // 4
+        host = torch.empty(elements, dtype=torch.float32, pin_memory=pinned)
+        device = torch.empty(elements, dtype=torch.float32, device=torch.accelerator.current_accelerator())
+        for _ in range(2):
+            device.copy_(host, non_blocking=pinned)
+        # The copy is asynchronous, so the clock has to be stopped by the device rather
+        # than by the return of the Python call.
+        torch.accelerator.synchronize()
+        start = time.perf_counter()
+        for _ in range(repeats):
+            device.copy_(host, non_blocking=pinned)
+        torch.accelerator.synchronize()
+        return (time.perf_counter() - start) / repeats
+
+    _rows = []
+    for _pinned in (False, True):
+        _seconds = _time_copy(transfer_size.value, _pinned)
+        _rows.append(
+            {
+                "host memory": "pinned" if _pinned else "pageable",
+                "milliseconds": round(_seconds * 1000, 3),
+                "GB/s": round(transfer_size.value / 1024 / _seconds, 1),
+            }
+        )
+    mo.vstack(
+        [
+            mo.ui.table(_rows, selection=None),
+            mo.md(
+                f"For scale: one batch of 64 FashionMNIST images is "
+                f"{64 * 784 * 4 / 1024:.0f} KB, so the copy costs about "
+                f"{_rows[0]['milliseconds'] * (64 * 784 * 4 / 1024**2) / transfer_size.value * 1000:.0f} "
+                "microseconds — next to nothing. A gradient all-reduce across two GPUs moves "
+                f"every parameter instead, and at {669706 * 4 / 1024**2:.1f} MB per copy that "
+                "arithmetic is what decides whether a second card makes training faster."
+            ),
+        ]
+    )
+    return
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
     Try out some of the operations from the list. If you're familiar with the NumPy API, you'll
     find the Tensor API a breeze to use.
     """)
@@ -240,18 +393,6 @@ def _(torch):
     tensor_2[:, 1] = 0
     print(tensor_2)
     return (tensor_2,)
-
-
-@app.cell
-def _(tensor_2):
-    tensor_2[:, 0]
-
-    return
-
-
-@app.cell
-def _():
-    return
 
 
 @app.cell(hide_code=True)
@@ -286,7 +427,7 @@ def _(mo):
     return
 
 
-@app.cell
+@app.cell(hide_code=True)
 def _():
     import altair as alt
     import pandas as pd
@@ -294,7 +435,7 @@ def _():
     return alt, pd
 
 
-@app.cell
+@app.cell(hide_code=True)
 def _(alt, pd):
     def as_heatmap(matrix, title, cell=54):
         """Render a small 1D or 2D tensor as an annotated heatmap."""
@@ -321,7 +462,7 @@ def _(alt, pd):
     return (as_heatmap,)
 
 
-@app.cell
+@app.cell(hide_code=True)
 def _(mo):
     slicing = mo.ui.dropdown(
         options={
@@ -345,7 +486,7 @@ def _(mo):
     return (slicing,)
 
 
-@app.cell
+@app.cell(hide_code=True)
 def _(alt, as_heatmap, mo, pd, slicing, torch):
     t_sliced = torch.arange(48).reshape(6, 8)
     try:
@@ -435,6 +576,57 @@ def _(mo):
 def _(tensor_2, torch):
     t1 = torch.cat([tensor_2, tensor_2, tensor_2], dim=1)
     print(t1)
+    return
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    ## Explore — `cat` against `stack`, which the paragraph above calls "subtly different"
+
+    It is not subtle once the shapes are side by side, and it is worth ten seconds now
+    because it is the difference between a batch of 64 images and a single image with 64
+    channels.
+
+    **`cat` joins along a dimension that already exists.** The inputs need to agree on
+    every *other* dimension, the chosen one adds up, and the result has the same number of
+    dimensions it started with.
+
+    **`stack` creates a new dimension.** The inputs must have identical shapes, and the
+    result has one dimension more than they did. `dim` says where the new axis goes.
+
+    Two 2x3 tensors, every option:
+    """)
+    return
+
+
+@app.cell
+def _(mo, torch):
+    _left = torch.zeros(2, 3)
+    _right = torch.ones(2, 3)
+    _rows = [
+        {
+            "call": f"torch.{_name}([a, b], dim={_dim})",
+            "result shape": str(tuple(getattr(torch, _name)([_left, _right], dim=_dim).shape)),
+            "dimensions": getattr(torch, _name)([_left, _right], dim=_dim).dim(),
+            "elements": getattr(torch, _name)([_left, _right], dim=_dim).numel(),
+        }
+        for _name, _dims in (("cat", (0, 1)), ("stack", (0, 1, 2)))
+        for _dim in _dims
+    ]
+    mo.vstack(
+        [
+            mo.md("`a` and `b` are both `(2, 3)` — twelve elements between them, in every row below."),
+            mo.ui.table(_rows, selection=None),
+            mo.md(
+                "Every result holds the same twelve numbers. `cat` arranges them in two "
+                "dimensions and `stack` in three, which is the entire difference. The one to "
+                "remember is `torch.stack(list_of_images)` — that is how a list of `(1, 28, 28)` "
+                "samples becomes the `(64, 1, 28, 28)` batch a `DataLoader` hands you, and it is "
+                "why every sample in a batch must have the same shape."
+            ),
+        ]
+    )
     return
 
 
