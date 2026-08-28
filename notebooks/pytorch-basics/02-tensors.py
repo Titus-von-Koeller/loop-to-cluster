@@ -58,10 +58,84 @@ def _(mo):
 
 @app.cell
 def _():
+    import altair as alt
     import numpy as np
+    import pandas as pd
     import torch
 
-    return np, torch
+    # Every random tensor below is drawn from this seed, so the numbers in one cell can be
+    # compared against the numbers in another and the pictures do not change under you.
+    torch.manual_seed(0)
+    return alt, np, pd, torch
+
+
+@app.cell(hide_code=True)
+def _(alt, mo, pd, torch):
+    # One way of looking at a tensor, used by every cell in this notebook.
+    #
+    # Magnitude is carried by lightness and only by lightness, so the picture survives being
+    # read by someone who cannot separate red from green, and survives being printed gray.
+    # Hue carries sign and nothing else. There are no axes and no chart title: the numbers
+    # are in the squares and the caption says what the object is.
+    RAMP = ["#dbe7f7", "#a8c6ec", "#6b9ede", "#2a78d6", "#17457c"]
+    POLARITY = ["#8f3413", "#d95926", "#eaa886", "#e8e8e6", "#93bae9", "#2a78d6", "#173f6e"]
+
+    def show(tensor, title=None, cell=54, facts=True):
+        """Render a small tensor as its own numbers, colored by magnitude."""
+        values = torch.as_tensor(tensor).detach().cpu()
+        grid = values.reshape(1, 1) if values.dim() == 0 else values if values.dim() == 2 else values.reshape(1, -1)
+        numbers = [[float(v) for v in row] for row in grid.tolist()]
+        signed = min(min(row) for row in numbers) < 0
+        limit = max((max(abs(v) for v in row) for row in numbers), default=1.0) or 1.0
+        digits = ".0f" if not values.dtype.is_floating_point else ".2f"
+
+        frame = pd.DataFrame(
+            [{"col": j, "row": i, "v": v} for i, row in enumerate(numbers) for j, v in enumerate(row)]
+        )
+        # The gap between squares is left transparent, so it takes the color of whatever
+        # theme the notebook is being read in rather than a white I chose.
+        at = {
+            "x": alt.X("col:O", axis=None, scale=alt.Scale(paddingInner=0.06)),
+            "y": alt.Y("row:O", axis=None, scale=alt.Scale(paddingInner=0.06)),
+        }
+        # Ink on a square is chosen against that square's fill, which is known here, rather
+        # than against the page, which is not.
+        on_dark = f"abs(datum.v) > {0.45 * limit}" if signed else f"datum.v > {0.55 * limit}"
+        picture = (
+            alt.Chart(frame)
+            .mark_rect()
+            .encode(
+                **at,
+                color=alt.Color(
+                    "v:Q",
+                    scale=alt.Scale(range=POLARITY, domain=[-limit, limit])
+                    if signed
+                    else alt.Scale(range=RAMP, domain=[0, limit]),
+                    legend=None,
+                ),
+                tooltip=[alt.Tooltip("v:Q", format=".4f", title="value"), "row:O", "col:O"],
+            )
+            + alt.Chart(frame)
+            .mark_text(fontSize=13, fontWeight=500)
+            .encode(
+                **at,
+                text=alt.Text("v:Q", format=digits),
+                color=alt.condition(on_dark, alt.value("#ffffff"), alt.value("#15181d")),
+            )
+        ).properties(width=cell * len(numbers[0]), height=cell * len(numbers))
+
+        caption = (
+            f"`{tuple(values.shape)}` · `{str(values.dtype).removeprefix('torch.')}` · "
+            f"stride `{values.stride()}`" + ("" if values.is_contiguous() else " · **not contiguous**")
+        )
+        parts = (
+            ([mo.md(f"**{title}**")] if title else [])
+            + [picture]
+            + ([mo.md(f"<small>{caption}</small>")] if facts else [])
+        )
+        return mo.vstack(parts, align="center", gap=0.2)
+
+    return (show,)
 
 
 @app.cell(hide_code=True)
@@ -79,9 +153,10 @@ def _(mo):
 
 
 @app.cell
-def _(torch):
+def _(show, torch):
     data = [[1, 2], [3, 4]]
     x_data = torch.tensor(data)
+    show(x_data, "x_data")
     return data, x_data
 
 
@@ -96,10 +171,15 @@ def _(mo):
 
 
 @app.cell
-def _(data, np, torch):
+def _(data, mo, np, show, torch):
     np_array = np.array(data)
     x_np = torch.from_numpy(np_array)
-    return
+    mo.hstack(
+        [show(np_array, "np_array — a NumPy array"), show(x_np, "x_np — a tensor on the same memory")],
+        justify="start",
+        gap=2,
+    )
+    return np_array, x_np
 
 
 @app.cell(hide_code=True)
@@ -114,12 +194,16 @@ def _(mo):
 
 
 @app.cell
-def _(torch, x_data):
+def _(mo, show, torch, x_data):
     x_ones = torch.ones_like(x_data)  # retains the properties of x_data
-    print(f"Ones Tensor: \n {x_ones} \n")
 
     x_rand = torch.rand_like(x_data, dtype=torch.float)  # overrides the datatype of x_data
-    print(f"Random Tensor: \n {x_rand} \n")
+
+    mo.hstack(
+        [show(x_data, "x_data"), show(x_ones, "ones_like(x_data)"), show(x_rand, "rand_like(x_data, dtype=float)")],
+        justify="start",
+        gap=2,
+    )
     return
 
 
@@ -135,15 +219,60 @@ def _(mo):
 
 
 @app.cell
-def _(torch):
+def _(mo, show, torch):
     shape = (2, 3)
     rand_tensor = torch.rand(shape)
     ones_tensor = torch.ones(shape)
     zeros_tensor = torch.zeros(shape)
 
-    print(f"Random Tensor: \n {rand_tensor} \n")
-    print(f"Ones Tensor: \n {ones_tensor} \n")
-    print(f"Zeros Tensor: \n {zeros_tensor}")
+    mo.hstack(
+        [
+            show(rand_tensor, "torch.rand(shape)"),
+            show(ones_tensor, "torch.ones(shape)"),
+            show(zeros_tensor, "torch.zeros(shape)"),
+        ],
+        justify="start",
+        gap=2,
+    )
+    return
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    Sixteen numbers fit in a grid. A real one does not, and at that size the same tensor is
+    better looked at as a picture — which is not a metaphor: an image *is* a tensor, and
+    every image the later notebooks classify arrives as one of these.
+    """)
+    return
+
+
+@app.cell
+def _(mo, torch):
+    _noise = torch.rand(64, 64)
+    _gradient = torch.linspace(0, 1, 64).expand(64, 64)
+    mo.hstack(
+        [
+            mo.vstack(
+                [
+                    mo.image(_noise, width=150, vmin=0, vmax=1, rounded=True),
+                    mo.md("<small>`torch.rand(64, 64)` — 4,096 numbers</small>"),
+                ],
+                align="center",
+                gap=0.2,
+            ),
+            mo.vstack(
+                [
+                    mo.image(_gradient, width=150, vmin=0, vmax=1, rounded=True),
+                    mo.md("<small>`torch.linspace(0, 1, 64).expand(64, 64)`</small>"),
+                ],
+                align="center",
+                gap=0.2,
+            ),
+        ],
+        justify="start",
+        gap=2,
+    )
     return
 
 
@@ -166,13 +295,46 @@ def _(mo):
 
 
 @app.cell
-def _(torch):
+def _(mo, show, torch):
     tensor = torch.rand(3, 4)
 
-    print(f"Shape of tensor: {tensor.shape}")
-    print(f"Datatype of tensor: {tensor.dtype}")
-    print(f"Device tensor is stored on: {tensor.device}")
+    mo.vstack(
+        [
+            mo.hstack(
+                [
+                    mo.stat(str(tuple(tensor.shape)), label="shape", caption="3 rows, 4 columns", bordered=True),
+                    mo.stat(
+                        str(tensor.dtype).removeprefix("torch."),
+                        label="dtype",
+                        caption=f"{tensor.element_size()} bytes each",
+                        bordered=True,
+                    ),
+                    mo.stat(str(tensor.device), label="device", caption="where the memory lives", bordered=True),
+                    mo.stat(
+                        str(tensor.stride()), label="stride", caption="steps to the next row, column", bordered=True
+                    ),
+                ],
+                justify="start",
+                gap=1,
+                wrap=True,
+            ),
+            show(tensor, facts=False),
+        ],
+        gap=1,
+    )
     return (tensor,)
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    Three of those four are the ones the tutorial names. The fourth, **stride**, is not
+    mentioned here and is the one that explains the other three: `(4, 1)` says that stepping
+    to the next row moves four positions through memory and stepping to the next column
+    moves one. Hold on to it — the last section of this notebook is about nothing else, and
+    it is printed under every picture in between.
+    """)
+    return
 
 
 @app.cell(hide_code=True)
@@ -193,9 +355,12 @@ def _(mo):
       routinely fall below that and become zero — which is what a gradient scaler exists
       to prevent, by multiplying the loss up before the backward pass and dividing it out
       after.
-    - **bfloat16** spends them on exponent. It has the *identical* range to float32, so
-      nothing underflows that would not have underflowed anyway, and no scaler is needed.
-      The price is precision: its steps are eight times coarser than float16's.
+    - **bfloat16** spends them on exponent — the same eight exponent bits as float32. So it
+      starts underflowing in the same place float32 does (`tiny` is 1.18e-38 for both), and
+      a gradient that survives in float32 survives here, which is why bfloat16 needs no
+      scaler. Its largest value differs from float32's only in the last mantissa digits,
+      3.39e38 against 3.40e38. The price is precision: its steps are eight times coarser
+      than float16's, exactly eight, as the `eps` column shows.
 
     Type a number and watch what each format does to it.
     """)
@@ -235,12 +400,15 @@ def _(mo, stored_value, torch):
         [
             mo.ui.table(_rows, selection=None),
             mo.md(
-                "A 669,706-parameter model needs "
-                f"**{669706 * 4 / 1024**2:.1f} MB** in float32 and "
-                f"**{669706 * 2 / 1024**2:.1f} MB** in either 16-bit format. That halving is "
-                "why mixed precision exists; the two rows above are why it is *mixed* rather "
-                "than simply 16-bit, since the optimizer keeps a float32 copy of the weights "
-                "to accumulate into."
+                f"The classifier built in **Build Model** holds 669,706 parameters: "
+                f"**{669706 * 4 / 1024**2:.1f} MB** in float32, **{669706 * 2 / 1024**2:.1f} MB** "
+                "in either 16-bit format.\n\n"
+                "Halving the parameters is the *least* of what mixed precision does, though. "
+                "Under `torch.autocast` the parameters stay float32; what moves to 16-bit is the "
+                "activations and the inputs to each matrix multiply — which is where both the "
+                "memory of a large batch and the speedup live, since the tensor cores that make "
+                "16-bit fast only accept 16-bit. That is what *mixed* names: two precisions in "
+                "one step, chosen per operation."
             ),
         ]
     )
@@ -385,13 +553,30 @@ def _(mo):
 
 
 @app.cell
-def _(torch):
+def _(mo, show, torch):
     tensor_2 = torch.rand(4, 4)
-    print(f"First row:    {tensor_2[0]}")
-    print(f"First column: {tensor_2[:, 0]}")
-    print(f"Last column:  {tensor_2[..., -1]}")
+    _first_row = tensor_2[0]
+    _first_column = tensor_2[:, 0]
+    _last_column = tensor_2[..., -1]
     tensor_2[:, 1] = 0
-    print(tensor_2)
+
+    mo.vstack(
+        [
+            mo.hstack(
+                [
+                    show(_first_row, "tensor_2[0]"),
+                    show(_first_column, "tensor_2[:, 0]"),
+                    show(_last_column, "tensor_2[..., -1]"),
+                ],
+                justify="start",
+                align="center",
+                gap=2,
+                wrap=True,
+            ),
+            show(tensor_2, "tensor_2, after `tensor_2[:, 1] = 0`"),
+        ],
+        gap=1,
+    )
     return (tensor_2,)
 
 
@@ -417,49 +602,16 @@ def _(mo):
     internalise: it is where a batch dimension quietly disappears and the error surfaces
     three lines later, in a matmul that expected two dimensions and got one.
 
-    **`...` means "as many full dimensions as it takes"**, so `t[..., -1]` is the last
-    column of a matrix and the last channel of a 4-dimensional batch, unchanged. And
-    `None` inserts a new dimension of size 1, which is how you line two tensors up for
-    broadcasting.
+    **`...` means "as many full dimensions as it takes"**, so what you write binds to the
+    *last* dimension whatever the rank. `t[..., -1]` is the last column of a matrix, and on
+    a `(batch, channel, height, width)` image batch it is still the last column — of every
+    image, leaving `(batch, channel, height)`. The last *channel* is `t[:, -1]`, counted
+    from the left. And `None` inserts a new dimension of size 1, which is how you line two
+    tensors up for broadcasting.
 
     Pick an expression: the highlighted cells are what it selects.
     """)
     return
-
-
-@app.cell(hide_code=True)
-def _():
-    import altair as alt
-    import pandas as pd
-
-    return alt, pd
-
-
-@app.cell(hide_code=True)
-def _(alt, pd):
-    def as_heatmap(matrix, title, cell=54):
-        """Render a small 1D or 2D tensor as an annotated heatmap."""
-        rows = matrix.tolist() if matrix.dim() == 2 else [matrix.tolist()]
-        digits = ".2f" if matrix.dtype.is_floating_point else ".0f"
-        cells = pd.DataFrame(
-            [{"row": i, "col": j, "value": float(v)} for i, row in enumerate(rows) for j, v in enumerate(row)]
-        )
-        limit = max(abs(cells["value"].min()), abs(cells["value"].max()), 1e-9)
-        base = alt.Chart(cells).encode(x=alt.X("col:O", axis=None), y=alt.Y("row:O", axis=None))
-        squares = base.mark_rect(stroke="white", strokeWidth=2).encode(
-            color=alt.Color(
-                "value:Q",
-                scale=alt.Scale(scheme="redblue", domain=[-limit, limit], reverse=True),
-                legend=None,
-            )
-        )
-        labels = base.mark_text(fontSize=12, fontWeight=500).encode(
-            text=alt.Text("value:Q", format=digits),
-            color=alt.condition(f"abs(datum.value) > {0.6 * limit}", alt.value("white"), alt.value("#111111")),
-        )
-        return (squares + labels).properties(width=cell * len(rows[0]), height=cell * len(rows), title=title)
-
-    return (as_heatmap,)
 
 
 @app.cell(hide_code=True)
@@ -487,7 +639,7 @@ def _(mo):
 
 
 @app.cell(hide_code=True)
-def _(alt, as_heatmap, mo, pd, slicing, torch):
+def _(alt, mo, pd, show, slicing, torch):
     t_sliced = torch.arange(48).reshape(6, 8)
     try:
         _result = slicing.value(t_sliced)
@@ -513,9 +665,7 @@ def _(alt, as_heatmap, mo, pd, slicing, torch):
             f"{'dimension' if _result.dim() == 1 else 'dimensions'}, {_result.numel()} elements, "
             f"and {'a **view**: it shares storage with `t`' if _shares else 'a **copy**: new storage'}."
         )
-        _panel = mo.vstack(
-            [_facts, as_heatmap(_result, "what you get back", cell=44) if _result.dim() <= 2 else mo.md("")]
-        )
+        _panel = mo.vstack([_facts, show(_result, "what you get back", cell=44) if _result.dim() <= 2 else mo.md("")])
 
     _cells = pd.DataFrame(
         [
@@ -554,10 +704,14 @@ def _(mo):
     mo.md(r"""
     The last two entries are the ones that cost memory. A slice is a view — the same
     storage read with different strides, which is why `tensor_2[:, 1] = 0` above changed
-    `tensor_2` itself. A boolean mask or a list of indices cannot be expressed as a
-    stride, so PyTorch has to gather the elements into new storage, and writing to the
-    result changes nothing in the original. The section at the end of this notebook takes
-    that apart.
+    `tensor_2` itself. A boolean mask or a list of indices cannot be expressed as a stride,
+    so PyTorch gathers the elements into new storage.
+
+    Which makes the mask asymmetric, and this is the part worth remembering. *Read* it and
+    you get a copy: `c = t[t % 7 == 0]` then `c[0] = -1` leaves `t` untouched. *Assign into*
+    it and you write through: `t[t % 7 == 0] = -1` does change `t`, because that is not a
+    read followed by a write — it is a single indexed assignment, and PyTorch scatters
+    straight back into the original storage. The next section takes that storage apart.
     """)
     return
 
@@ -573,9 +727,9 @@ def _(mo):
 
 
 @app.cell
-def _(tensor_2, torch):
+def _(mo, show, tensor_2, torch):
     t1 = torch.cat([tensor_2, tensor_2, tensor_2], dim=1)
-    print(t1)
+    mo.vstack([show(tensor_2, "tensor_2"), show(t1, "torch.cat([tensor_2] * 3, dim=1)", cell=38)], gap=1)
     return
 
 
@@ -639,7 +793,7 @@ def _(mo):
 
 
 @app.cell
-def _(tensor_2, torch):
+def _(mo, show, tensor_2, torch):
     # This computes the matrix multiplication between two tensors. y1, y2, y3 will have the same value
     # ``tensor.T`` returns the transpose of a tensor
     y1 = tensor_2 @ tensor_2.T
@@ -651,6 +805,34 @@ def _(tensor_2, torch):
     z3 = torch.rand_like(tensor_2)
     # This computes the element-wise product. z1, z2, z3 will have the same value
     torch.mul(tensor_2, tensor_2, out=z3)
+
+    mo.vstack(
+        [
+            mo.hstack(
+                [
+                    show(tensor_2, "tensor_2"),
+                    show(y1, "y1 = tensor_2 @ tensor_2.T"),
+                    show(z1, "z1 = tensor_2 * tensor_2"),
+                ],
+                justify="start",
+                align="center",
+                gap=2,
+                wrap=True,
+            ),
+            mo.callout(
+                mo.md(
+                    "The three spellings of each really do agree: "
+                    f"`y1 == y2 == y3` is **{bool(torch.equal(y1, y2) and torch.equal(y2, y3))}**, "
+                    f"`z1 == z2 == z3` is **{bool(torch.equal(z1, z2) and torch.equal(z2, z3))}**. "
+                    "The zeroed column of `tensor_2` survives into `z1` in the same place, because "
+                    "element-wise multiplication never moves a number; in `y1` it is gone, because "
+                    "every entry there is a dot product over the whole row."
+                ),
+                kind="neutral",
+            ),
+        ],
+        gap=1,
+    )
     return
 
 
@@ -686,14 +868,14 @@ def _(mo):
 
 
 @app.cell
-def _(as_heatmap, editable, mo, torch):
+def _(editable, mo, show, torch):
     _a = torch.tensor(editable.value)
     mo.hstack(
         [
-            as_heatmap(_a, "A"),
-            as_heatmap(_a.T, "A.T"),
-            as_heatmap(_a @ _a.T, "A @ A.T  (2x2)"),
-            as_heatmap(_a * _a, "A * A  (2x3)"),
+            show(_a, "A"),
+            show(_a.T, "A.T"),
+            show(_a @ _a.T, "A @ A.T  (2x2)"),
+            show(_a * _a, "A * A  (2x3)"),
         ],
         justify="start",
         align="center",
@@ -774,10 +956,22 @@ def _(mo):
 
 
 @app.cell
-def _(tensor_2):
+def _(mo, show, tensor_2):
     agg = tensor_2.sum()
     agg_item = agg.item()
-    print(agg_item, type(agg_item))
+
+    mo.hstack(
+        [
+            show(tensor_2, "tensor_2"),
+            mo.md("### `.sum()`"),
+            show(agg, "agg — a tensor with no dimensions"),
+            mo.md(f"### `.item()`\n\n`{agg_item}`\n\n<small>a Python `{type(agg_item).__name__}`</small>"),
+        ],
+        justify="start",
+        align="center",
+        gap=1.5,
+        wrap=True,
+    )
     return
 
 
@@ -791,10 +985,20 @@ def _(mo):
 
 
 @app.cell
-def _(tensor_2):
-    print(f"{tensor_2} \n")
-    tensor_2.add_(5)
-    print(tensor_2)
+def _(mo, show, tensor_2):
+    # Demonstrated on a copy. `tensor_2.add_(5)` would mutate a tensor five cells above
+    # still read by four cells below, and marimo tracks reassignment rather than mutation,
+    # so nothing downstream would be marked stale and every re-run would add another 5.
+    demo = tensor_2.clone()
+    before = demo.clone()
+    demo.add_(5)
+
+    mo.hstack(
+        [show(before, "demo"), mo.md("### `.add_(5)`"), show(demo, "demo, after — same object")],
+        justify="start",
+        align="center",
+        gap=2,
+    )
     return
 
 
@@ -836,11 +1040,14 @@ def _(mo):
 
 
 @app.cell
-def _(torch):
+def _(mo, show, torch):
     t = torch.ones(5)
-    print(f"t: {t}")
     n = t.numpy()
-    print(f"n: {n}")
+    mo.hstack(
+        [show(t, "t — a tensor"), show(n, "n = t.numpy() — the same five numbers")],
+        justify="start",
+        gap=2,
+    )
     return n, t
 
 
@@ -853,10 +1060,18 @@ def _(mo):
 
 
 @app.cell
-def _(n, t):
+def _(mo, n, show, t):
     t.add_(1)
-    print(f"t: {t}")
-    print(f"n: {n}")
+    mo.vstack(
+        [
+            mo.hstack([show(t, "t, after t.add_(1)"), show(n, "n, which nobody touched")], justify="start", gap=2),
+            mo.md(
+                "`n` was never assigned to and still changed. It is not a copy of `t`; it is a "
+                "second label on the same storage, and `add_` wrote into that storage in place."
+            ),
+        ],
+        gap=1,
+    )
     return
 
 
@@ -884,10 +1099,13 @@ def _(mo):
 
 
 @app.cell
-def _(n_1, np, t_1):
+def _(mo, n_1, np, show, t_1):
     np.add(n_1, 1, out=n_1)
-    print(f"t: {t_1}")
-    print(f"n: {n_1}")
+    mo.hstack(
+        [show(n_1, "n_1, written by NumPy"), show(t_1, "t_1, which followed")],
+        justify="start",
+        gap=2,
+    )
     return
 
 
@@ -938,7 +1156,7 @@ def _(mo):
 
 
 @app.cell
-def _(as_heatmap, mo, operation, torch):
+def _(mo, operation, show, torch):
     x_storage = torch.arange(12).reshape(3, 4)
     try:
         _result = operation.value(x_storage)
@@ -959,7 +1177,7 @@ def _(as_heatmap, mo, operation, torch):
         _same_storage = _result.untyped_storage().data_ptr() == x_storage.untyped_storage().data_ptr()
         _panel = mo.vstack(
             [
-                as_heatmap(_result, "the tensor you get", cell=48),
+                show(_result, "the tensor you get", cell=48),
                 mo.md(
                     "| shape | stride | storage offset | contiguous | same storage as `x` |\n"
                     "| --- | --- | --- | --- | --- |\n"
@@ -972,7 +1190,7 @@ def _(as_heatmap, mo, operation, torch):
 
     mo.vstack(
         [
-            as_heatmap(x_storage.flatten(), "storage: the same twelve numbers, always", cell=44),
+            show(x_storage.flatten(), "storage: the same twelve numbers, always", cell=44),
             _panel,
         ],
         gap=1,
