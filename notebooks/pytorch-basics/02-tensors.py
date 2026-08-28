@@ -495,42 +495,14 @@ def _(mo):
     return
 
 
-@app.cell
-def _(mo, show, torch):
-    tensor_2 = torch.rand(4, 4)
-    _first_row = tensor_2[0]
-    _first_column = tensor_2[:, 0]
-    _last_column = tensor_2[..., -1]
-    tensor_2[:, 1] = 0
-
-    mo.vstack(
-        [
-            mo.hstack(
-                [
-                    show(tensor_2, "tensor_2"),
-                    show(_first_row, "tensor_2[0]"),
-                    show(_first_column, "tensor_2[:, 0]"),
-                    show(_last_column, "tensor_2[..., -1]"),
-                ],
-                justify="start",
-                align="center",
-                gap=2,
-                wrap=True,
-            ),
-            show(tensor_2, "tensor_2, after `tensor_2[:, 1] = 0`"),
-        ],
-        gap=1,
-    )
-    return (tensor_2,)
-
-
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
-    ## Explore — indexing, defined before it is used
+    ## Explore — the notation, before the lines that use it
 
-    The three lines above use four separate pieces of notation and explain none of them.
-    The whole grammar is small, so here it is first.
+    "numpy-like indexing and slicing" is four separate pieces of notation, and the cell
+    below uses all four without introducing any of them. The whole grammar is small, so
+    here it is first; then the cell reads as arithmetic rather than as incantation.
 
     ### The brackets
 
@@ -568,9 +540,45 @@ def _(mo):
     to the end, `:3` stops before 3, `::2` takes every second, and negative numbers count
     from the end, so `t[-1]` is the last row.
 
-    That is the entire syntax. Everything below is a consequence of the table.
+    That is the entire syntax. Everything after this is a consequence of the table.
+
+    Read the next cell against it. `tensor_2[0]` is an integer, so dimension 0 disappears
+    and four numbers come back. `tensor_2[:, 0]` keeps every row and drops the column
+    dimension. `tensor_2[..., -1]` is the same thing said in a way that would still work on
+    a four-dimensional batch. And `tensor_2[:, 1] = 0` puts an indexed expression on the
+    *left* of an assignment, which writes into the tensor rather than reading from it —
+    which is why the picture underneath has a column of zeros in it.
     """)
     return
+
+
+@app.cell
+def _(mo, show, torch):
+    tensor_2 = torch.rand(4, 4)
+    _first_row = tensor_2[0]
+    _first_column = tensor_2[:, 0]
+    _last_column = tensor_2[..., -1]
+    tensor_2[:, 1] = 0
+
+    mo.vstack(
+        [
+            mo.hstack(
+                [
+                    show(tensor_2, "tensor_2"),
+                    show(_first_row, "tensor_2[0]"),
+                    show(_first_column, "tensor_2[:, 0]"),
+                    show(_last_column, "tensor_2[..., -1]"),
+                ],
+                justify="start",
+                align="center",
+                gap=2,
+                wrap=True,
+            ),
+            show(tensor_2, "tensor_2, after `tensor_2[:, 1] = 0`"),
+        ],
+        gap=1,
+    )
+    return (tensor_2,)
 
 
 @app.cell(hide_code=True)
