@@ -507,6 +507,7 @@ def _(mo, show, torch):
         [
             mo.hstack(
                 [
+                    show(tensor_2, "tensor_2"),
                     show(_first_row, "tensor_2[0]"),
                     show(_first_column, "tensor_2[:, 0]"),
                     show(_last_column, "tensor_2[..., -1]"),
@@ -581,11 +582,11 @@ def _(mo):
     return (slicing,)
 
 
-@app.cell(hide_code=True)
+@app.cell
 def _(alt, mo, pd, show, slicing, torch):
-    t_sliced = torch.arange(48).reshape(6, 8)
+    t2_sliced = torch.arange(48).reshape(6, 8)
     try:
-        _result = slicing.value(t_sliced)
+        _result = slicing.value(t2_sliced)
     except (RuntimeError, ValueError) as error:
         _panel = mo.callout(
             mo.md(
@@ -602,7 +603,7 @@ def _(alt, mo, pd, show, slicing, torch):
         _picked = set()
     else:
         _picked = set(_result.flatten().tolist())
-        _shares = _result.untyped_storage().data_ptr() == t_sliced.untyped_storage().data_ptr()
+        _shares = _result.untyped_storage().data_ptr() == t2_sliced.untyped_storage().data_ptr()
         _facts = mo.md(
             f"`{tuple(_result.shape)}` — {_result.dim()} "
             f"{'dimension' if _result.dim() == 1 else 'dimensions'}, {_result.numel()} elements, "
@@ -613,7 +614,7 @@ def _(alt, mo, pd, show, slicing, torch):
     _cells = pd.DataFrame(
         [
             {"row": i, "col": j, "value": v, "picked": v in _picked}
-            for i, _row in enumerate(t_sliced.tolist())
+            for i, _row in enumerate(t2_sliced.tolist())
             for j, v in enumerate(_row)
         ]
     )
