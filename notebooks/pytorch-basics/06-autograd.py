@@ -127,9 +127,10 @@ def _(mo):
     `.next_functions`, the edges to whatever produced its inputs. Walking that from `loss`
     to the leaves is a dozen lines, and it draws the picture the text describes.
 
-    Read it bottom-up, which is the direction `backward()` travels. The green nodes are
+    Read it bottom-up, which is the direction `backward()` travels. The ovals are
     `AccumulateGrad`: the ends of the road, one per leaf tensor with `requires_grad=True`,
-    and the only places a `.grad` is ever written.
+    and the only places a `.grad` is ever written. The double-outlined box at the top is
+    the root you called `backward()` on; the plain boxes between them are operations.
 
     One node is not in the code you wrote. `torch.matmul(x, w)` with a 1-D `x` becomes
     unsqueeze, matrix multiply, squeeze — so a `SqueezeBackward` sits in the graph
@@ -145,10 +146,17 @@ def _(b, mo, w, x):
     import graphviz
 
     def backward_graph(root, named):
-        """Walk .grad_fn back to the leaves and draw it."""
+        """Walk .grad_fn back to the leaves and draw it.
+
+        The three node kinds are told apart by shape first and color second. Hue is a
+        selective variable, not an ordered one, and roughly one man in twelve cannot
+        separate a red node from a green one; a rectangle, an oval and a doubled outline
+        survive that, and survive printing in gray as well.
+        """
         dot = graphviz.Digraph()
-        dot.attr(bgcolor="white", rankdir="BT", margin="8")
-        dot.attr("node", shape="box", style="rounded,filled", fontname="Helvetica", fontsize="11")
+        dot.attr(bgcolor="transparent", rankdir="BT", margin="8")
+        dot.attr("node", style="rounded,filled", fontname="Helvetica", fontsize="11", fontcolor="#15181d")
+        dot.attr("edge", color="#8a8f98")
         seen = set()
 
         def walk(node):
@@ -159,10 +167,18 @@ def _(b, mo, w, x):
             if kind == "AccumulateGrad":
                 tensor = node.variable
                 label = f"{named.get(id(tensor), 'leaf')}\\n{tuple(tensor.shape)}"
-                dot.node(str(id(node)), label, fillcolor="#d8f0d8", color="#5a9e5a")
+                dot.node(str(id(node)), label, shape="oval", fillcolor="#d5eee4", color="#199e70")
+            elif node is root.grad_fn:
+                dot.node(
+                    str(id(node)),
+                    kind.removesuffix("0"),
+                    shape="box",
+                    peripheries="2",
+                    fillcolor="#f7e0d5",
+                    color="#d95926",
+                )
             else:
-                fill = "#f8d8d8" if node is root.grad_fn else "#dce6f5"
-                dot.node(str(id(node)), kind.removesuffix("0"), fillcolor=fill, color="#7a8fb0")
+                dot.node(str(id(node)), kind.removesuffix("0"), shape="box", fillcolor="#dbe7f7", color="#2a78d6")
             for child, _ in node.next_functions:
                 if child is not None:
                     walk(child)
