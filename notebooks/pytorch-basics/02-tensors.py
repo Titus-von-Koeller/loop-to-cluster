@@ -10,8 +10,9 @@
 # opts in on its own. `auto_instantiate` cannot be set here (marimo strips it from script
 # metadata), so opening this file still runs nothing.
 #
-# Cells under an "Explore" heading are additions; everything else is the upstream
-# tutorial as converted.
+# Sections under an "Explore" heading are additions. The upstream tutorial's prose and its
+# sequence are untouched; its code cells were changed in one respect only, which is that
+# they render their tensors instead of printing them.
 
 import marimo
 
@@ -24,12 +25,6 @@ def _():
     import marimo as mo
 
     return (mo,)
-
-
-@app.cell
-def _():
-    # '%matplotlib inline' command supported automatically in marimo
-    return
 
 
 @app.cell(hide_code=True)
@@ -52,6 +47,23 @@ def _(mo):
     also optimized for automatic differentiation (we'll see more about that later in the
     [Autograd](autogradqs_tutorial.html) section). If you’re familiar with ndarrays, you’ll be
     right at home with the Tensor API. If not, follow along!
+    """)
+    return
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    ---
+
+    Every tensor below is drawn rather than printed, so that what changes is visible. Under
+    each picture is what the object *is*: its shape, its dtype, and its **stride**, which the
+    tutorial does not mention and which turns out to be the whole story.
+
+    The notebook builds toward one claim, and it is worth having in mind from the start: a
+    tensor is not its numbers. It is a shape, a stride and an offset over one flat run of
+    memory — and creating, indexing, joining, multiplying and sharing with NumPy are all
+    consequences of that.
     """)
     return
 
@@ -374,7 +386,7 @@ def _(mo):
     return (stored_value,)
 
 
-@app.cell
+@app.cell(hide_code=True)
 def _(mo, stored_value, torch):
     try:
         _exact = float(stored_value.value)
@@ -440,6 +452,12 @@ def _(mo):
     By default, tensors are created on the CPU. We need to explicitly move tensors to the
     accelerator using `.to` method (after checking for accelerator availability). Keep in mind that
     copying large tensors across devices can be expensive in terms of time and memory!
+
+    Worth a number to hold on to: this machine moves about 12 GB/s between host memory and
+    the card. One batch of 64 FashionMNIST images is 196 KB and costs a rounding error; the
+    669,706 parameters of the classifier in **Build Model** are 2.6 MB, and a second GPU has
+    to move all of them on every step. That ratio is what decides whether the second card
+    helps.
     """)
     return
 
@@ -451,87 +469,6 @@ def _(tensor, torch):
         tensor_1 = tensor.to(torch.accelerator.current_accelerator())
 
     torch.accelerator.current_accelerator()
-    return
-
-
-@app.cell(hide_code=True)
-def _(mo):
-    mo.md(r"""
-    ## Explore — "can be expensive" as a number
-
-    The paragraph above ends with a warning that copying large tensors across devices is
-    expensive, and gives no figure. Measure it: the slider allocates a tensor of that size
-    and times the copy to the accelerator, host to device, five times after a warm-up.
-
-    Two rows, because host memory comes in two kinds. *Pageable* is what `torch.empty`
-    gives you and the operating system may move it around, so the driver copies it into a
-    staging buffer first. *Pinned* memory is locked in place, which is what
-    `DataLoader(pin_memory=True)` allocates.
-
-    Read the measured numbers rather than the folklore. On this machine pinning buys
-    almost nothing in raw bandwidth — both land near the same GB/s — because the staging
-    copy is not the bottleneck here. What pinning actually buys is that the transfer can
-    be issued asynchronously, `non_blocking=True`, and overlap with computation already on
-    the device. That overlap is the reason it appears in every input pipeline, and it does
-    not show up in a benchmark that waits for the copy to finish, as this one does.
-    """)
-    return
-
-
-@app.cell
-def _(mo):
-    transfer_size = mo.ui.slider(steps=[1, 4, 16, 64, 256], value=64, label="megabytes", show_value=True)
-    transfer_size
-    return (transfer_size,)
-
-
-@app.cell
-def _(mo, torch, transfer_size):
-    import time
-
-    mo.stop(
-        not torch.accelerator.is_available(),
-        mo.callout(mo.md("No accelerator available, so there is nothing to time."), kind="neutral"),
-    )
-
-    def _time_copy(megabytes, pinned, repeats=5):
-        elements = megabytes * 1024 * 1024 // 4
-        host = torch.empty(elements, dtype=torch.float32, pin_memory=pinned)
-        device = torch.empty(elements, dtype=torch.float32, device=torch.accelerator.current_accelerator())
-        for _ in range(2):
-            device.copy_(host, non_blocking=pinned)
-        # The copy is asynchronous, so the clock has to be stopped by the device rather
-        # than by the return of the Python call.
-        torch.accelerator.synchronize()
-        start = time.perf_counter()
-        for _ in range(repeats):
-            device.copy_(host, non_blocking=pinned)
-        torch.accelerator.synchronize()
-        return (time.perf_counter() - start) / repeats
-
-    _rows = []
-    for _pinned in (False, True):
-        _seconds = _time_copy(transfer_size.value, _pinned)
-        _rows.append(
-            {
-                "host memory": "pinned" if _pinned else "pageable",
-                "milliseconds": round(_seconds * 1000, 3),
-                "GB/s": round(transfer_size.value / 1024 / _seconds, 1),
-            }
-        )
-    mo.vstack(
-        [
-            mo.ui.table(_rows, selection=None),
-            mo.md(
-                f"For scale: one batch of 64 FashionMNIST images is "
-                f"{64 * 784 * 4 / 1024:.0f} KB, so the copy costs about "
-                f"{_rows[0]['milliseconds'] * (64 * 784 * 4 / 1024**2) / transfer_size.value * 1000:.0f} "
-                "microseconds — next to nothing. A gradient all-reduce across two GPUs moves "
-                f"every parameter instead, and at {669706 * 4 / 1024**2:.1f} MB per copy that "
-                "arithmetic is what decides whether a second card makes training faster."
-            ),
-        ]
-    )
     return
 
 
@@ -719,6 +656,117 @@ def _(mo):
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
+    ## Explore — what a tensor actually is
+
+    Every slice above reported itself as a view or a copy, and the caption under every
+    picture in this notebook has been quietly printing a `stride` you were told to hold on
+    to. Here is what both mean.
+
+    A tensor is not its numbers. It is a *view* — a shape, a stride and an offset — onto one
+    flat run of memory, and several tensors can describe the same run differently. That
+    single sentence is what makes `x.T` free, what makes `reshape` sometimes copy, and, two
+    sections from now, what makes a NumPy array and a tensor able to be the same data under
+    two names.
+
+    Pick an operation. The strip is the storage, twelve numbers in the order they lie in
+    memory, and it never changes. The grid is what the resulting tensor claims to be.
+
+    - **stride** is how far to step, in elements, to move one position along each
+      dimension. `x.T` does not move a single number: it swaps the two strides.
+    - **contiguous** means the strides still walk the storage front to back. Transposing
+      breaks that, and any operation needing a linear layout has to copy first.
+    - **same storage** answers whether you got a view or a copy. Write into a view and
+      the original changes with it.
+
+    `x.T.view(2, 6)` is in the list on purpose: it is the error the `reshape` beneath it
+    exists to avoid.
+    """)
+    return
+
+
+@app.cell
+def _(mo):
+    operation = mo.ui.dropdown(
+        options={
+            "x.T": lambda x: x.T,
+            "x.view(2, 6)": lambda x: x.view(2, 6),
+            "x.T.view(2, 6)": lambda x: x.T.view(2, 6),
+            "x.T.reshape(2, 6)": lambda x: x.T.reshape(2, 6),
+            "x[:, 1:3]": lambda x: x[:, 1:3],
+            "x[:1].expand(3, 4)": lambda x: x[:1].expand(3, 4),
+            "x.contiguous()": lambda x: x.contiguous(),
+            "x.T.contiguous()": lambda x: x.T.contiguous(),
+        },
+        value="x.T",
+        label="`x = torch.arange(12).reshape(3, 4)`, then",
+    )
+    operation
+    return (operation,)
+
+
+@app.cell
+def _(mo, operation, show, torch):
+    x_storage = torch.arange(12).reshape(3, 4)
+    try:
+        _result = operation.value(x_storage)
+    except RuntimeError as error:
+        _panel = mo.callout(
+            mo.md(
+                f"""
+                `RuntimeError: {error}`
+
+                `view` refuses to guess. It only ever reinterprets the strides it was
+                given, and no stride pattern reads a transposed 3x4 as a 2x6, so it sends
+                you to `reshape`, which is allowed to copy when it has to.
+                """
+            ),
+            kind="danger",
+        )
+    else:
+        _same_storage = _result.untyped_storage().data_ptr() == x_storage.untyped_storage().data_ptr()
+        _panel = mo.vstack(
+            [
+                show(_result, "the tensor you get", cell=48),
+                mo.md(
+                    "| shape | stride | storage offset | contiguous | same storage as `x` |\n"
+                    "| --- | --- | --- | --- | --- |\n"
+                    f"| `{tuple(_result.shape)}` | `{_result.stride()}` | {_result.storage_offset()} "
+                    f"| {'yes' if _result.is_contiguous() else '**no**'} "
+                    f"| {'yes — a view' if _same_storage else '**no — it copied**'} |"
+                ),
+            ]
+        )
+
+    mo.vstack(
+        [
+            show(x_storage.flatten(), "storage: the same twelve numbers, always", cell=44),
+            _panel,
+        ],
+        gap=1,
+    )
+    return
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    `x[:1].expand(3, 4)` is the one to sit with: stride `(0, 1)`, so stepping along rows
+    steps zero elements and all three rows read the same four numbers. Broadcasting is
+    implemented exactly this way — no memory is allocated for the repeated dimension,
+    which is why broadcasting a large tensor against a small one costs nothing.
+
+    The sharing is real, and it cuts: `e = x[:1].expand(3, 4)` then `e[0, 0] = 99` puts
+    99 in all three rows, because there is only one 99 to put. Writing to the whole thing
+    at once is refused outright — `e.add_(1)` raises *more than one element of the
+    written-to tensor refers to a single memory location* — so PyTorch catches the
+    ambiguous case and lets the surprising one through.
+    """)
+    return
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
     **Joining tensors** You can use `torch.cat` to concatenate a sequence of tensors along a given
     dimension. See also [torch.stack](https://pytorch.org/docs/stable/generated/torch.stack.html),
     another tensor joining operator that is subtly different from `torch.cat`.
@@ -755,31 +803,39 @@ def _(mo):
 
 
 @app.cell
-def _(mo, torch):
-    _left = torch.zeros(2, 3)
-    _right = torch.ones(2, 3)
-    _rows = [
-        {
-            "call": f"torch.{_name}([a, b], dim={_dim})",
-            "result shape": str(tuple(getattr(torch, _name)([_left, _right], dim=_dim).shape)),
-            "dimensions": getattr(torch, _name)([_left, _right], dim=_dim).dim(),
-            "elements": getattr(torch, _name)([_left, _right], dim=_dim).numel(),
-        }
-        for _name, _dims in (("cat", (0, 1)), ("stack", (0, 1, 2)))
-        for _dim in _dims
-    ]
+def _(mo, show, torch):
+    a = torch.arange(6).reshape(2, 3)
+    b = torch.arange(6, 12).reshape(2, 3)
+
+    def _panel(result):
+        # A 3-D result is drawn as the 2-D slices it is made of, which is what having a new
+        # dimension actually looks like.
+        if result.dim() == 2:
+            return show(result, cell=44)
+        return mo.hstack([show(plane, f"[{i}]", cell=44) for i, plane in enumerate(result)], justify="start", gap=1.5)
+
+    _views = {
+        f"cat, dim=0 → {tuple(torch.cat([a, b], 0).shape)}": _panel(torch.cat([a, b], 0)),
+        f"cat, dim=1 → {tuple(torch.cat([a, b], 1).shape)}": _panel(torch.cat([a, b], 1)),
+        f"stack, dim=0 → {tuple(torch.stack([a, b], 0).shape)}": _panel(torch.stack([a, b], 0)),
+        f"stack, dim=1 → {tuple(torch.stack([a, b], 1).shape)}": _panel(torch.stack([a, b], 1)),
+        f"stack, dim=2 → {tuple(torch.stack([a, b], 2).shape)}": _panel(torch.stack([a, b], 2)),
+    }
     mo.vstack(
         [
-            mo.md("`a` and `b` are both `(2, 3)` — twelve elements between them, in every row below."),
-            mo.ui.table(_rows, selection=None),
+            mo.hstack([show(a, "a", cell=44), show(b, "b", cell=44)], justify="start", gap=2),
+            mo.ui.tabs(_views),
             mo.md(
-                "Every result holds the same twelve numbers. `cat` arranges them in two "
-                "dimensions and `stack` in three, which is the entire difference. The one to "
-                "remember is `torch.stack(list_of_images)` — that is how a list of `(1, 28, 28)` "
-                "samples becomes the `(64, 1, 28, 28)` batch a `DataLoader` hands you, and it is "
-                "why every sample in a batch must have the same shape."
+                "The twelve numbers are numbered so you can follow them. Every tab holds all "
+                "twelve; only the arrangement changes. `cat` keeps two dimensions and grows one "
+                "of them, `stack` adds a third and leaves both originals intact inside it — which "
+                "is why the stacked tabs are drawn as separate planes.\n\n"
+                "The one to remember is `torch.stack(list_of_images)`: that is how a list of "
+                "`(1, 28, 28)` samples becomes the `(64, 1, 28, 28)` batch a `DataLoader` hands "
+                "you, and it is why every sample in a batch must have the same shape."
             ),
-        ]
+        ],
+        gap=1,
     )
     return
 
@@ -910,7 +966,7 @@ def _(mo):
     return left_shape, right_shape
 
 
-@app.cell
+@app.cell(hide_code=True)
 def _(left_shape, mo, right_shape, torch):
     def _parse(text):
         return tuple(int(part) for part in text.replace("(", "").replace(")", "").split(",") if part.strip())
@@ -1112,105 +1168,26 @@ def _(mo, n_1, np, show, t_1):
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
-    ## Explore — what a tensor actually is
+    ---
 
-    "Tensors share their underlying memory with NumPy arrays" is the same fact as the one
-    the section above demonstrates in one direction: a tensor is not its numbers. It is a
-    *view* — a shape, a stride and an offset — onto one flat run of memory, and several
-    tensors can describe the same run differently.
+    ## Where this leaves you
 
-    Pick an operation. The strip is the storage, twelve numbers in the order they lie in
-    memory, and it never changes. The grid is what the resulting tensor claims to be.
+    The bridge is not a feature. It is the last consequence of the sentence at the top: a
+    tensor is a shape, a stride and an offset over a run of memory, so a NumPy array and a
+    tensor can be two descriptions of one run, and writing through either is writing to the
+    same bytes. Nothing was copied and nothing was synchronized.
 
-    - **stride** is how far to step, in elements, to move one position along each
-      dimension. `x.T` does not move a single number: it swaps the two strides.
-    - **contiguous** means the strides still walk the storage front to back. Transposing
-      breaks that, and any operation needing a linear layout has to copy first.
-    - **same storage** answers whether you got a view or a copy. Write into a view and
-      the original changes with it.
+    The same sentence answers the rest of the notebook. `x.T` is free because it swaps two
+    strides. `view` refuses where `reshape` copies because no stride pattern reads a
+    transposed matrix as a flat one. A slice is a view and a boolean mask is a gather.
+    `expand` costs nothing because a stride of zero reads the same memory repeatedly.
 
-    `x.T.view(2, 6)` is in the list on purpose: it is the error the `reshape` beneath it
-    exists to avoid.
-    """)
-    return
-
-
-@app.cell
-def _(mo):
-    operation = mo.ui.dropdown(
-        options={
-            "x.T": lambda x: x.T,
-            "x.view(2, 6)": lambda x: x.view(2, 6),
-            "x.T.view(2, 6)": lambda x: x.T.view(2, 6),
-            "x.T.reshape(2, 6)": lambda x: x.T.reshape(2, 6),
-            "x[:, 1:3]": lambda x: x[:, 1:3],
-            "x[:1].expand(3, 4)": lambda x: x[:1].expand(3, 4),
-            "x.contiguous()": lambda x: x.contiguous(),
-            "x.T.contiguous()": lambda x: x.T.contiguous(),
-        },
-        value="x.T",
-        label="`x = torch.arange(12).reshape(3, 4)`, then",
-    )
-    operation
-    return (operation,)
-
-
-@app.cell
-def _(mo, operation, show, torch):
-    x_storage = torch.arange(12).reshape(3, 4)
-    try:
-        _result = operation.value(x_storage)
-    except RuntimeError as error:
-        _panel = mo.callout(
-            mo.md(
-                f"""
-                `RuntimeError: {error}`
-
-                `view` refuses to guess. It only ever reinterprets the strides it was
-                given, and no stride pattern reads a transposed 3x4 as a 2x6, so it sends
-                you to `reshape`, which is allowed to copy when it has to.
-                """
-            ),
-            kind="danger",
-        )
-    else:
-        _same_storage = _result.untyped_storage().data_ptr() == x_storage.untyped_storage().data_ptr()
-        _panel = mo.vstack(
-            [
-                show(_result, "the tensor you get", cell=48),
-                mo.md(
-                    "| shape | stride | storage offset | contiguous | same storage as `x` |\n"
-                    "| --- | --- | --- | --- | --- |\n"
-                    f"| `{tuple(_result.shape)}` | `{_result.stride()}` | {_result.storage_offset()} "
-                    f"| {'yes' if _result.is_contiguous() else '**no**'} "
-                    f"| {'yes — a view' if _same_storage else '**no — it copied**'} |"
-                ),
-            ]
-        )
-
-    mo.vstack(
-        [
-            show(x_storage.flatten(), "storage: the same twelve numbers, always", cell=44),
-            _panel,
-        ],
-        gap=1,
-    )
-    return
-
-
-@app.cell(hide_code=True)
-def _(mo):
-    mo.md(r"""
-    `x[:1].expand(3, 4)` is the one to sit with: stride `(0, 1)`, so stepping along rows
-    steps zero elements and all three rows read the same four numbers. Broadcasting is
-    implemented exactly this way — no memory is allocated for the repeated dimension,
-    which is why broadcasting a large tensor against a small one costs nothing.
-
-    The sharing is real, and it cuts: `e = x[:1].expand(3, 4)` then `e[0, 0] = 99` puts
-    99 in all three rows, because there is only one 99 to put. Writing to the whole thing
-    at once is refused outright — `e.add_(1)` raises *more than one element of the
-    written-to tensor refers to a single memory location* — so PyTorch catches the
-    ambiguous case and lets the surprising one through.
+    Three things planted here are collected later. **dtype** — `Optimization` is where
+    16-bit starts paying and the `eps` column starts mattering. **Contiguity** — the moment
+    training goes to more than one GPU, the collectives that exchange gradients want a
+    linear buffer, and the copy that makes one is not free. And **`torch.stack`**, which is
+    the next notebook's whole job: a list of `(1, 28, 28)` samples going in, one
+    `(64, 1, 28, 28)` batch coming out.
     """)
     return
 
