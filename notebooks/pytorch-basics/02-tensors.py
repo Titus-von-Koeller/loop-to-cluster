@@ -57,8 +57,8 @@ def _(mo):
     ---
 
     Every tensor below is drawn rather than printed, so that what changes is visible. Under
-    each picture is what the object *is*: its shape, its dtype, and its **stride**, which the
-    tutorial does not mention and which turns out to be the whole story.
+    each picture is what the object *is*: its shape, its dtype, and its **stride** — the
+    last of which turns out to be the whole story.
 
     The notebook builds toward one claim, and it is worth having in mind from the start: a
     tensor is not its numbers. It is a shape, a stride and an offset over one flat run of
@@ -340,11 +340,11 @@ def _(mo, show, torch):
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
-    Three of those four are the ones the tutorial names. The fourth, **stride**, is not
-    mentioned here and is the one that explains the other three: `(4, 1)` says that stepping
-    to the next row moves four positions through memory and stepping to the next column
-    moves one. Hold on to it — the last section of this notebook is about nothing else, and
-    it is printed under every picture in between.
+    Shape, dtype and device say what a tensor holds and where. **Stride** says how it is
+    read, and it explains the other three: `(4, 1)` means that stepping to the next row
+    moves four positions through memory, and stepping to the next column moves one. Hold on
+    to it. It is printed under every picture from here on, and a later section is about
+    nothing else.
     """)
     return
 
@@ -354,10 +354,10 @@ def _(mo):
     mo.md(r"""
     ## Explore — `dtype` is three decisions, not one
 
-    `torch.float32` is the default and the tutorial moves on. It is worth stopping,
-    because the choice of dtype decides how much memory a model needs, how fast it
-    trains, and what it can represent — and the two 16-bit formats below differ from each
-    other more than either differs from `float32`.
+    `torch.float32` is the default, and it is worth stopping on, because the choice of
+    dtype decides how much memory a model needs, how fast it trains, and what it can
+    represent — and the two 16-bit formats below differ from each other more than either
+    differs from `float32`.
 
     A floating point number is a sign, an exponent and a mantissa. The exponent sets the
     *range*, the mantissa sets the *precision*, and 16 bits has to be split between them —
@@ -498,11 +498,11 @@ def _(mo):
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
-    ## Explore — the notation, before the lines that use it
+    ## Explore — the notation
 
-    "numpy-like indexing and slicing" is four separate pieces of notation, and the cell
-    below uses all four without introducing any of them. The whole grammar is small, so
-    here it is first; then the cell reads as arithmetic rather than as incantation.
+    Indexing a tensor is four separate pieces of notation wearing one pair of brackets. The
+    whole grammar is small, so here it is, and then the expressions read as arithmetic
+    rather than as incantation.
 
     ### The brackets
 
@@ -947,11 +947,11 @@ def _(mo, show, tensor_2, torch):
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
-    ## Explore — `cat` against `stack`, which the paragraph above calls "subtly different"
+    ## Explore — `cat` against `stack`
 
-    It is not subtle once the shapes are side by side, and it is worth ten seconds now
-    because it is the difference between a batch of 64 images and a single image with 64
-    channels.
+    The difference is easy to see once the shapes are side by side, and it is worth ten
+    seconds now, because it is the difference between a batch of 64 images and a single
+    image with 64 channels.
 
     **`cat` joins along a dimension that already exists.** The inputs need to agree on
     every *other* dimension, the chosen one adds up, and the result has the same number of
@@ -1109,10 +1109,9 @@ def _(mo):
     mo.md(r"""
     ## Explore — broadcasting, one dimension at a time
 
-    The tutorial multiplies tensors of equal shape, which hides the rule that actually
-    governs PyTorch arithmetic. Shapes are lined up from the *right*; a missing dimension
-    counts as 1, and a dimension of 1 is stretched to meet its partner. Anything else is
-    an error.
+    Equal shapes multiply elementwise, which is the easy case. The rule underneath governs
+    every other one. Shapes are lined up from the *right*; a missing dimension counts as 1,
+    and a dimension of 1 is stretched to meet its partner. Anything else is an error.
 
     Type two shapes. The table shows the alignment PyTorch performs, and the error text
     when there isn't one — worth reading once deliberately, because it is the error you
