@@ -360,22 +360,34 @@ def _(mo):
     other more than either differs from `float32`.
 
     A floating point number is a sign, an exponent and a mantissa. The exponent sets the
-    *range*, the mantissa sets the *precision*, and 16 bits has to be split between them:
+    *range*, the mantissa sets the *precision*, and 16 bits has to be split between them —
+    which the two formats do differently, and that is the whole story.
 
-    - **float16** spends its bits on mantissa. Finer steps than bfloat16, but the largest
-      number it can hold is 65,504 and the smallest normal one is 6.1e-05. Gradients
-      routinely fall below that and become zero — which is what a gradient scaler exists
-      to prevent, by multiplying the loss up before the backward pass and dividing it out
-      after.
-    - **bfloat16** spends them on exponent — the same eight exponent bits as float32. So it
-      starts underflowing in the same place float32 does (`tiny` is 1.18e-38 for both), and
-      a gradient that survives in float32 survives here, which is why bfloat16 needs no
-      scaler. Its largest value differs from float32's only in the last mantissa digits,
-      3.39e38 against 3.40e38. The price is precision: its steps are eight times coarser
-      than float16's, exactly eight, as the `eps` column shows.
-
-    Type a number and watch what each format does to it.
+    Type a number and watch what each format does to it. The columns say the rest.
     """)
+    return
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.accordion(
+        {
+            "How the two 16-bit formats spend their bits": mo.md(r"""
+            - **float16** spends its bits on mantissa. Finer steps than bfloat16, but the
+              largest number it can hold is 65,504 and the smallest normal one is 6.1e-05.
+              Gradients routinely fall below that and become zero — which is what a gradient
+              scaler exists to prevent, by multiplying the loss up before the backward pass
+              and dividing it out after.
+            - **bfloat16** spends them on exponent — the same eight exponent bits as float32.
+              So it starts underflowing in the same place float32 does (`tiny` is 1.18e-38
+              for both), and a gradient that survives in float32 survives here, which is why
+              bfloat16 needs no scaler. Its largest value differs from float32's only in the
+              last mantissa digits, 3.39e38 against 3.40e38. The price is precision: its
+              steps are eight times coarser than float16's, exactly eight, as the `eps`
+              column shows.
+            """)
+        }
+    )
     return
 
 
@@ -705,8 +717,56 @@ def _(mo):
 
 
 @app.cell
-def _(mo, operation, show, torch):
+def _(alt, mo, operation, pd, show, torch):
+    import itertools
+
+    def storage_strip(result, base, shares):
+        """The twelve slots of `base`, shaded by the order `result` reads them in.
+
+        This is the whole mechanism in one row: a view does not hold numbers, it holds a
+        rule for walking someone else's memory, and the rule is the stride.
+        """
+        read_at = {}
+        if shares:
+            for rank, index in enumerate(itertools.product(*[range(s) for s in result.shape])):
+                slot = result.storage_offset() + sum(i * s for i, s in zip(index, result.stride(), strict=True))
+                read_at.setdefault(slot, rank)
+        cells = pd.DataFrame(
+            [
+                {"slot": slot, "row": 0, "value": int(v), "order": read_at.get(slot)}
+                for slot, v in enumerate(base.flatten())
+            ]
+        )
+        # Both marks are placed on the same two band scales, so each number sits inside its
+        # own square rather than at a pixel offset that happens to look right at one size.
+        at = {
+            "x": alt.X("slot:O", axis=None, scale=alt.Scale(paddingInner=0.06)),
+            "y": alt.Y("row:O", axis=None),
+        }
+        squares = (
+            alt.Chart(cells)
+            .mark_rect()
+            .encode(
+                **at,
+                # A slot nothing reads keeps the neutral end rather than taking a rank it never earned.
+                color=alt.Color("order:Q", scale=alt.Scale(range=["#dbe7f7", "#17457c"]), legend=None),
+                tooltip=[alt.Tooltip("slot:O", title="storage slot"), alt.Tooltip("order:Q", title="read position")],
+            )
+        )
+        labels = (
+            alt.Chart(cells)
+            .mark_text(fontSize=13, fontWeight=500)
+            .encode(
+                **at,
+                text=alt.Text("value:Q", format=".0f"),
+                color=alt.condition("datum.order > 6", alt.value("#ffffff"), alt.value("#15181d")),
+            )
+        )
+        return (squares + labels).properties(width=44 * 12, height=48)
+
     x_storage = torch.arange(12).reshape(3, 4)
+    _result = None
+    _same_storage = False
     try:
         _result = operation.value(x_storage)
     except RuntimeError as error:
@@ -739,7 +799,15 @@ def _(mo, operation, show, torch):
 
     mo.vstack(
         [
-            show(x_storage.flatten(), "storage: the same twelve numbers, always", cell=44),
+            mo.md(
+                "**storage** — the same twelve numbers, always, in the order they lie in memory"
+                + (
+                    ", shaded by the order the result reads them in"
+                    if _same_storage
+                    else ". The result above reads none of them: it has storage of its own."
+                )
+            ),
+            storage_strip(_result, x_storage, _same_storage) if _result is not None else mo.md(""),
             _panel,
         ],
         gap=1,
