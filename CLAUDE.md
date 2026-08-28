@@ -38,6 +38,15 @@ do it. It is young enough that its installed source under `.pixi/envs/` settles 
 its documentation does not — `--mcp` is hidden from `--help`, `custom_css` does not expand `~` —
 so check `marimo config describe`, then that source in a subagent, and only then the web.
 
+A single notebook overrides that config from its own PEP 723 header, which
+`ScriptConfigManager` merges at the *highest* precedence — above this repo's `pyproject.toml`.
+The tutorials under `notebooks/pytorch-basics/` use it to set `on_cell_change = "autorun"`,
+because the repo-wide `lazy` marks a cell stale instead of running it and a widget that does not
+update is not a widget. Three sections are stripped from a script header for security
+(`runtime.auto_instantiate`, `experimental.isolate_apps`, `display.custom_css`), which is
+convenient here rather than limiting: opening one of those notebooks still executes nothing.
+Same `lru_cache`, so the same window reload.
+
 The VSCode extension contributes a *native* notebook rather than embedding marimo's web app,
 so anything routed through marimo's own HTML — `display.custom_css`, the `--marimo-*-font`
 variables — never reaches it. Cells there are governed by VSCode's `editor.*` and
