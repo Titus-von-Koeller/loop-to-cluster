@@ -527,33 +527,110 @@ def _(mo, show, torch):
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
-    ## Explore — slicing, if you are arriving from Python lists
+    ## Explore — indexing, defined before it is used
 
-    Three lines above carry most of what indexing a tensor involves, and they go past
-    quickly. The rules, once:
+    The three lines above use four separate pieces of notation and explain none of them.
+    The whole grammar is small, so here it is first.
 
-    **One pair of brackets, one entry per dimension, separated by commas.** A list of
-    lists needs `rows[1][3]`, two lookups; a tensor takes `t[1, 3]`, one lookup that the
-    shape and stride resolve directly. `t[1]` with the second entry left out means *every*
-    column, so `t[1]` and `t[1, :]` are the same tensor.
+    ### The brackets
 
-    **A slice is `start:stop:step`, and `stop` is not included.** Leave a part out and it
-    takes its default: `:` is everything, `2:` is from 2 to the end, `:3` is up to but not
-    including 3. Negative numbers count from the end, so `t[-1]` is the last row.
+    **`t[a, b, c]` — one pair of brackets, one entry per dimension, left to right.**
 
-    **An integer removes a dimension; a slice keeps it.** `t[0]` has shape `(8,)` and
-    `t[0:1]` has shape `(1, 8)`, holding exactly the same numbers. This is the one to
-    internalise: it is where a batch dimension quietly disappears and the error surfaces
-    three lines later, in a matmul that expected two dimensions and got one.
+    A list of lists needs `rows[1][3]`: two lookups, because the outer list hands you an
+    inner list which you then index again. A tensor takes `t[1, 3]`: a single lookup that
+    the shape and stride resolve by arithmetic. There is no inner object to fetch.
 
-    **`...` means "as many full dimensions as it takes"**, so what you write binds to the
-    *last* dimension whatever the rank. `t[..., -1]` is the last column of a matrix, and on
-    a `(batch, channel, height, width)` image batch it is still the last column — of every
-    image, leaving `(batch, channel, height)`. The last *channel* is `t[:, -1]`, counted
-    from the left. And `None` inserts a new dimension of size 1, which is how you line two
-    tensors up for broadcasting.
+    **Dimensions you leave off the end are untouched** — the missing entries are `:`. For a
+    2-D `t`, these are all the same tensor:
 
-    Pick an expression: the highlighted cells are what it selects.
+    ```
+    t[1]        t[1, :]        t[1, 0:8]
+    ```
+
+    and `t[:]` is the entire tensor, because the one entry says "all of dimension 0" and
+    the unwritten second entry says "all of dimension 1".
+
+    ### The four things an entry can be
+
+    What matters about each is not only what it selects, but what it does to *that
+    dimension of the shape*:
+
+    | entry | example | selects | effect on that dimension |
+    | --- | --- | --- | --- |
+    | an integer | `t[3]` | one position | **it disappears** |
+    | a slice | `t[1:5]` | a range | stays, usually shorter |
+    | `:` | `t[:]` | all of it | stays, unchanged |
+    | `None` | `t[None]` | nothing at all | a **new** dimension of size 1 is inserted here |
+
+    Two spellings sit on top of that. `...` stands for as many `:` as it takes to reach the
+    entries you did write, so `t[..., -1]` binds to the *last* dimension whatever the rank.
+    And a slice is `start:stop:step` with any part omissible: `stop` is excluded, `2:` runs
+    to the end, `:3` stops before 3, `::2` takes every second, and negative numbers count
+    from the end, so `t[-1]` is the last row.
+
+    That is the entire syntax. Everything below is a consequence of the table.
+    """)
+    return
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    ### The first consequence: the column that is not a column
+
+    `t[:, 0]` reads aloud as "every row, column zero", so it feels like it should give you
+    a column standing upright. It does not, and the table above says why: the integer `0`
+    made dimension 1 disappear. What comes back has shape `(4,)` — four numbers in *one*
+    dimension.
+
+    A one-dimensional tensor has no orientation. Neither upright nor flat; the words only
+    mean something once there are two dimensions to tell apart. `t[0]`, the first *row*,
+    comes back with the identical shape `(4,)`. The row and the column are the same kind of
+    object, which is why they are drawn the same way below.
+
+    Keep the dimension and you get the upright thing you pictured: `t[:, 0:1]` is a slice,
+    so dimension 1 survives with length 1, and the shape is `(4, 1)`.
+
+    Watch the strides, though. That is where the difference went.
+    """)
+    return
+
+
+@app.cell
+def _(mo, show, tensor_2):
+    mo.hstack(
+        [
+            show(tensor_2[0], "tensor_2[0]"),
+            show(tensor_2[0:1], "tensor_2[0:1]"),
+            show(tensor_2[:, 0], "tensor_2[:, 0]"),
+            show(tensor_2[:, 0:1], "tensor_2[:, 0:1]"),
+        ],
+        justify="start",
+        align="center",
+        gap=2,
+        wrap=True,
+    )
+    return
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    Four tensors holding four numbers each, and the captions do all the work.
+
+    `tensor_2[0]` has stride `(1,)`: its four numbers lie side by side in memory.
+    `tensor_2[:, 0]` has stride `(4,)`: it reads number 0, then 4, then 8, then 12, stepping
+    a whole row each time — which is what "going down a column" *is* once the rows are laid
+    end to end. The column-ness did not vanish when the dimension did. It moved into the
+    stride.
+
+    And the two that kept their second dimension differ from their flattened partners only
+    there: `(1, 4)` against `(4,)`, `(4, 1)` against `(4,)`, the same four numbers in the
+    same memory either way. This is the distinction worth carrying, because it is where a
+    batch dimension quietly disappears and the error surfaces three lines later in a matrix
+    multiply that wanted two dimensions and got one.
+
+    Now pick an expression. The highlighted cells are what it selects.
     """)
     return
 
@@ -564,7 +641,9 @@ def _(mo):
         options={
             "t[0] — one row, and the row dimension is gone": lambda t: t[0],
             "t[0:1] — the same eight numbers, still a matrix": lambda t: t[0:1],
-            "t[:, 0] — every row, column zero": lambda t: t[:, 0],
+            "t[:] — every entry omitted: the whole tensor, as a view": lambda t: t[:],
+            "t[:, 0] — every row, column zero, and now one-dimensional": lambda t: t[:, 0],
+            "t[:, 0:1] — the same numbers, kept upright": lambda t: t[:, 0:1],
             "t[-1] — the last row": lambda t: t[-1],
             "t[1:5:2] — from 1, stopping before 5, every second": lambda t: t[1:5:2],
             "t[2:4, 3:6] — a block, sliced in both dimensions": lambda t: t[2:4, 3:6],
@@ -582,7 +661,7 @@ def _(mo):
     return (slicing,)
 
 
-@app.cell
+@app.cell(hide_code=True)
 def _(alt, mo, pd, show, slicing, torch):
     t2_sliced = torch.arange(48).reshape(6, 8)
     try:
@@ -650,6 +729,19 @@ def _(mo):
     storage read with different strides, which is why `tensor_2[:, 1] = 0` above changed
     `tensor_2` itself. A boolean mask or a list of indices cannot be expressed as a stride,
     so PyTorch gathers the elements into new storage.
+
+    `t[:]` is where that bites someone arriving from Python, because there the same
+    notation means the opposite. `lst[:]` is *the* shallow-copy idiom: `copy = lst[:]`,
+    edit `copy`, and `lst` is untouched. On a tensor nothing is copied — you get a second
+    view onto the same bytes, and editing it edits the original. `t.clone()` is the one
+    that copies.
+
+    Which leaves `t[:]` looking useless, since reading through it gives back exactly what
+    you had. Its use is on the other side of the assignment: `w[:] = 0` fills the existing
+    tensor in place, keeping its storage and its identity, where `w = 0` merely rebinds the
+    name and abandons the tensor. Anything else pointing at that memory — another view, a
+    NumPy array sharing it, a parameter held by a module — sees the first and misses the
+    second.
 
     Which makes the mask asymmetric, and this is the part worth remembering. *Read* it and
     you get a copy: `c = t[t % 7 == 0]` then `c[0] = -1` leaves `t` untouched. *Assign into*
