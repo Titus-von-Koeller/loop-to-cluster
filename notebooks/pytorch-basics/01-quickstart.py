@@ -1,3 +1,18 @@
+# /// script
+# [tool.marimo.runtime]
+# on_cell_change = "autorun"
+# ///
+
+# The repository default is lazy, which marks a cell stale rather than running it when
+# something upstream changes -- correct for a notebook holding a model on the GPU, and
+# fatal for a slider, whose whole point is that the picture moves while you drag. Script
+# metadata is merged over the project config at the highest precedence, so a notebook
+# opts in on its own. `auto_instantiate` cannot be set here (marimo strips it from script
+# metadata), so opening this file still runs nothing.
+#
+# Cells under an "Explore" heading are additions; everything else is the upstream
+# tutorial as converted.
+
 import marimo
 
 __generated_with = "0.24.0"
@@ -165,6 +180,26 @@ def _(nn, torch):
     model = NeuralNetwork().to(device)
     print(model)
     return NeuralNetwork, device, model
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    ## Explore — the same object, rendered rather than printed
+
+    `print(model)` produced the text above. Returning the module instead hands it to
+    marimo's formatter: parameter counts per layer, dtype and device, and a color per
+    layer kind. Open `linear_relu_stack` and read the counts — 401,920 of the model's
+    669,706 parameters are in the *first* `Linear`, because it is the only one that
+    meets all 784 pixels. That ratio is why input resolution costs more than depth.
+    """)
+    return
+
+
+@app.cell
+def _(model):
+    model
+    return
 
 
 @app.cell(hide_code=True)
@@ -368,7 +403,7 @@ def _(device, model_1, test_data, torch):
         pred = model_1(x)
         predicted, actual = (classes[pred[0].argmax(0)], classes[_y])
         print(f'Predicted: "{predicted}", Actual: "{actual}"')
-    return
+    return (classes,)
 
 
 @app.cell(hide_code=True)
@@ -376,6 +411,195 @@ def _(mo):
     mo.md(r"""
     Read more about [Saving & Loading your model](saveloadrun_tutorial.html).
     """)
+    return
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    ## Explore — all ten thousand test images, not just the first
+
+    The cell above predicts `test_data[0]` and prints one line. The same three lines run
+    over the whole test set below, once, and everything after it is a *view* onto those
+    stored predictions rather than another forward pass. That separation is worth
+    noticing: it is the same reason a training loop keeps `model.eval()` and
+    `torch.no_grad()` around inference, and the reason an evaluation is cheap to slice
+    afterwards but expensive to redo.
+    """)
+    return
+
+
+@app.cell
+def _():
+    import altair as alt
+    import pandas as pd
+
+    return alt, pd
+
+
+@app.cell
+def _(DataLoader, device, model_1, test_data, torch):
+    @torch.no_grad()
+    def _predict_everything():
+        model_1.eval()
+        batched = [model_1(images.to(device)) for images, _ in DataLoader(test_data, batch_size=512)]
+        return torch.cat(batched).cpu()
+
+    test_probabilities = _predict_everything().softmax(1)
+    test_predicted = test_probabilities.argmax(1)
+    test_actual = test_data.targets
+    test_hits = test_predicted == test_actual
+    return test_actual, test_hits, test_predicted, test_probabilities
+
+
+@app.cell
+def _(mo, test_hits, test_probabilities):
+    mo.hstack(
+        [
+            mo.stat(
+                f"{test_hits.float().mean():.1%}",
+                label="Accuracy",
+                caption=f"{len(test_hits):,} images",
+                bordered=True,
+            ),
+            mo.stat(f"{(~test_hits).sum():,}", label="Mistakes", caption="browsable below", bordered=True),
+            mo.stat(
+                f"{test_probabilities.max(1).values.mean():.0%}",
+                label="Mean confidence",
+                caption="probability of the chosen class",
+                bordered=True,
+            ),
+        ],
+        justify="start",
+        gap=1,
+    )
+    return
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    ### Where the mistakes are
+
+    A single accuracy number hides *which* classes the model confuses, and the answer is
+    never uniform. Click a square: the images behind it appear below. The color scale is
+    symlog, because the diagonal is two orders of magnitude larger than everything else
+    and a linear scale would render the interesting cells as white.
+    """)
+    return
+
+
+@app.cell
+def _(alt, classes, mo, pd, test_actual, test_predicted):
+    _pairs = pd.DataFrame(
+        {
+            "actual": [classes[i] for i in test_actual.tolist()],
+            "predicted": [classes[i] for i in test_predicted.tolist()],
+        }
+    )
+    _heatmap = (
+        alt.Chart(_pairs.groupby(["actual", "predicted"], as_index=False).size())
+        .mark_rect()
+        .encode(
+            x=alt.X("predicted:N", sort=classes, title="predicted"),
+            y=alt.Y("actual:N", sort=classes, title="actual"),
+            color=alt.Color("size:Q", scale=alt.Scale(scheme="blues", type="symlog"), title="images"),
+            tooltip=["actual", "predicted", "size"],
+        )
+        .properties(width=420, height=420)
+    )
+    confusion = mo.ui.altair_chart(_heatmap)
+    confusion
+    return (confusion,)
+
+
+@app.cell
+def _(classes, confusion, mo, test_actual, test_hits, test_predicted, torch):
+    if len(confusion.value):
+        _selected = {(row.actual, row.predicted) for row in confusion.value.itertuples()}
+        _mask = torch.tensor(
+            [
+                (classes[a], classes[p]) in _selected
+                for a, p in zip(test_actual.tolist(), test_predicted.tolist(), strict=True)
+            ]
+        )
+        _what = "in the squares you selected"
+    else:
+        _mask = ~test_hits
+        _what = "the model got wrong — select squares above to narrow this down"
+    picked = _mask.nonzero().flatten()
+    mo.md(f"**{len(picked):,}** images {_what}.")
+    return (picked,)
+
+
+@app.cell
+def _(mo, picked):
+    offset = mo.ui.slider(
+        0, max(len(picked) - 10, 0), step=10, value=0, label="browse", full_width=True, show_value=True
+    )
+    offset
+    return (offset,)
+
+
+@app.cell
+def _(classes, mo, offset, picked, test_actual, test_data, test_predicted, test_probabilities):
+    _cards = [
+        mo.vstack(
+            [
+                mo.image(test_data[i][0].squeeze(0), width=88, vmin=0, vmax=1, rounded=True),
+                mo.md(
+                    f"said **{classes[test_predicted[i]]}** "
+                    f"({test_probabilities[i].max():.0%})<br>was {classes[test_actual[i]]}"
+                ),
+            ],
+            gap=0.25,
+        )
+        for i in picked[offset.value : offset.value + 10].tolist()
+    ]
+    mo.hstack(_cards, justify="start", wrap=True, gap=1)
+    return
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    The squares off the diagonal are not scattered: they cluster into upper-body garments
+    and into footwear. Nothing in the loss function said those groups existed — the model
+    was told only that the ten labels are distinct — so the structure comes from the
+    pixels. Rather than name the pairs here, where they would go stale the first time you
+    change an epoch count, the table below reads them off the run you just did.
+    """)
+    return
+
+
+@app.cell
+def _(classes, mo, pd, test_actual, test_hits, test_predicted):
+    _misses = pd.DataFrame(
+        {
+            "true label": [classes[i] for i in test_actual[~test_hits].tolist()],
+            "the model said": [classes[i] for i in test_predicted[~test_hits].tolist()],
+        }
+    )
+    _ranked = _misses.groupby(["true label", "the model said"], as_index=False).size()
+    _ranked = _ranked.sort_values("size", ascending=False).head(8).rename(columns={"size": "images"})
+    mo.ui.table(_ranked, selection=None, label="Where the mistakes concentrate")
+    return
+
+
+@app.cell
+def _(classes, mo, test_actual, test_hits, torch):
+    _recall = torch.stack([test_hits[test_actual == i].float().mean() for i in range(len(classes))])
+    _worst = _recall.argmin().item()
+    mo.md(
+        f"""
+        Read the extreme case off that table: **{classes[_worst]}** is recovered
+        {_recall[_worst]:.0%} of the time, against {_recall.max():.0%} for
+        {classes[_recall.argmax().item()]}. A single accuracy figure averages those two
+        together, which is the argument for looking at a confusion matrix before
+        believing one number — and, later, the argument for a per-class metric in any
+        evaluation that decides whether a training change helped.
+        """
+    )
     return
 
 
