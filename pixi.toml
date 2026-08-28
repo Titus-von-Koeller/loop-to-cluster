@@ -69,3 +69,22 @@ marimo = ">=0.24, <0.25"
 matplotlib = ">=3.11.1, <4"
 seaborn = ">=0.13.2, <0.14"
 trackio = ">=0.35.0, <0.36"
+
+# For the interactive cells added to the tutorials under notebooks/pytorch-basics.
+# None of these is imported by anything under scripts/ or l2c/.
+#
+# altair and plotly are the two chart libraries marimo makes reactive: a selection on
+# an altair chart arrives back in Python as a dataframe, and plotly draws the 3D
+# surfaces a loss landscape needs. matplotlib stays for everything static.
+altair = ">=6.2, <7"
+plotly = ">=7.0, <8"
+# anywidget is the protocol marimo speaks to third-party widgets; wigglystuff is a
+# collection built on it, and the reason it is here is TangleSlider -- a number you
+# drag inside a sentence, so a paragraph about 28x28 images can be edited by hand.
+anywidget = ">=0.11, <0.12"
+wigglystuff = ">=0.5.30, <0.6"
+# Draws an nn.Module by tracing a forward pass, so the picture shows the shapes that
+# actually flow rather than the declaration order. Shells out to graphviz's `dot`,
+# which is installed from nixpkgs in ~/dotfiles rather than here: it is a binary, not
+# a wheel, and pixi's conda-forge build would collide with the system one on PATH.
+torchview = ">=0.2.7, <0.3"

@@ -40,3 +40,7 @@ bench/snapshots/
 
 # Datasets the tutorials download at runtime; torchvision re-fetches them on demand.
 notebooks/**/data/
+
+# Checkpoints the save/load tutorials write beside themselves. Re-created by running
+# the notebook that saves them, which is the only thing that reads them back.
+notebooks/**/*.pth
