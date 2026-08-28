@@ -1,3 +1,18 @@
+# /// script
+# [tool.marimo.runtime]
+# on_cell_change = "autorun"
+# ///
+
+# The repository default is lazy, which marks a cell stale rather than running it when
+# something upstream changes -- correct for a notebook holding a model on the GPU, and
+# fatal for a slider, whose whole point is that the picture moves while you drag. Script
+# metadata is merged over the project config at the highest precedence, so a notebook
+# opts in on its own. `auto_instantiate` cannot be set here (marimo strips it from script
+# metadata), so opening this file still runs nothing.
+#
+# Cells under an "Explore" heading are additions; everything else is the upstream
+# tutorial as converted.
+
 import marimo
 
 __generated_with = "0.24.0"
@@ -130,6 +145,58 @@ def _(plt, torch, training_data):
         plt.axis("off")
         plt.imshow(_img.squeeze(), cmap="gray")
     plt.show()
+    return (labels_map,)
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    ## Explore — the dataset as something you can page through
+
+    Nine random samples per re-run is enough to prove the dataset loads, and not enough to
+    give you a feel for it. Pick classes and page through them instead. Sandal, Sneaker
+    and Ankle boot are worth putting side by side: at 28x28 in grayscale they are three
+    silhouettes with the same footprint, and the model that struggles with them in the
+    quickstart notebook is not being stupid.
+    """)
+    return
+
+
+@app.cell
+def _(labels_map, mo, training_data):
+    wanted = mo.ui.multiselect(
+        options=dict(sorted((name, index) for index, name in labels_map.items())),
+        value=["Sandal", "Sneaker", "Ankle Boot"],
+        label="classes",
+    )
+    page = mo.ui.slider(0, 40, value=0, label="page", show_value=True)
+    mo.hstack([wanted, page, mo.md(f"{len(training_data):,} training images")], justify="start", gap=1)
+    return page, wanted
+
+
+@app.cell
+def _(labels_map, mo, page, torch, training_data, wanted):
+    _targets = training_data.targets
+    _keep = torch.isin(_targets, torch.tensor(wanted.value or list(labels_map)))
+    _matching = _keep.nonzero().flatten()
+    _start = min(page.value * 12, max(len(_matching) - 12, 0))
+    _cards = [
+        mo.vstack(
+            [
+                mo.image(training_data[i][0].squeeze(0), width=84, vmin=0, vmax=1, rounded=True),
+                mo.md(f"<small>{labels_map[int(_targets[i])]}</small>"),
+            ],
+            align="center",
+            gap=0.2,
+        )
+        for i in _matching[_start : _start + 12].tolist()
+    ]
+    mo.vstack(
+        [
+            mo.md(f"**{len(_matching):,}** images in the selected classes."),
+            mo.hstack(_cards, justify="start", wrap=True, gap=0.8),
+        ]
+    )
     return
 
 
@@ -294,7 +361,7 @@ def _(test_data, training_data):
 
     train_dataloader = DataLoader(training_data, batch_size=64, shuffle=True)
     test_dataloader = DataLoader(test_data, batch_size=64, shuffle=True)
-    return (train_dataloader,)
+    return DataLoader, train_dataloader
 
 
 @app.cell(hide_code=True)
@@ -323,6 +390,97 @@ def _(plt, train_dataloader):
     plt.imshow(_img, cmap="gray")
     plt.show()
     print(f"Label: {_label}")
+    return
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    ## Explore — the three arguments that decide what a batch is
+
+    `DataLoader(training_data, batch_size=64, shuffle=True)` hides three separate
+    decisions. Change them and watch what arrives.
+
+    - **batch_size** sets the first dimension of every tensor the model sees. It is also
+      the number that `len(dataloader)` counts *batches* of, not samples — an off-by-a-
+      factor-of-64 error waiting to happen in a progress bar.
+    - **shuffle** decides whether the sampler walks the dataset in file order or permutes
+      it each epoch. FashionMNIST is already stored well mixed — all ten classes appear in
+      the first 64 images — so the class counts below barely move when you turn it off.
+      What does change is that every epoch then sees the identical sequence of batches,
+      and consecutive gradients stay correlated in whatever way the file happens to be
+      ordered. On a dataset stored grouped by class, and many are, that is the difference
+      between training and not.
+    - **drop_last** decides what happens to the remainder. 60,000 images in batches of 64
+      leaves a final batch of 48. Keeping it means one batch has a different shape from
+      all the others; dropping it means throwing away those 48 images every epoch.
+
+    That last one stops being cosmetic once there is more than one GPU: ranks that
+    disagree about how many batches exist will hang at the collective that ends the epoch,
+    which is why distributed training usually drops the remainder.
+    """)
+    return
+
+
+@app.cell
+def _(mo):
+    batch_size_choice = mo.ui.slider(steps=[1, 8, 16, 32, 64, 128, 256], value=64, label="batch_size", show_value=True)
+    shuffle_choice = mo.ui.switch(True, label="shuffle")
+    drop_last_choice = mo.ui.switch(False, label="drop_last")
+    mo.hstack([batch_size_choice, shuffle_choice, drop_last_choice], justify="start", gap=2)
+    return batch_size_choice, drop_last_choice, shuffle_choice
+
+
+@app.cell
+def _(
+    DataLoader,
+    batch_size_choice,
+    drop_last_choice,
+    labels_map,
+    mo,
+    shuffle_choice,
+    torch,
+    training_data,
+):
+    explore_loader = DataLoader(
+        training_data,
+        batch_size=batch_size_choice.value,
+        shuffle=shuffle_choice.value,
+        drop_last=drop_last_choice.value,
+        generator=torch.Generator().manual_seed(0),
+    )
+    _images, _labels = next(iter(explore_loader))
+    _remainder = len(training_data) % batch_size_choice.value
+    _last = "same as the rest" if _remainder == 0 or drop_last_choice.value else f"{_remainder} images"
+
+    _strip = [
+        mo.vstack(
+            [
+                mo.image(image.squeeze(0), width=52, vmin=0, vmax=1, rounded=True),
+                mo.md(f"<small>{labels_map[int(label)][:8]}</small>"),
+            ],
+            align="center",
+            gap=0.1,
+        )
+        for image, label in zip(_images[:24], _labels[:24], strict=True)
+    ]
+    mo.vstack(
+        [
+            mo.hstack(
+                [
+                    mo.stat(f"{len(explore_loader):,}", label="batches per epoch", bordered=True),
+                    mo.stat(str(tuple(_images.shape)), label="shape of one batch", bordered=True),
+                    mo.stat(_last, label="last batch", bordered=True),
+                    mo.stat(f"{len(_labels.unique())}/10", label="classes in this batch", bordered=True),
+                ],
+                justify="start",
+                gap=1,
+            ),
+            mo.md("The first batch, up to the first 24 images:"),
+            mo.hstack(_strip, justify="start", wrap=True, gap=0.5),
+        ],
+        gap=1,
+    )
     return
 
 
