@@ -1,3 +1,18 @@
+# /// script
+# [tool.marimo.runtime]
+# on_cell_change = "autorun"
+# ///
+
+# The repository default is lazy, which marks a cell stale rather than running it when
+# something upstream changes -- correct for a notebook holding a model on the GPU, and
+# fatal for a slider, whose whole point is that the picture moves while you drag. Script
+# metadata is merged over the project config at the highest precedence, so a notebook
+# opts in on its own. `auto_instantiate` cannot be set here (marimo strips it from script
+# metadata), so opening this file still runs nothing.
+#
+# Cells under an "Explore" heading are additions; everything else is the upstream
+# tutorial as converted.
+
 import marimo
 
 __generated_with = "0.24.0"
@@ -120,6 +135,51 @@ def _(NeuralNetwork, device):
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
+    ## Explore — two better pictures of the same model
+
+    `print(model)` gives the constructor arguments back. marimo formats an `nn.Module`
+    itself, which adds what the constructor does not say: how many parameters each layer
+    holds, what dtype and device they are on, and whether they are trainable. Fold the
+    stack open.
+
+    Underneath, torchview traces an actual forward pass and draws what happened. The two
+    pictures answer different questions. The tree is what the model *contains* — nesting,
+    parameter counts, devices — and it is built by walking attributes, so it would look
+    the same if `forward` never called half of them. The graph is what the data *did*, and
+    its edges carry the shapes that actually flowed.
+
+    For this model the two agree, because `forward` runs the container in order. They stop
+    agreeing the moment a `forward` does anything else: a skip connection, a branch, a
+    layer applied twice, a layer defined and never called. Only the graph can show that,
+    which is why it is the picture worth drawing for someone else's model.
+    """)
+    return
+
+
+@app.cell
+def _(model):
+    model
+    return
+
+
+@app.cell
+def _(device, mo, model):
+    from torchview import draw_graph
+
+    _graph = draw_graph(model, input_size=(1, 1, 28, 28), device=device, expand_nested=True, depth=3)
+    # A transparent graph is black-on-black in a dark editor theme; graphviz has no
+    # notion of the surrounding page, so the card carries its own background.
+    _graph.visual_graph.graph_attr.update(bgcolor="white", rankdir="TB", margin="8")
+    _svg = _graph.visual_graph.pipe(format="svg").decode()
+    mo.Html(
+        f'<div style="background:white;border-radius:8px;padding:8px;display:inline-block">{_svg[_svg.index("<svg") :]}</div>'
+    )
+    return
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
     To use the model, we pass it the input data. This executes the model's `forward`, along with
     some [background
     operations](https://github.com/pytorch/pytorch/blob/270111b7b611d174967ed204776985cefca9c144/torch/nn/modules/module.py#L866).
@@ -236,6 +296,79 @@ def _(hidden1, nn):
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
+    ## Explore — what ReLU did, as a picture
+
+    Sixty numbers printed twice is accurate and unreadable. The same two tensors drawn on
+    one shared color scale: three rows, one per image in the minibatch, twenty columns,
+    one per output unit. Blue is positive, red negative, white zero.
+
+    Every red square in the first becomes white in the second and nothing else moves. That
+    is the entire operation — `max(x, 0)`, elementwise — and it is the whole reason the
+    network is not equivalent to a single matrix. Stack two linear layers with nothing
+    between them and their product is another linear layer; the model would have the depth
+    but not the expressiveness.
+
+    Watch the fraction below rather than the picture, though. A unit that lands on the
+    zero side for *every* input in the batch contributes no gradient to its incoming
+    weights on that step, and one that does so for every input in the dataset is dead for
+    good. Half the activations being clipped is normal at initialization; most of them
+    being clipped is a symptom.
+    """)
+    return
+
+
+@app.cell
+def _(hidden1, nn):
+    import altair as alt
+    import pandas as pd
+
+    def activation_map(values, title, limit):
+        """Draw a small 2D activation tensor on a fixed diverging scale."""
+        cells = pd.DataFrame(
+            [
+                {"unit": column, "image": row, "value": float(value)}
+                for row, line in enumerate(values.detach().tolist())
+                for column, value in enumerate(line)
+            ]
+        )
+        return (
+            alt.Chart(cells)
+            .mark_rect(stroke="white", strokeWidth=1)
+            .encode(
+                x=alt.X("unit:O", title=None, axis=None),
+                y=alt.Y("image:O", title=None, axis=None),
+                color=alt.Color(
+                    "value:Q",
+                    scale=alt.Scale(scheme="redblue", domain=[-limit, limit]),
+                    legend=None,
+                ),
+                tooltip=[alt.Tooltip("value:Q", format=".3f"), "image:O", "unit:O"],
+            )
+            .properties(width=20 * 26, height=3 * 26, title=title)
+        )
+
+    after_relu = nn.ReLU()(hidden1)
+    return activation_map, after_relu, alt, pd
+
+
+@app.cell
+def _(activation_map, after_relu, hidden1, mo):
+    _limit = hidden1.abs().max().item()
+    _zeroed = (after_relu == 0).float().mean().item()
+    mo.vstack(
+        [
+            activation_map(hidden1, "before ReLU", _limit),
+            activation_map(after_relu, "after ReLU", _limit),
+            mo.md(f"**{_zeroed:.0%}** of the {after_relu.numel()} activations are now exactly zero."),
+        ],
+        gap=0.6,
+    )
+    return
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
     # nn.Sequential
 
     [nn.Sequential](https://pytorch.org/docs/stable/generated/torch.nn.Sequential.html) is an
@@ -296,6 +429,159 @@ def _(model):
 
     for name, param in model.named_parameters():
         print(f"Layer: {name} | Size: {param.size()} | Values : {param[:2]} \n")
+    return
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    ## Explore — the parameters as a table, and where their values came from
+
+    The loop above prints six blocks of numbers. The same six as a table are easier to
+    total, and the totals are the ones that decide whether a model fits on a card.
+
+    Then the question the tutorial does not ask: who chose those starting values? Nobody
+    typed them, and they are not random in the loose sense. `nn.Linear` draws both weights
+    and bias from a uniform distribution over ±1/√fan_in — for the first layer, fan_in is
+    784, so the bound is 0.0357 and nothing lands outside it. The histogram is flat
+    between the two rules and empty beyond them.
+
+    That bound is not arbitrary. It keeps the variance of a layer's output close to the
+    variance of its input, so a signal passing through several layers neither collapses to
+    zero nor explodes — which is why a fresh classifier's loss starts near ln(10) = 2.303
+    rather than somewhere unhelpful, and why initialization has its own literature.
+    """)
+    return
+
+
+@app.cell
+def _(mo, model):
+    _rows = [
+        {
+            "parameter": name,
+            "shape": str(tuple(parameter.shape)),
+            "count": parameter.numel(),
+            "MB": round(parameter.numel() * parameter.element_size() / 1024**2, 3),
+            "trainable": parameter.requires_grad,
+        }
+        for name, parameter in model.named_parameters()
+    ]
+    _total = sum(row["count"] for row in _rows)
+    mo.vstack(
+        [
+            mo.hstack(
+                [
+                    mo.stat(f"{_total:,}", label="parameters", bordered=True),
+                    mo.stat(f"{sum(row['MB'] for row in _rows):.1f} MB", label="as float32", bordered=True),
+                    mo.stat(
+                        f"{max(_rows, key=lambda row: row['count'])['parameter']}", label="largest", bordered=True
+                    ),
+                ],
+                justify="start",
+                gap=1,
+            ),
+            mo.ui.table(_rows, selection=None),
+        ],
+        gap=1,
+    )
+    return
+
+
+@app.cell
+def _(alt, mo, model, pd):
+    import math
+
+    _first = next(parameter for name, parameter in model.named_parameters() if name.endswith("0.weight")).detach()
+    _bound = 1 / math.sqrt(_first.shape[1])
+    _values = pd.DataFrame({"weight": _first.cpu().flatten().tolist()})
+    _histogram = (
+        alt.Chart(_values)
+        .mark_bar(color="#4c78a8")
+        .encode(
+            x=alt.X("weight:Q", bin=alt.Bin(maxbins=60), title="weight value"),
+            y=alt.Y("count()", title="count"),
+        )
+        .properties(width=460, height=200, title=f"{tuple(_first.shape)} weights, fresh from nn.Linear")
+    )
+    _limits = (
+        alt.Chart(pd.DataFrame({"edge": [-_bound, _bound]}))
+        .mark_rule(color="#e45756", strokeDash=[6, 4], strokeWidth=2)
+        .encode(x="edge:Q")
+    )
+    mo.vstack(
+        [
+            _histogram + _limits,
+            mo.md(
+                f"fan_in = {_first.shape[1]}, so the bound is ±{_bound:.4f}. "
+                f"Measured: min {_first.min():.4f}, max {_first.max():.4f}, "
+                f"standard deviation {_first.std():.4f} — which is bound/√3 = {_bound / math.sqrt(3):.4f}, "
+                "exactly what a uniform distribution gives."
+            ),
+        ]
+    )
+    return
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    ### One number decides the size of this model
+
+    Drag the underlined number in the sentence below.
+    """)
+    return
+
+
+@app.cell
+def _(mo):
+    from wigglystuff import TangleSlider
+
+    hidden_width = mo.ui.anywidget(TangleSlider(amount=512, min_value=16, max_value=2048, step=16, digits=0))
+    return (hidden_width,)
+
+
+@app.cell
+def _(alt, hidden_width, mo, pd):
+    def _parameter_count(width):
+        # 784 -> width -> width -> 10, each Linear carrying one bias per output.
+        return 784 * width + width + width * width + width + width * 10 + 10
+
+    _width = int(hidden_width.amount)
+    _sentence = mo.md(
+        f"""
+        With a hidden width of {hidden_width} units, this network holds
+        **{_parameter_count(_width):,}** parameters and occupies
+        **{_parameter_count(_width) * 4 / 1024**2:.1f} MB** in float32 — before the
+        optimizer, which will want a copy or two of its own.
+        """
+    )
+    _curve = pd.DataFrame({"width": range(16, 2049, 16)})
+    _curve["parameters"] = [_parameter_count(w) for w in _curve["width"]]
+    _chart = (
+        alt.Chart(_curve)
+        .mark_line(color="#4c78a8")
+        .encode(x=alt.X("width:Q", title="hidden width"), y=alt.Y("parameters:Q", title="parameters"))
+        .properties(width=420, height=200)
+    )
+    _here = (
+        alt.Chart(pd.DataFrame({"width": [_width], "parameters": [_parameter_count(_width)]}))
+        .mark_point(size=120, filled=True, color="#e45756")
+        .encode(x="width:Q", y="parameters:Q")
+    )
+    mo.vstack([_sentence, _chart + _here])
+    return
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    The curve bends because the middle layer is `width x width` while the other two are
+    linear in `width`. Below roughly 800 units the 784-wide input layer dominates and the
+    model grows in a straight line; above it the square term takes over. Widening a
+    network is cheap until it suddenly is not, and the crossover is set by the input size
+    — which is the same arithmetic that makes hidden size the expensive dimension in a
+    transformer.
+    """)
     return
 
 
