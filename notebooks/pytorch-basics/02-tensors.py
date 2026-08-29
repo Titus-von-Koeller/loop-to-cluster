@@ -56,7 +56,7 @@ def _(mo):
     mo.md(r"""
     ---
 
-    Every tensor below is drawn rather than printed, so that what changes is visible. Under
+    Every tensor here is drawn rather than printed, so that what changes is visible. Under
     each picture is what the object *is*: its shape, its dtype, and its **stride** — the
     last of which turns out to be the whole story.
 
@@ -252,14 +252,17 @@ def _(mo, show, torch):
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
-    Sixteen numbers fit in a grid. A real one does not, and at that size the same tensor is
-    better looked at as a picture — which is not a metaphor: an image *is* a tensor, and
-    every image the later notebooks classify arrives as one of these.
+    Six numbers can be read as numbers. Four thousand cannot, and do not need to be:
+    `torch.rand(64, 64)` is 4,096 of them, drawn instead of listed.
+
+    That is not an analogy. An image *is* a tensor — one number per pixel, brightness as
+    magnitude — so drawing a tensor as an image shows it as what it already is, and every
+    image the later notebooks classify arrives as exactly this.
     """)
     return
 
 
-@app.cell
+@app.cell(hide_code=True)
 def _(mo, torch):
     _noise = torch.rand(64, 64)
     _gradient = torch.linspace(0, 1, 64).expand(64, 64)
@@ -306,7 +309,7 @@ def _(mo):
     return
 
 
-@app.cell
+@app.cell(hide_code=True)
 def _(mo, show, torch):
     tensor = torch.rand(3, 4)
 
@@ -356,8 +359,8 @@ def _(mo):
 
     `torch.float32` is the default, and it is worth stopping on, because the choice of
     dtype decides how much memory a model needs, how fast it trains, and what it can
-    represent — and the two 16-bit formats below differ from each other more than either
-    differs from `float32`.
+    represent — and the two 16-bit formats in the table differ from each other more than
+    either differs from `float32`.
 
     A floating point number is a sign, an exponent and a mantissa. The exponent sets the
     *range*, the mantissa sets the *precision*, and 16 bits has to be split between them —
@@ -369,29 +372,6 @@ def _(mo):
 
 
 @app.cell(hide_code=True)
-def _(mo):
-    mo.accordion(
-        {
-            "How the two 16-bit formats spend their bits": mo.md(r"""
-            - **float16** spends its bits on mantissa. Finer steps than bfloat16, but the
-              largest number it can hold is 65,504 and the smallest normal one is 6.1e-05.
-              Gradients routinely fall below that and become zero — which is what a gradient
-              scaler exists to prevent, by multiplying the loss up before the backward pass
-              and dividing it out after.
-            - **bfloat16** spends them on exponent — the same eight exponent bits as float32.
-              So it starts underflowing in the same place float32 does (`tiny` is 1.18e-38
-              for both), and a gradient that survives in float32 survives here, which is why
-              bfloat16 needs no scaler. Its largest value differs from float32's only in the
-              last mantissa digits, 3.39e38 against 3.40e38. The price is precision: its
-              steps are eight times coarser than float16's, exactly eight, as the `eps`
-              column shows.
-            """)
-        }
-    )
-    return
-
-
-@app.cell
 def _(mo):
     stored_value = mo.ui.text("0.1", label="store this number as")
     stored_value
@@ -435,6 +415,29 @@ def _(mo, stored_value, torch):
                 "one step, chosen per operation."
             ),
         ]
+    )
+    return
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.accordion(
+        {
+            "How the two 16-bit formats spend their bits": mo.md(r"""
+            - **float16** spends its bits on mantissa. Finer steps than bfloat16, but the
+              largest number it can hold is 65,504 and the smallest normal one is 6.1e-05.
+              Gradients routinely fall below that and become zero — which is what a gradient
+              scaler exists to prevent, by multiplying the loss up before the backward pass
+              and dividing it out after.
+            - **bfloat16** spends them on exponent — the same eight exponent bits as float32.
+              So it starts underflowing in the same place float32 does (`tiny` is 1.18e-38
+              for both), and a gradient that survives in float32 survives here, which is why
+              bfloat16 needs no scaler. Its largest value differs from float32's only in the
+              last mantissa digits, 3.39e38 against 3.40e38. The price is precision: its
+              steps are eight times coarser than float16's, exactly eight, as the `eps`
+              column shows.
+            """)
+        }
     )
     return
 
@@ -513,13 +516,7 @@ def _(mo):
     the shape and stride resolve by arithmetic. There is no inner object to fetch.
 
     **Dimensions you leave off the end are untouched** — the missing entries are `:`. For a
-    2-D `t`, these are all the same tensor:
-
-    ```
-    t[1]        t[1, :]        t[1, 0:8]
-    ```
-
-    and `t[:]` is the entire tensor, because the one entry says "all of dimension 0" and
+    2-D `t`, `t[1]` and `t[1, :]` are the same tensor, and `t[:]` is the entire tensor, because the one entry says "all of dimension 0" and
     the unwritten second entry says "all of dimension 1".
 
     ### The four things an entry can be
@@ -542,12 +539,13 @@ def _(mo):
 
     That is the entire syntax. Everything after this is a consequence of the table.
 
-    Read the next cell against it. `tensor_2[0]` is an integer, so dimension 0 disappears
-    and four numbers come back. `tensor_2[:, 0]` keeps every row and drops the column
-    dimension. `tensor_2[..., -1]` is the same thing said in a way that would still work on
-    a four-dimensional batch. And `tensor_2[:, 1] = 0` puts an indexed expression on the
+    The cell that builds `tensor_2` puts four of them to work. `tensor_2[0]` has an integer
+    for its only entry, so dimension 0 disappears and four numbers come back.
+    `tensor_2[:, 0]` keeps every row and drops the column dimension. `tensor_2[..., -1]`
+    takes the *last* column, written so that it would still mean the last column on a
+    four-dimensional batch. And `tensor_2[:, 1] = 0` puts an indexed expression on the
     *left* of an assignment, which writes into the tensor rather than reading from it —
-    which is why the picture underneath has a column of zeros in it.
+    which is why `tensor_2` ends up with a column of zeros in it.
     """)
     return
 
@@ -555,16 +553,20 @@ def _(mo):
 @app.cell
 def _(mo, show, torch):
     tensor_2 = torch.rand(4, 4)
-    _first_row = tensor_2[0]
-    _first_column = tensor_2[:, 0]
-    _last_column = tensor_2[..., -1]
+    # Snapshotted before the write, because the three reads below are views: once
+    # `tensor_2[:, 1] = 0` runs they show the zeros too, and the before/after would be
+    # two pictures of the same tensor.
+    _before = tensor_2.clone()
+    _first_row = tensor_2[0].clone()
+    _first_column = tensor_2[:, 0].clone()
+    _last_column = tensor_2[..., -1].clone()
     tensor_2[:, 1] = 0
 
     mo.vstack(
         [
             mo.hstack(
                 [
-                    show(tensor_2, "tensor_2"),
+                    show(_before, "tensor_2"),
                     show(_first_row, "tensor_2[0]"),
                     show(_first_column, "tensor_2[:, 0]"),
                     show(_last_column, "tensor_2[..., -1]"),
@@ -586,25 +588,25 @@ def _(mo):
     mo.md(r"""
     ### The first consequence: the column that is not a column
 
-    `t[:, 0]` reads aloud as "every row, column zero", so it feels like it should give you
-    a column standing upright. It does not, and the table above says why: the integer `0`
-    made dimension 1 disappear. What comes back has shape `(4,)` — four numbers in *one*
-    dimension.
+    `tensor_2[:, 0]` reads aloud as "every row, column zero", so it feels like it should
+    give you a column standing upright. It does not, and the table of entries says why: the
+    integer `0` made dimension 1 disappear. What comes back has shape `(4,)` — four numbers
+    in *one* dimension.
 
     A one-dimensional tensor has no orientation. Neither upright nor flat; the words only
-    mean something once there are two dimensions to tell apart. `t[0]`, the first *row*,
-    comes back with the identical shape `(4,)`. The row and the column are the same kind of
-    object, which is why they are drawn the same way below.
+    mean something once there are two dimensions to tell apart. `tensor_2[0]`, the first
+    *row*, comes back with the identical shape `(4,)`. The row and the column are the same
+    kind of object, which is why they are drawn the same way.
 
-    Keep the dimension and you get the upright thing you pictured: `t[:, 0:1]` is a slice,
-    so dimension 1 survives with length 1, and the shape is `(4, 1)`.
+    Keep the dimension and you get the upright thing you pictured: `tensor_2[:, 0:1]` is a
+    slice, so dimension 1 survives with length 1, and the shape is `(4, 1)`.
 
     Watch the strides, though. That is where the difference went.
     """)
     return
 
 
-@app.cell
+@app.cell(hide_code=True)
 def _(mo, show, tensor_2):
     mo.hstack(
         [
@@ -733,29 +735,28 @@ def _(alt, mo, pd, show, slicing, torch):
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
-    The last two entries are the ones that cost memory. A slice is a view — the same
-    storage read with different strides, which is why `tensor_2[:, 1] = 0` above changed
-    `tensor_2` itself. A boolean mask or a list of indices cannot be expressed as a stride,
-    so PyTorch gathers the elements into new storage.
+    A slice is a view — the same storage read with different strides, which is why
+    `tensor_2[:, 1] = 0` changed `tensor_2` itself. The boolean mask and the list of indices
+    are the two that cost memory: neither can be expressed as a stride, so PyTorch gathers
+    the elements into new storage.
 
-    `t[:]` is where that bites someone arriving from Python, because there the same
-    notation means the opposite. `lst[:]` is *the* shallow-copy idiom: `copy = lst[:]`,
-    edit `copy`, and `lst` is untouched. On a tensor nothing is copied — you get a second
-    view onto the same bytes, and editing it edits the original. `t.clone()` is the one
-    that copies.
-
-    Which leaves `t[:]` looking useless, since reading through it gives back exactly what
-    you had. Its use is on the other side of the assignment: `w[:] = 0` fills the existing
-    tensor in place, keeping its storage and its identity, where `w = 0` merely rebinds the
-    name and abandons the tensor. Anything else pointing at that memory — another view, a
-    NumPy array sharing it, a parameter held by a module — sees the first and misses the
-    second.
-
-    Which makes the mask asymmetric, and this is the part worth remembering. *Read* it and
+    That makes the mask asymmetric, and this is the part worth remembering. *Read* it and
     you get a copy: `c = t[t % 7 == 0]` then `c[0] = -1` leaves `t` untouched. *Assign into*
     it and you write through: `t[t % 7 == 0] = -1` does change `t`, because that is not a
     read followed by a write — it is a single indexed assignment, and PyTorch scatters
-    straight back into the original storage. The next section takes that storage apart.
+    straight back into the original storage.
+
+    `t[:]` sets the matching trap for anyone arriving from Python, where the same notation
+    means the opposite. `lst[:]` is *the* shallow-copy idiom: `copy = lst[:]`, edit `copy`,
+    and `lst` is untouched. On a tensor nothing is copied — you get a second view onto the
+    same bytes, and editing it edits the original. `t.clone()` is the one that copies.
+
+    Which leaves `t[:]` looking useless, since reading through it hands back what you
+    already had. Its use is on the other side of the assignment: `w[:] = 0` fills the
+    existing tensor in place, keeping its storage and its identity, where `w = 0` merely
+    rebinds the name and abandons the tensor. Anything else pointing at that memory —
+    another view, a NumPy array sharing it, a parameter held by a module — sees the first
+    and misses the second.
     """)
     return
 
@@ -765,18 +766,19 @@ def _(mo):
     mo.md(r"""
     ## Explore — what a tensor actually is
 
-    Every slice above reported itself as a view or a copy, and the caption under every
-    picture in this notebook has been quietly printing a `stride` you were told to hold on
-    to. Here is what both mean.
+    Every slice in the previous section reported itself as a view or a copy, and the
+    caption under every picture has been quietly printing a `stride` you were told to hold
+    on to. Here is what both mean.
 
     A tensor is not its numbers. It is a *view* — a shape, a stride and an offset — onto one
     flat run of memory, and several tensors can describe the same run differently. That
-    single sentence is what makes `x.T` free, what makes `reshape` sometimes copy, and, two
-    sections from now, what makes a NumPy array and a tensor able to be the same data under
-    two names.
+    single sentence is what makes `x.T` free, what makes `reshape` sometimes copy, and, at
+    the end of this notebook, what makes a NumPy array and a tensor able to be the same data
+    under two names.
 
-    Pick an operation. The strip is the storage, twelve numbers in the order they lie in
-    memory, and it never changes. The grid is what the resulting tensor claims to be.
+    Pick an operation. The strip is the storage: twelve numbers in the order they lie in
+    memory, and those numbers never change. What moves is the shading, which marks the order
+    this particular operation reads them in. The grid is what the result claims to be.
 
     - **stride** is how far to step, in elements, to move one position along each
       dimension. `x.T` does not move a single number: it swaps the two strides.
@@ -791,7 +793,7 @@ def _(mo):
     return
 
 
-@app.cell
+@app.cell(hide_code=True)
 def _(mo):
     operation = mo.ui.dropdown(
         options={
@@ -811,7 +813,7 @@ def _(mo):
     return (operation,)
 
 
-@app.cell
+@app.cell(hide_code=True)
 def _(alt, mo, operation, pd, show, torch):
     import itertools
 
@@ -899,7 +901,7 @@ def _(alt, mo, operation, pd, show, torch):
                 + (
                     ", shaded by the order the result reads them in"
                     if _same_storage
-                    else ". The result above reads none of them: it has storage of its own."
+                    else ". This result reads none of them: it has storage of its own."
                 )
             ),
             storage_strip(_result, x_storage, _same_storage) if _result is not None else mo.md(""),
@@ -965,7 +967,7 @@ def _(mo):
     return
 
 
-@app.cell
+@app.cell(hide_code=True)
 def _(mo, show, torch):
     a = torch.arange(6).reshape(2, 3)
     b = torch.arange(6, 12).reshape(2, 3)
@@ -1060,7 +1062,7 @@ def _(mo):
     mo.md(r"""
     ## Explore — matrix multiplication you can drag
 
-    Drag horizontally inside a cell of `A` to change it; every panel below recomputes.
+    Drag horizontally inside a cell of `A` to change it; every panel recomputes.
 
     Two things are worth watching. `A @ A.T` stays symmetric whatever you do to `A`,
     because entry *(i, j)* is the dot product of rows *i* and *j* of `A`, and swapping *i*
@@ -1072,7 +1074,7 @@ def _(mo):
     return
 
 
-@app.cell
+@app.cell(hide_code=True)
 def _(mo):
     editable = mo.ui.matrix(
         [[1.0, 2.0, -1.0], [0.5, 0.0, 3.0]],
@@ -1086,7 +1088,7 @@ def _(mo):
     return (editable,)
 
 
-@app.cell
+@app.cell(hide_code=True)
 def _(editable, mo, show, torch):
     _a = torch.tensor(editable.value)
     mo.hstack(
@@ -1120,7 +1122,7 @@ def _(mo):
     return
 
 
-@app.cell
+@app.cell(hide_code=True)
 def _(mo):
     left_shape = mo.ui.text("3, 1, 4", label="left")
     right_shape = mo.ui.text("2, 4", label="right")
