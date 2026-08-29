@@ -116,8 +116,10 @@ def _(alt, mo, pd, torch):
             "y": alt.Y("row:O", axis=None, scale=alt.Scale(paddingInner=0.06)),
         }
         # Ink on a square is chosen against that square's fill, which is known here, rather
-        # than against the page, which is not.
-        on_dark = f"abs(datum.v) > {0.45 * limit}" if signed else f"datum.v > {0.55 * limit}"
+        # than against the page, which is not. The crossovers are measured, not guessed: white
+        # only overtakes near-black at 0.73 of the sequential ramp, and at 0.71 of the
+        # diverging one, taking the later of its two arms so neither switches early.
+        on_dark = f"abs(datum.v) > {0.71 * limit}" if signed else f"datum.v > {0.73 * limit}"
         picture = (
             alt.Chart(frame)
             .mark_rect()
@@ -706,6 +708,8 @@ def _(alt, mo, pd, show, slicing, torch):
         )
         _panel = mo.vstack([_facts, show(_result, "what you get back", cell=44) if _result.dim() <= 2 else mo.md("")])
 
+    # Matched by value rather than by position, which is exact here only because
+    # `torch.arange` gives every element a distinct one. It would mis-highlight duplicates.
     _cells = pd.DataFrame(
         [
             {"row": i, "col": j, "value": v, "picked": v in _picked}
@@ -851,8 +855,15 @@ def _(alt, mo, operation, pd, show, torch):
             .mark_rect()
             .encode(
                 **at,
-                # A slot nothing reads keeps the neutral end rather than taking a rank it never earned.
-                color=alt.Color("order:Q", scale=alt.Scale(range=["#dbe7f7", "#17457c"]), legend=None),
+                # Pinned to every slot, not to the ranks this operation happens to use. Left to
+                # the data extent, an operation reading four slots would paint rank 3 the
+                # darkest -- shading that means something different per selection, and dark
+                # text on a dark fill.
+                color=alt.Color(
+                    "order:Q",
+                    scale=alt.Scale(range=["#dbe7f7", "#17457c"], domain=[0, base.numel() - 1]),
+                    legend=None,
+                ),
                 tooltip=[alt.Tooltip("slot:O", title="storage slot"), alt.Tooltip("order:Q", title="read position")],
             )
         )
@@ -862,10 +873,12 @@ def _(alt, mo, operation, pd, show, torch):
             .encode(
                 **at,
                 text=alt.Text("value:Q", format=".0f"),
-                color=alt.condition("datum.order > 6", alt.value("#ffffff"), alt.value("#15181d")),
+                color=alt.condition(
+                    f"datum.order > {0.73 * (base.numel() - 1):.2f}", alt.value("#ffffff"), alt.value("#15181d")
+                ),
             )
         )
-        return (squares + labels).properties(width=44 * 12, height=48)
+        return (squares + labels).properties(width=44 * len(cells), height=48)
 
     x_storage = torch.arange(12).reshape(3, 4)
     _result = None
@@ -907,7 +920,7 @@ def _(alt, mo, operation, pd, show, torch):
                 + (
                     ", shaded by the order the result reads them in"
                     if _same_storage
-                    else ". This result reads none of them: it has storage of its own."
+                    else ". This result copied its numbers out and indexes storage of its own."
                 )
             ),
             storage_strip(_result, x_storage, _same_storage) if _result is not None else mo.md(""),
