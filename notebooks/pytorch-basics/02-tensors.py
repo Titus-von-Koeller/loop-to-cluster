@@ -75,8 +75,13 @@ def _():
     import pandas as pd
     import torch
 
-    # Every random tensor below is drawn from this seed, so the numbers in one cell can be
-    # compared against the numbers in another and the pictures do not change under you.
+    # Seeded so that a full run of the notebook always draws the same numbers. Note what
+    # this does not buy: the generator is global state, invisible to the dependency graph,
+    # and it is consumed in whatever order the graph runs. Re-run one random cell on its
+    # own and it draws the *next* numbers in the sequence rather than its own again, so its
+    # picture changes while every other picture stays put. Nothing here depends on a
+    # particular value -- the lessons are about shape, stride and structure -- but it is
+    # the reason a cell reading hidden state cannot be reactive.
     torch.manual_seed(0)
     return alt, np, pd, torch
 
@@ -1260,18 +1265,6 @@ def _(mo):
     return
 
 
-@app.cell
-def _(mo, show, torch):
-    t = torch.ones(5)
-    n = t.numpy()
-    mo.hstack(
-        [show(t, "t — a tensor"), show(n, "n = t.numpy() — the same five numbers")],
-        justify="start",
-        gap=2,
-    )
-    return n, t
-
-
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
@@ -1281,10 +1274,20 @@ def _(mo):
 
 
 @app.cell
-def _(mo, n, show, t):
+def _(mo, show, torch):
+    t = torch.ones(5)
+    n = t.numpy()
+    # The mutation lives in the same cell that creates what it mutates. Were `t.add_(1)`
+    # in a cell of its own it would not be idempotent -- marimo tracks reassignment, not
+    # mutation, so re-running it alone would reach 3.0 while the cell that drew 1.0 stayed
+    # on screen and was never marked stale.
+    _before = (show(t, "t — a tensor"), show(n, "n = t.numpy() — the same five numbers"))
     t.add_(1)
+
     mo.vstack(
         [
+            mo.hstack(list(_before), justify="start", gap=2),
+            mo.md("### `t.add_(1)`"),
             mo.hstack([show(t, "t, after t.add_(1)"), show(n, "n, which nobody touched")], justify="start", gap=2),
             mo.md(
                 "`n` was never assigned to and still changed. It is not a copy of `t`; it is a "
@@ -1304,13 +1307,6 @@ def _(mo):
     return
 
 
-@app.cell
-def _(np, torch):
-    n_1 = np.ones(5)
-    t_1 = torch.from_numpy(n_1)
-    return n_1, t_1
-
-
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
@@ -1320,10 +1316,14 @@ def _(mo):
 
 
 @app.cell
-def _(mo, n_1, np, show, t_1):
+def _(mo, np, show, torch):
+    n_1 = np.ones(5)
+    t_1 = torch.from_numpy(n_1)
+    _before = show(t_1, "t_1, before")
     np.add(n_1, 1, out=n_1)
+
     mo.hstack(
-        [show(n_1, "n_1, written by NumPy"), show(t_1, "t_1, which followed")],
+        [_before, show(n_1, "n_1, written by NumPy"), show(t_1, "t_1, which followed")],
         justify="start",
         gap=2,
     )
