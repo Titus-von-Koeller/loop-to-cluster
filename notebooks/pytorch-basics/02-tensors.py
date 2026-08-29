@@ -516,8 +516,8 @@ def _(mo):
     the shape and stride resolve by arithmetic. There is no inner object to fetch.
 
     **Dimensions you leave off the end are untouched** — the missing entries are `:`. For a
-    2-D `t`, `t[1]` and `t[1, :]` are the same tensor, and `t[:]` is the entire tensor, because the one entry says "all of dimension 0" and
-    the unwritten second entry says "all of dimension 1".
+    2-D `t`, `t[1]` and `t[1, :]` are the same tensor. And `t[:]` is the entire tensor: the
+    one entry says "all of dimension 0", and the unwritten second says "all of dimension 1".
 
     ### The four things an entry can be
 
@@ -626,7 +626,8 @@ def _(mo, show, tensor_2):
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
-    Four tensors holding four numbers each, and the captions do all the work.
+    Four tensors holding four numbers each, all taken from `tensor_2` as it now stands,
+    zeroed column and all. The captions do the rest of the work.
 
     `tensor_2[0]` has stride `(1,)`: its four numbers lie side by side in memory.
     `tensor_2[:, 0]` has stride `(4,)`: it reads number 0, then 4, then 8, then 12, stepping
@@ -787,8 +788,8 @@ def _(mo):
     - **same storage** answers whether you got a view or a copy. Write into a view and
       the original changes with it.
 
-    `x.T.view(2, 6)` is in the list on purpose: it is the error the `reshape` beneath it
-    exists to avoid.
+    `x.T.view(2, 6)` is in the list on purpose: it is the error that the `x.T.reshape(2, 6)`
+    beside it exists to avoid.
     """)
     return
 
@@ -969,8 +970,8 @@ def _(mo):
 
 @app.cell(hide_code=True)
 def _(mo, show, torch):
-    a = torch.arange(6).reshape(2, 3)
-    b = torch.arange(6, 12).reshape(2, 3)
+    _a = torch.arange(6).reshape(2, 3)
+    _b = torch.arange(6, 12).reshape(2, 3)
 
     def _panel(result):
         # A 3-D result is drawn as the 2-D slices it is made of, which is what having a new
@@ -980,15 +981,15 @@ def _(mo, show, torch):
         return mo.hstack([show(plane, f"[{i}]", cell=44) for i, plane in enumerate(result)], justify="start", gap=1.5)
 
     _views = {
-        f"cat, dim=0 → {tuple(torch.cat([a, b], 0).shape)}": _panel(torch.cat([a, b], 0)),
-        f"cat, dim=1 → {tuple(torch.cat([a, b], 1).shape)}": _panel(torch.cat([a, b], 1)),
-        f"stack, dim=0 → {tuple(torch.stack([a, b], 0).shape)}": _panel(torch.stack([a, b], 0)),
-        f"stack, dim=1 → {tuple(torch.stack([a, b], 1).shape)}": _panel(torch.stack([a, b], 1)),
-        f"stack, dim=2 → {tuple(torch.stack([a, b], 2).shape)}": _panel(torch.stack([a, b], 2)),
+        f"cat, dim=0 → {tuple(torch.cat([_a, _b], 0).shape)}": _panel(torch.cat([_a, _b], 0)),
+        f"cat, dim=1 → {tuple(torch.cat([_a, _b], 1).shape)}": _panel(torch.cat([_a, _b], 1)),
+        f"stack, dim=0 → {tuple(torch.stack([_a, _b], 0).shape)}": _panel(torch.stack([_a, _b], 0)),
+        f"stack, dim=1 → {tuple(torch.stack([_a, _b], 1).shape)}": _panel(torch.stack([_a, _b], 1)),
+        f"stack, dim=2 → {tuple(torch.stack([_a, _b], 2).shape)}": _panel(torch.stack([_a, _b], 2)),
     }
     mo.vstack(
         [
-            mo.hstack([show(a, "a", cell=44), show(b, "b", cell=44)], justify="start", gap=2),
+            mo.hstack([show(_a, "a", cell=44), show(_b, "b", cell=44)], justify="start", gap=2),
             mo.ui.tabs(_views),
             mo.md(
                 "The twelve numbers are numbered so you can follow them. Every tab holds all "
@@ -1209,12 +1210,12 @@ def _(mo, show, tensor_2):
     # Demonstrated on a copy. `tensor_2.add_(5)` would mutate a tensor five cells above
     # still read by four cells below, and marimo tracks reassignment rather than mutation,
     # so nothing downstream would be marked stale and every re-run would add another 5.
-    demo = tensor_2.clone()
-    before = demo.clone()
-    demo.add_(5)
+    _demo = tensor_2.clone()
+    _before = _demo.clone()
+    _demo.add_(5)
 
     mo.hstack(
-        [show(before, "demo"), mo.md("### `.add_(5)`"), show(demo, "demo, after — same object")],
+        [show(_before, "demo"), mo.md("### `.add_(5)`"), show(_demo, "demo, after — same object")],
         justify="start",
         align="center",
         gap=2,
