@@ -51,12 +51,21 @@ max-doc-length = 95
 # A marimo cell renders its last expression, so a bare trailing name is the output rather
 # than dead code. Every other rule, and the formatter, still applies.
 "notebooks/**/*.py" = ["B018"]
-# Converted upstream tutorials. Their prose carries typographic quotes and their code
-# assigns results it never reads, both on purpose; rewriting either would be editing
-# someone else's material to satisfy a linter. F821 deliberately still applies -- it
-# caught a conversion that renamed a reference shadowed by a function parameter, which
-# would otherwise have failed at runtime.
-"notebooks/pytorch-basics/*.py" = ["B018", "F841", "RUF001", "E501", "W505"]
+# Converted upstream tutorials, since substantially rewritten: every code cell renders its
+# tensors rather than printing them, sections have moved, and a good deal of the prose is
+# this repository's. So they are held to the same line width as everything else, and only
+# the two rules that would change what a tutorial *says or does* stay off.
+#
+# F841 -- the arithmetic cells assign y2 and z2 and never read them, on purpose: the point
+# is that three spellings of one operation agree. Satisfying the rule means deleting the
+# demonstration.
+# RUF001 -- the prose carries typographic quotes and a multiplication sign. The rule is a
+# security check for code, where a Cyrillic character posing as a Latin one is a hazard;
+# in text that renders as markdown they are simply correct.
+#
+# F821 deliberately still applies -- it caught a conversion that renamed a reference
+# shadowed by a function parameter, which would otherwise have failed at runtime.
+"notebooks/pytorch-basics/*.py" = ["F841", "RUF001"]
 
 [tool.marimo.formatting]
 # Match ruff's line-length, so saving in the editor and the pre-commit hook cannot disagree.

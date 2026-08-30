@@ -1034,7 +1034,8 @@ def _(mo):
 
 @app.cell
 def _(mo, show, tensor_2, torch):
-    # This computes the matrix multiplication between two tensors. y1, y2, y3 will have the same value
+    # This computes the matrix multiplication between two tensors.
+    # y1, y2, y3 will have the same value
     # ``tensor.T`` returns the transpose of a tensor
     y1 = tensor_2 @ tensor_2.T
     y2 = tensor_2.matmul(tensor_2.T)

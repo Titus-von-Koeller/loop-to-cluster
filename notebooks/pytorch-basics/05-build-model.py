@@ -171,9 +171,8 @@ def _(device, mo, model):
     # notion of the surrounding page, so the card carries its own background.
     _graph.visual_graph.graph_attr.update(bgcolor="white", rankdir="TB", margin="8")
     _svg = _graph.visual_graph.pipe(format="svg").decode()
-    mo.Html(
-        f'<div style="background:white;border-radius:8px;padding:8px;display:inline-block">{_svg[_svg.index("<svg") :]}</div>'
-    )
+    _card = "background:white;border-radius:8px;padding:8px;display:inline-block"
+    mo.Html(f'<div style="{_card}">{_svg[_svg.index("<svg") :]}</div>')
     return
 
 

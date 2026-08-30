@@ -295,9 +295,10 @@ def _(batch_size, torch):
                 )  # Unnecessary in this situation but added for best practices
         test_loss /= num_batches
         correct /= size
-        print(
-            f"Test Error: \n Accuracy: {100 * correct:>0.1f}%, Avg loss: {test_loss:>8f} \n"
-        )  # Evaluating the model with torch.no_grad() ensures that no gradients are computed during test mode  # also serves to reduce unnecessary gradient computations and memory usage for tensors with requires_grad=True
+        print(f"Test Error: \n Accuracy: {100 * correct:>0.1f}%, Avg loss: {test_loss:>8f} \n")
+        # Evaluating the model with torch.no_grad() ensures that no gradients are
+        # computed during test mode; also serves to reduce unnecessary gradient
+        # computations and memory usage for tensors with requires_grad=True
 
     return test_loop, train_loop
 
