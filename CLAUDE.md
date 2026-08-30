@@ -17,14 +17,14 @@ safer, since an agent's working directory resets between commands.
 cd /home/titus/src/loop-to-cluster && pixi run python ...
 ```
 
-**Always `CUDA_VISIBLE_DEVICES=0`.** GPU 1 drives a display, so its clocks move with the
+**Always `CUDA_VISIBLE_DEVICES=0`, when running single GPU workloads.** GPU 1 drives a display, so its clocks move with the
 compositor and its memory starts several GiB down — a timing taken there is not a measurement.
 Use `direnv exec <abs-dir> <cmd>` when you also need `nvcc` or nix's `libstdc++`. A missing tool
 is not a dead end: `nix shell nixpkgs#<pkg> -c <cmd>`.
 
 Resolved versions come from `pixi list <package>` rather than from memory or from a list here
 that would go stale. `pixi.toml` records why each dependency comes from PyPI rather than
-conda-forge; the reason is the torch ABI and it still holds.
+conda-forge; one reason is the torch ABI and it still holds.
 
 A *new* skill directory is discovered live, but an *edit* to an existing `SKILL.md` serves from a
 cached payload until the session restarts.
