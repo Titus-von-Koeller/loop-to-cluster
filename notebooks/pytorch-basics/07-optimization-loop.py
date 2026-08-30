@@ -29,12 +29,6 @@ def _():
     return (mo,)
 
 
-@app.cell
-def _():
-    # '%matplotlib inline' command supported automatically in marimo
-    return
-
-
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""

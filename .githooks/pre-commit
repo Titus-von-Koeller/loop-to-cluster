@@ -14,6 +14,16 @@ if ! pixi run ruff format --check .; then
     exit 1
 fi
 
+# ruff sees valid Python and stops there. It cannot see that two cells define the same
+# name, or that a cell no longer parses -- marimo stores such a cell as a call to
+# app._unparsable_cell, which is itself valid Python and commits without complaint. Both
+# have happened here. --strict because the notebooks are clean of warnings today and the
+# cheapest time to keep them that way is now. Takes about a second.
+if ! pixi run marimo check --strict notebooks/; then
+    echo "pre-commit: marimo check failed" >&2
+    exit 1
+fi
+
 # Datasets land beside the notebooks that download them, and a directory staged whole
 # takes them along. 82 MB of FashionMNIST reached origin that way once.
 max_kb=1024
