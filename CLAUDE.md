@@ -52,6 +52,39 @@ so anything routed through marimo's own HTML — `display.custom_css`, the `--ma
 variables — never reaches it. Cells there are governed by VSCode's `editor.*` and
 `notebook.*` settings instead.
 
+## Editing notebooks
+
+A marimo notebook is a Python file: each cell is a function body, the last expression
+statement is what renders, the `return` tuple is what other cells may use, an underscore
+prefix keeps a name cell-local, and a top-level name may be defined by exactly one cell in
+the file. marimo tracks reassignment, not mutation, so a mutation belongs in the cell that
+creates what it mutates — several tutorial cells carry comments saying so, and moving the
+mutation out breaks their idempotency.
+
+**Folding.** `@app.cell(hide_code=True)` is the only folding the file knows. Policy in
+`notebooks/pytorch-basics/`: a visible cell carries only code the narrative asks the reader
+to read; display plumbing lives in hidden cells; the mutation demos keep their rendering
+inline because snapshot timing is the demonstration. The VSCode extension (vscode-marimo
+0.17.2) applies `hide_code` by collapsing cell input when the notebook is (re)opened, and
+thereafter reacts only to changes — expanding a cell by hand is transient editor state that
+writes nothing and is not re-collapsed until the next reopen. Folds "gone" while `git diff`
+is clean is therefore a session artifact, cured by reopening. Persist visibility with the
+`marimo.hideCellCode` / `marimo.showCellCode` commands, never the collapse chevron, which
+persists nothing.
+
+**Never rewrite a notebook on disk while it is open in the editor.** The extension syncs
+cells by id in transactions, and an external rewrite produces
+`ValueError: Cell 'X' already exists` or spurious multiple-definition errors that exist
+only in the editor session while the file stays valid. Recovery order matters: close the
+tab *without saving* — saving writes the stale merge over the good file, and can silently
+drop `hide_code` from any cell whose `marimo.options` metadata was lost — then reload the
+window and reopen. After any editor save, `git diff` and look for decorator churn.
+
+**Checks.** `pixi run marimo check --strict` catches duplicate names and unparsable cells
+without running anything. The content check is executing the file itself —
+`CUDA_VISIBLE_DEVICES=0 pixi run python notebooks/pytorch-basics/<nb>.py` — where exit 0
+means every cell ran.
+
 ## Claims
 
 Version-dependent behaviour, defaults and API semantics are where confident wrongness happens.
