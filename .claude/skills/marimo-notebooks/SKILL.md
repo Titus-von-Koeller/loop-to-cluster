@@ -5,54 +5,65 @@ description: Intent and working preferences for the marimo notebooks under noteb
 
 # Working on the marimo notebooks
 
+An entry here that no longer matches how Titus works is wrong — fix it or delete it, and
+prefer deletion: every line taxes the attention of the agent reading it. Quoted phrases
+below are evidence from one file, not templates for the next.
+
 ## What a notebook here is
 
-A teaching document with **one argument**, not a scratchpad and not a reference. 02's
-argument is that a tensor is a shape, a stride and an offset over one flat run of memory;
-every section either advances that argument or earns its place some other way it can name.
-The upstream PyTorch tutorial's prose and code stay intact underneath; additions are either
-self-contained Explore sections or a declared editorial layer. Before adding anything, ask
-what the file's argument needs — not what the topic could include. Prune rather than
-accrete; this file has had whole sections cut for not serving it.
+A teaching document, not a scratchpad and not a reference. The upstream PyTorch tutorial's
+prose and code stay intact underneath; additions are self-contained Explore sections or a
+declared editorial layer, and the file's header comment says which. 02 found its one
+argument — a tensor is a shape, a stride and an offset over one flat run of memory — and
+every section now either advances it or can name what else it earns its place by. Whether
+another notebook has an argument, and what it is, is discovered from that file, not
+imposed by this one.
 
-The reader is a learner one step behind the current material — concretely, Titus a few
-months from now, or someone like him. What he stumbled on, a reader will stumble on; a
-question he needed answered is evidence the notebook has a gap at that spot. But the
-document must never show the seam: it references itself, never the conversation that
-produced it. Motivation from a question is good; question-and-answer register is a leak.
+The reader is a learner one step behind the material: Titus a few months from now, or
+someone like him. A question he needed answered is evidence of a gap at that spot — the
+gap is the evidence, not the answer's wording. Write for a reader who never saw any
+conversation; a passage addressed to *someone* rather than to that reader is a leak,
+however useful its content.
 
-## What makes an edit good
+## The bar for an addition
 
-- **Coherence over local fixes.** Read the whole file before and after. A concept must be
-  defined at first contact, not two sections later. Forward promises get redeemed
-  ("a later section is about nothing else"), and redemptions point back ("it settles a
-  debt"). If an addition uses a concept the file hasn't taught yet, either move it, or
-  flag the forward reference explicitly the way the file already does with stride.
-- **Every displayed claim is executed, not transcribed.** Shapes, strides, equalities and
-  error messages in prose come from running them in this repo's env, in the same session
-  that writes them. When a claim later proves wrong, correct it at the source and say what
-  the correction was — an overclaim discovered is a commit, not an embarrassment.
-- **Concrete before abstract.** Materialize intermediate objects rather than describing
-  them; one falsifying experiment beats a paragraph. Prefer self-identifying values —
-  `arange`, digit-address tensors — so every slice and picture traces itself. Name traps
-  precisely ("slices clamp, integers raise"), never vaguely ("be careful with indexing").
-- **Visible code is narrative code.** A visible cell holds only what the reader is asked
-  to read; display plumbing goes in hidden cells; the mutation demos keep rendering inline
-  because snapshot timing *is* the demonstration. When display and content share a cell,
-  split them.
+Three questions, in order; failing any one is a no. Each has an artifact, so a review can
+check the questions were asked rather than take it on faith:
 
-## How Titus wants the collaboration to run
+1. **Does the file already promise or claim it?** (Artifact: the quoted promise.)
+   Redeeming a standing promise is the strongest reason to add — 02 claimed for two
+   sections that `...` binds from the right at any rank before anything showed it. An
+   addition with no anchor in the file belongs in the REPL or in Notion.
+2. **What does it displace?** (Artifact: the whole-file read, before and after.) Sections
+   have been cut for not serving the file; an addition that makes it longer but not
+   tighter fails even when correct.
+3. **Where does the reader first meet each concept it uses?** (Artifact: the location.)
+   Define at first contact, or flag the forward reference explicitly, as the file already
+   does with stride.
 
-- The notebooks are his. Propose with the concrete text or code, get a go, then edit;
-  ask before staging; once verified, commit without being reminded — leaving verified work
-  uncommitted annoys him more than asking to commit does.
-- Announce before writing to a notebook he may have open, and end with "done — ctrl+alt+m".
-  The sync hazards and recovery are in the CLAUDE.md ledger.
-- He pushes back with observations, not orders — "this doesn't make sense relative to what's
-  above" means find the actual incoherence and fix its cause. Take his falsifying
-  observations as data that outranks your model, including your reading of source code.
-- Explanations to him: step back to the gist before mechanisms, be honest about what is
-  and is not worth his time, and say plainly when something he suspects is wrong — with the
-  check that shows it.
-- Understanding belongs to him in Notion, in his own words; the repo gets artifacts and
-  checkable claims. Do not write his notes.
+## What makes the content good
+
+- Displayed claims are executed, never transcribed: every shape, stride, equality and
+  error message in prose comes from a run in this repo's env in the session that writes
+  it. A claim later found wrong is corrected at the source and named as a correction.
+- Concrete before abstract: materialize intermediate objects; prefer self-identifying
+  values (`arange`, digit-address tensors) so every picture traces itself; name traps
+  exactly ("slices clamp, integers raise"), never vaguely.
+- Cell visibility and all other mechanics: CLAUDE.md, "Editing notebooks".
+
+## The collaboration loop
+
+- Propose with the concrete text or code and wait for the go. The go covers the whole
+  arc: edit, verify, stage the named paths, commit. Verified work does not sit waiting
+  for a second invitation; unverified work does not get committed to satisfy this line.
+- Announce before writing to a notebook he may have open; write; end with
+  "done — ctrl+alt+m". The failure this averts, and the recovery that keystroke runs,
+  are in CLAUDE.md under "Editing notebooks".
+- Pushback arrives as observations, not orders. A falsifying observation outranks your
+  model, including your reading of source code. When he questions compliance or
+  correctness, answer with an audit of the whole change, judgment calls listed for
+  overrule — not a spot fix.
+- Step back to the gist before mechanisms. Say what is and is not worth his time; when
+  his suspicion is wrong, show the check that says so.
+- Understanding is his, written by him, in Notion. The repo gets artifacts and checkable
+  claims; do not write his notes.
