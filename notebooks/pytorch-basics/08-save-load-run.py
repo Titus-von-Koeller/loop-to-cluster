@@ -43,6 +43,23 @@ def _(mo):
     return
 
 
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    > **Today's target** — run the notebook; consuming it means having saved a `state_dict`,
+    > loaded it into a fresh model, and run a prediction from the reload.
+    >
+    > **Marc's depth line** — when Marc mapped what to really focus on — forward and backward,
+    > loss, gradients, optimizer, dataloader — this one never came up. Shallow is enough.
+    >
+    > **Stop-line** — done means: ran it, could explain to Marc what a `state_dict` carries and
+    > what it does not, questions captured — close it.
+    >
+    > **Capture** — `scripts/q "your question"` appends it to Friday's file for Marc.
+    """)
+    return
+
+
 @app.cell
 def _():
     import torch

@@ -50,6 +50,24 @@ def _(mo):
     return
 
 
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    > **Today's target** — run the notebook; consuming it means having watched `requires_grad`,
+    > `backward()` and `.grad` produce a gradient — and accumulate one when nothing resets it.
+    >
+    > **Marc's depth line** — the other half of the base Marc named: understanding how the gradient
+    > works. His own checks: `zero_grad` leaves every gradient zero; two backward passes on one
+    > batch without resetting is twice the gradient. Half a day here is fine.
+    >
+    > **Stop-line** — done means: ran it, could explain to Marc where a gradient lives and when it
+    > accumulates, questions captured — close it.
+    >
+    > **Capture** — `scripts/q "your question"` appends it to Friday's file for Marc.
+    """)
+    return
+
+
 @app.cell
 def _():
     import torch

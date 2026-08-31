@@ -56,6 +56,24 @@ def _(mo):
     return
 
 
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    > **Today's target** — run the notebook; consuming it means having run the whole loop —
+    > forward, loss, backward, step, zero_grad — and named what each line moves.
+    >
+    > **Marc's depth line** — the heart of the whole project. Marc's frame for everything here:
+    > "I have this basic training loop and I want to understand how this works" — and a loss
+    > decreasing as expected is the one check he says they really use.
+    >
+    > **Stop-line** — done means: ran it, could explain to Marc what each line of the loop moves,
+    > questions captured — close it.
+    >
+    > **Capture** — `scripts/q "your question"` appends it to Friday's file for Marc.
+    """)
+    return
+
+
 @app.cell
 def _():
     import torch

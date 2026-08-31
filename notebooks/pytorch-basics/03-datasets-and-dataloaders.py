@@ -43,6 +43,23 @@ def _(mo):
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
+    > **Today's target** — run the notebook; consuming it means having watched a `Dataset` hand out
+    > single samples and a `DataLoader` turn them into shuffled batches.
+    >
+    > **Marc's depth line** — Marc: "really, the part which is interesting is the data loader" —
+    > worth real time here; the datasets half stays light, Hugging Face has its own.
+    >
+    > **Stop-line** — done means: ran it, could explain to Marc what `DataLoader` adds on top of a
+    > `Dataset`, questions captured — close it.
+    >
+    > **Capture** — `scripts/q "your question"` appends it to Friday's file for Marc.
+    """)
+    return
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
     Code for processing data samples can get messy and hard to maintain; we ideally want our
     dataset code to be decoupled from our model training code for better readability and
     modularity. PyTorch provides two data primitives: `torch.utils.data.DataLoader` and

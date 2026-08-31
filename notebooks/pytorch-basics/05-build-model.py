@@ -50,6 +50,24 @@ def _(mo):
     return
 
 
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    > **Today's target** — run the notebook; consuming it means having built an `nn.Module` and
+    > followed one forward pass through it, layer by layer, shape by shape.
+    >
+    > **Marc's depth line** — part of the base Marc named: the forward, the backward, a loss
+    > computed with a simple model — the model itself stays a black box for training. Half a day
+    > here is fine.
+    >
+    > **Stop-line** — done means: ran it, could explain to Marc what `forward` runs and where the
+    > parameters live, questions captured — close it.
+    >
+    > **Capture** — `scripts/q "your question"` appends it to Friday's file for Marc.
+    """)
+    return
+
+
 @app.cell
 def _():
     import torch

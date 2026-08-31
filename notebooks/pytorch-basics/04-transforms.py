@@ -54,6 +54,23 @@ def _(mo):
     return
 
 
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    > **Today's target** — run the notebook; consuming it means having seen what `transform` and
+    > `target_transform` do to a sample on its way in — pixels to scaled floats, labels to one-hot.
+    >
+    > **Marc's depth line** — Marc priced this one at "could be interesting" and moved on; it is
+    > not on his focus map — a skim is fine.
+    >
+    > **Stop-line** — done means: ran it, could explain to Marc why features and labels each get
+    > their own transform, questions captured — close it.
+    >
+    > **Capture** — `scripts/q "your question"` appends it to Friday's file for Marc.
+    """)
+    return
+
+
 @app.cell
 def _():
     import torch
