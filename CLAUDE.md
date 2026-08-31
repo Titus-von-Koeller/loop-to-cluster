@@ -75,10 +75,13 @@ persists nothing.
 **Never rewrite a notebook on disk while it is open in the editor.** The extension syncs
 cells by id in transactions, and an external rewrite produces
 `ValueError: Cell 'X' already exists` or spurious multiple-definition errors that exist
-only in the editor session while the file stays valid. Recovery order matters: close the
-tab *without saving* — saving writes the stale merge over the good file, and can silently
-drop `hide_code` from any cell whose `marimo.options` metadata was lost — then reload the
-window and reopen. After any editor save, `git diff` and look for decorator churn.
+only in the editor session while the file stays valid. Recovery: `ctrl+alt+m` in the
+focused notebook closes it *discarding* the stale model and reopens it from disk — a fresh
+deserialize, folds reapplied. Discarding is the point: saving a stale model writes the
+broken merge over the good file, and can silently drop `hide_code` from any cell whose
+`marimo.options` metadata was lost. The window reload named under Environment remains the
+fallback when the whole session is confused. After any editor save, `git diff` and look
+for decorator churn.
 
 **Checks.** `pixi run marimo check --strict` catches duplicate names and unparsable cells
 without running anything. The content check is executing the file itself —
