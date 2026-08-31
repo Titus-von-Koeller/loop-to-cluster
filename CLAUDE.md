@@ -68,11 +68,13 @@ inline because snapshot timing is the demonstration. The VSCode extension (vscod
 0.17.2) applies `hide_code` by collapsing cell input the first time a notebook is opened in a
 window session, and thereafter compares against its own window-lifetime memory of what it collapsed — a manual
 expand never updates that memory, so an expanded cell stays expanded through any number of
-tab reopens. Folds "gone" while `git diff` is clean is therefore a session artifact, and
-the cure is a window reload (`ctrl+alt+shift+m`), which resets that memory so the next
-activation folds every `hide_code` cell. Persist visibility with the
-`marimo.hideCellCode` / `marimo.showCellCode` commands, never the collapse chevron, which
-persists nothing.
+tab reopens. Folds "gone" while `git diff` is clean is therefore a session artifact, not
+damage. A window reload (`ctrl+alt+shift+m`) resets that memory and refolds on the next
+activation — but only the cells the editor has materialized, so on a long notebook some
+cells stay expanded and, the memory now marking them folded, are never retried. The
+reliable spot fix is per cell: the collapse chevron, or the "marimo: Hide cell code"
+command, which also persists. The file stays authoritative throughout; fold drift in the
+editor is cosmetic.
 
 **Never rewrite a notebook on disk while it is open in the editor.** The extension syncs
 cells by id in transactions, and an external rewrite produces
