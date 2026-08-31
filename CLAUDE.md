@@ -65,10 +65,12 @@ mutation out breaks their idempotency.
 `notebooks/pytorch-basics/`: a visible cell carries only code the narrative asks the reader
 to read; display plumbing lives in hidden cells; the mutation demos keep their rendering
 inline because snapshot timing is the demonstration. The VSCode extension (vscode-marimo
-0.17.2) applies `hide_code` by collapsing cell input when the notebook is (re)opened, and
-thereafter reacts only to changes — expanding a cell by hand is transient editor state that
-writes nothing and is not re-collapsed until the next reopen. Folds "gone" while `git diff`
-is clean is therefore a session artifact, cured by reopening. Persist visibility with the
+0.17.2) applies `hide_code` by collapsing cell input the first time a notebook is opened in a
+window session, and thereafter compares against its own window-lifetime memory of what it collapsed — a manual
+expand never updates that memory, so an expanded cell stays expanded through any number of
+tab reopens. Folds "gone" while `git diff` is clean is therefore a session artifact, and
+the cure is a window reload (`ctrl+alt+shift+m`), which resets that memory so the next
+activation folds every `hide_code` cell. Persist visibility with the
 `marimo.hideCellCode` / `marimo.showCellCode` commands, never the collapse chevron, which
 persists nothing.
 
@@ -77,7 +79,8 @@ cells by id in transactions, and an external rewrite produces
 `ValueError: Cell 'X' already exists` or spurious multiple-definition errors that exist
 only in the editor session while the file stays valid. Recovery: `ctrl+alt+m` in the
 focused notebook closes it *discarding* the stale model and reopens it from disk — a fresh
-deserialize, folds reapplied. Discarding is the point: saving a stale model writes the
+deserialize of the cells, though not of the folds, which take the window reload above.
+Discarding is the point: saving a stale model writes the
 broken merge over the good file, and can silently drop `hide_code` from any cell whose
 `marimo.options` metadata was lost. The window reload named under Environment remains the
 fallback when the whole session is confused. After any editor save, `git diff` and look
