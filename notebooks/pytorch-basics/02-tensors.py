@@ -10,9 +10,10 @@
 # opts in on its own. `auto_instantiate` cannot be set here (marimo strips it from script
 # metadata), so opening this file still runs nothing.
 #
-# Sections under an "Explore" heading are additions. The upstream tutorial's prose and its
-# sequence are untouched; its code cells were changed in one respect only, which is that
-# they render their tensors instead of printing them.
+# The upstream tutorial's prose and code are all still here. Additions take two forms:
+# sections under an "Explore" heading are the self-contained ones, and an editorial layer
+# runs through the rest — the framing cell at the top, the drawn tensors and their stride
+# captions, the images aside, the callout under the arithmetic, and the closing section.
 
 import marimo
 
@@ -20,7 +21,7 @@ __generated_with = "0.24.0"
 app = marimo.App()
 
 
-@app.cell
+@app.cell(hide_code=True)
 def _():
     import marimo as mo
 
@@ -70,30 +71,25 @@ def _(mo):
 
 @app.cell
 def _():
-    import altair as alt
     import numpy as np
-    import pandas as pd
     import torch
 
-    # Seeded so that a full run of the notebook always draws the same numbers. Note what
-    # this does not buy: the generator is global state, invisible to the dependency graph,
-    # and it is consumed in whatever order the graph runs. Re-run one random cell on its
-    # own and it draws the *next* numbers in the sequence rather than its own again, so its
-    # picture changes while every other picture stays put. Nothing here depends on a
-    # particular value -- the lessons are about shape, stride and structure -- but it is
-    # the reason a cell reading hidden state cannot be reactive.
-    torch.manual_seed(0)
-    return alt, np, pd, torch
+    return np, torch
 
 
 @app.cell(hide_code=True)
-def _(alt, mo, pd, torch):
-    # One way of looking at a tensor, used by every cell in this notebook.
+def _(mo, torch):
+    # One way of looking at a tensor, used by every cell in this notebook. altair and
+    # pandas arrive here rather than with numpy and torch, because they serve the drawing
+    # and nothing else.
     #
     # Magnitude is carried by lightness and only by lightness, so the picture survives being
     # read by someone who cannot separate red from green, and survives being printed gray.
     # Hue carries sign and nothing else. There are no axes and no chart title: the numbers
     # are in the squares and the caption says what the object is.
+    import altair as alt
+    import pandas as pd
+
     RAMP = ["#dbe7f7", "#a8c6ec", "#6b9ede", "#2a78d6", "#17457c"]
     POLARITY = ["#8f3413", "#d95926", "#eaa886", "#e8e8e6", "#93bae9", "#2a78d6", "#173f6e"]
 
@@ -154,7 +150,7 @@ def _(alt, mo, pd, torch):
         )
         return mo.vstack(parts, align="center", gap=0.2)
 
-    return (show,)
+    return alt, pd, show
 
 
 @app.cell(hide_code=True)
@@ -172,11 +168,16 @@ def _(mo):
 
 
 @app.cell
-def _(show, torch):
+def _(torch):
     data = [[1, 2], [3, 4]]
     x_data = torch.tensor(data)
-    show(x_data, "x_data")
     return data, x_data
+
+
+@app.cell(hide_code=True)
+def _(show, x_data):
+    show(x_data, "x_data")
+    return
 
 
 @app.cell(hide_code=True)
@@ -190,9 +191,14 @@ def _(mo):
 
 
 @app.cell
-def _(data, mo, np, show, torch):
+def _(data, np, torch):
     np_array = np.array(data)
     x_np = torch.from_numpy(np_array)
+    return np_array, x_np
+
+
+@app.cell(hide_code=True)
+def _(mo, np_array, show, x_np):
     mo.hstack(
         [show(np_array, "np_array — a NumPy array"), show(x_np, "x_np — a tensor on the same memory")],
         justify="start",
@@ -213,11 +219,15 @@ def _(mo):
 
 
 @app.cell
-def _(mo, show, torch, x_data):
+def _(torch, x_data):
     x_ones = torch.ones_like(x_data)  # retains the properties of x_data
 
     x_rand = torch.rand_like(x_data, dtype=torch.float)  # overrides the datatype of x_data
+    return x_ones, x_rand
 
+
+@app.cell(hide_code=True)
+def _(mo, show, x_data, x_ones, x_rand):
     mo.hstack(
         [show(x_data, "x_data"), show(x_ones, "ones_like(x_data)"), show(x_rand, "rand_like(x_data, dtype=float)")],
         justify="start",
@@ -238,12 +248,16 @@ def _(mo):
 
 
 @app.cell
-def _(mo, show, torch):
+def _(torch):
     shape = (2, 3)
     rand_tensor = torch.rand(shape)
     ones_tensor = torch.ones(shape)
     zeros_tensor = torch.zeros(shape)
+    return ones_tensor, rand_tensor, zeros_tensor
 
+
+@app.cell(hide_code=True)
+def _(mo, ones_tensor, rand_tensor, show, zeros_tensor):
     mo.hstack(
         [
             show(rand_tensor, "torch.rand(shape)"),
@@ -362,96 +376,6 @@ def _(mo):
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
-    ## Explore — `dtype` is three decisions, not one
-
-    `torch.float32` is the default, and it is worth stopping on, because the choice of
-    dtype decides how much memory a model needs, how fast it trains, and what it can
-    represent — and the two 16-bit formats in the table differ from each other more than
-    either differs from `float32`.
-
-    A floating point number is a sign, an exponent and a mantissa. The exponent sets the
-    *range*, the mantissa sets the *precision*, and 16 bits has to be split between them —
-    which the two formats do differently, and that is the whole story.
-
-    Type a number and watch what each format does to it. The columns say the rest.
-    """)
-    return
-
-
-@app.cell(hide_code=True)
-def _(mo):
-    stored_value = mo.ui.text("0.1", label="store this number as")
-    stored_value
-    return (stored_value,)
-
-
-@app.cell(hide_code=True)
-def _(mo, stored_value, torch):
-    try:
-        _exact = float(stored_value.value)
-    except ValueError:
-        _exact = 0.1
-
-    _rows = []
-    for _dtype in (torch.float64, torch.float32, torch.bfloat16, torch.float16):
-        _info = torch.finfo(_dtype)
-        _kept = torch.tensor(_exact, dtype=_dtype).item()
-        _rows.append(
-            {
-                "dtype": str(_dtype).removeprefix("torch."),
-                "bytes": torch.empty(0, dtype=_dtype).element_size(),
-                "stored as": f"{_kept!r}",
-                "error": f"{abs(_kept - _exact):.3e}",
-                "step near 1.0 (eps)": f"{_info.eps:.3e}",
-                "largest": f"{_info.max:.3e}",
-                "smallest normal": f"{_info.tiny:.1e}",
-            }
-        )
-    mo.vstack(
-        [
-            mo.ui.table(_rows, selection=None),
-            mo.md(
-                f"The classifier built in **Build Model** holds 669,706 parameters: "
-                f"**{669706 * 4 / 1024**2:.1f} MB** in float32, **{669706 * 2 / 1024**2:.1f} MB** "
-                "in either 16-bit format.\n\n"
-                "Halving the parameters is the *least* of what mixed precision does, though. "
-                "Under `torch.autocast` the parameters stay float32; what moves to 16-bit is the "
-                "activations and the inputs to each matrix multiply — which is where both the "
-                "memory of a large batch and the speedup live, since the tensor cores that make "
-                "16-bit fast only accept 16-bit. That is what *mixed* names: two precisions in "
-                "one step, chosen per operation."
-            ),
-        ]
-    )
-    return
-
-
-@app.cell(hide_code=True)
-def _(mo):
-    mo.accordion(
-        {
-            "How the two 16-bit formats spend their bits": mo.md(r"""
-            - **float16** spends its bits on mantissa. Finer steps than bfloat16, but the
-              largest number it can hold is 65,504 and the smallest normal one is 6.1e-05.
-              Gradients routinely fall below that and become zero — which is what a gradient
-              scaler exists to prevent, by multiplying the loss up before the backward pass
-              and dividing it out after.
-            - **bfloat16** spends them on exponent — the same eight exponent bits as float32.
-              So it starts underflowing in the same place float32 does (`tiny` is 1.18e-38
-              for both), and a gradient that survives in float32 survives here, which is why
-              bfloat16 needs no scaler. Its largest value differs from float32's only in the
-              last mantissa digits, 3.39e38 against 3.40e38. The price is precision: its
-              steps are eight times coarser than float16's, exactly eight, as the `eps`
-              column shows.
-            """)
-        }
-    )
-    return
-
-
-@app.cell(hide_code=True)
-def _(mo):
-    mo.md(r"""
     -----------------------------------------------------------------------------------------------
     """)
     return
@@ -550,14 +474,15 @@ def _(mo):
     for its only entry, so dimension 0 disappears and four numbers come back.
     `tensor_2[:, 0]` keeps every row and drops the column dimension. `tensor_2[..., -1]`
     takes the *last* column, written so that it would still mean the last column on a
-    four-dimensional batch. And `tensor_2[:, 1] = 0` puts an indexed expression on the
+    four-dimensional batch — a batch this section ends by building, because on a matrix
+    that claim cannot even be seen. And `tensor_2[:, 1] = 0` puts an indexed expression on the
     *left* of an assignment, which writes into the tensor rather than reading from it —
     which is why `tensor_2` ends up with a column of zeros in it.
     """)
     return
 
 
-@app.cell
+@app.cell(hide_code=True)
 def _(mo, show, torch):
     tensor_2 = torch.rand(4, 4)
     # Snapshotted before the write, because the three reads below are views: once
@@ -641,6 +566,14 @@ def _(mo):
     a whole row each time — which is what "going down a column" *is* once the rows are laid
     end to end. The column-ness did not vanish when the dimension did. It moved into the
     stride.
+
+    Two of the captions also say **not contiguous**, the flag's first appearance. A tensor
+    is contiguous when reading it in order walks its storage front to back, one step per
+    element, no gaps: `tensor_2[0]`, stride `(1,)`, is that definition made visible. The
+    columns break it — both land on slots 0, 4, 8, 12, skipping three each time. Nothing
+    about them is wrong; the flag describes how a tensor reads, not what it holds. It
+    starts to cost only when an operation needs the elements as one unbroken run of
+    memory, and which operations those are is the storage section's business below.
 
     And the two that kept their second dimension differ from their flattened partners only
     there: `(1, 4)` against `(4,)`, `(4, 1)` against `(4,)`, the same four numbers in the
@@ -767,6 +700,85 @@ def _(mo):
     rebinds the name and abandons the tensor. Anything else pointing at that memory —
     another view, a NumPy array sharing it, a parameter held by a module — sees the first
     and misses the second.
+    """)
+    return
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    ### The last column, whatever the rank
+
+    One promise made above cannot be tested on a matrix: that `...` binds the entries you
+    wrote to the *last* dimensions, whatever the rank. `tensor_2[..., -1]` and
+    `tensor_2[:, -1]` land on the same four numbers, because with two dimensions, counting
+    from the left and counting from the right meet in the middle.
+
+    They part at four dimensions — which is also where reading a tensor by eye gives out,
+    so the demonstration needs a tensor built to be read. In this one, every value spells
+    its own address, one digit per axis: `1234` lives at batch 1, channel 2, row 3,
+    column 4. That is the axis order every batch of images in the later notebooks arrives
+    in. Slice it however you like; the result identifies itself, because whichever digit
+    has stopped changing is the axis you pinned.
+    """)
+    return
+
+
+@app.cell
+def _(torch):
+    # Four vectors, each parked in its own axis by the `None` of the table above. How the
+    # sum spreads them into four dimensions is broadcasting, a section of its own further
+    # down; nothing here depends on it beyond trusting the digits.
+    digits = (
+        torch.arange(2)[:, None, None, None] * 1000  # batch   -> thousands digit
+        + torch.arange(3)[:, None, None] * 100  # channel -> hundreds digit
+        + torch.arange(4)[:, None] * 10  # row     -> tens digit
+        + torch.arange(5)  # col     -> ones digit
+    )
+    return (digits,)
+
+
+@app.cell(hide_code=True)
+def _(digits, mo, show):
+    def _planes(sliced):
+        return mo.hstack(
+            [show(plane, f"batch {i}", cell=44) for i, plane in enumerate(sliced)],
+            justify="start",
+            gap=1.5,
+            wrap=True,
+        )
+
+    def _head(expr, sliced, note):
+        return mo.md(f"#### `{expr}` → `{tuple(sliced.shape)}` — {note}")
+
+    mo.vstack(
+        [
+            show(digits[1, 2], "digits[1, 2] — thousands pinned at 1, hundreds at 2", cell=44),
+            _head("digits[..., -1]", digits[..., -1], "ones digit pinned: the last *column*"),
+            _planes(digits[..., -1]),
+            _head("digits[:, -1]", digits[:, -1], "hundreds digit pinned: the last *channel*"),
+            _planes(digits[:, -1]),
+        ],
+        gap=1,
+    )
+    return
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    Read the digits, not the grid positions. In `digits[..., -1]` the ones digit is pinned
+    at 4 and the other three still run: `...` reached past batch, channel and row to bind
+    the `-1` to the last axis, and the same spelling would have done the same at any rank.
+    That is why library code leans on `...` — it cannot know how many batch dimensions a
+    caller stacked in front. `digits[:, -1]` pinned the hundreds instead: the same `-1`,
+    counted from the left, a different axis entirely. So use `:` to address an axis by its
+    position from the front, and `...` when the axis you mean is defined by being last.
+
+    And nothing was copied. Every panel above is a re-reading of the same 120 integers,
+    and the column panels are flagged **not contiguous** for the reason the column of
+    `tensor_2` was: their walk through the storage skips. What a view actually is, and
+    what the skipping eventually costs, is the next section's subject.
     """)
     return
 
@@ -959,8 +971,13 @@ def _(mo):
 
 
 @app.cell
-def _(mo, show, tensor_2, torch):
+def _(tensor_2, torch):
     t1 = torch.cat([tensor_2, tensor_2, tensor_2], dim=1)
+    return (t1,)
+
+
+@app.cell(hide_code=True)
+def _(mo, show, t1, tensor_2):
     mo.vstack([show(tensor_2, "tensor_2"), show(t1, "torch.cat([tensor_2] * 3, dim=1)", cell=38)], gap=1)
     return
 
@@ -1033,7 +1050,7 @@ def _(mo):
 
 
 @app.cell
-def _(mo, show, tensor_2, torch):
+def _(tensor_2, torch):
     # This computes the matrix multiplication between two tensors.
     # y1, y2, y3 will have the same value
     # ``tensor.T`` returns the transpose of a tensor
@@ -1046,7 +1063,11 @@ def _(mo, show, tensor_2, torch):
     z3 = torch.rand_like(tensor_2)
     # This computes the element-wise product. z1, z2, z3 will have the same value
     torch.mul(tensor_2, tensor_2, out=z3)
+    return y1, y2, y3, z1, z2, z3
 
+
+@app.cell(hide_code=True)
+def _(mo, show, tensor_2, torch, y1, y2, y3, z1, z2, z3):
     mo.vstack(
         [
             mo.hstack(
@@ -1188,6 +1209,89 @@ def _(left_shape, mo, right_shape, torch):
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
+    ### Where the matrix comes from
+
+    The table says what shape comes out. It does not say how two vectors can add up to a
+    matrix, and that is worth seeing once, because the word "stretching" suggests the wrong
+    thing.
+
+    `col` is five numbers with shape `(5, 1)` — the `None` from the indexing table, placed
+    after a `:`, put the second dimension there. `row` is six numbers with shape `(6,)`.
+    Aligned from the right, `1` meets `6` and a supplied `1` meets `5`, so both are read as
+    `(5, 6)`. Here is what that reading looks like, with the stride under each picture.
+    """)
+    return
+
+
+@app.cell(hide_code=True)
+def _(mo, show, torch):
+    _col = torch.arange(0, 50, 10)[:, None]
+    _row = torch.arange(6)
+    _col_read, _row_read = _col.expand(5, 6), _row.expand(5, 6)
+    _sum = _col + _row
+
+    def _shares(a, b):
+        return a.untyped_storage().data_ptr() == b.untyped_storage().data_ptr()
+
+    mo.vstack(
+        [
+            mo.hstack([show(_col, "col"), show(_row, "row")], justify="start", align="center", gap=2),
+            mo.md("### `+` reads them as"),
+            mo.hstack(
+                [
+                    show(_col_read, "col, stretched along dimension 1"),
+                    show(_row_read, "row, stretched along dimension 0"),
+                ],
+                justify="start",
+                align="center",
+                gap=2,
+                wrap=True,
+            ),
+            mo.md("### and allocates"),
+            show(_sum, "col + row"),
+            mo.md(
+                "| | elements in storage | same storage as the vector it came from |\n"
+                "| --- | --- | --- |\n"
+                f"| `col.expand(5, 6)` | {_col_read.untyped_storage().nbytes() // _col_read.element_size()} "
+                f"| {'yes — a view' if _shares(_col_read, _col) else 'no'} |\n"
+                f"| `row.expand(5, 6)` | {_row_read.untyped_storage().nbytes() // _row_read.element_size()} "
+                f"| {'yes — a view' if _shares(_row_read, _row) else 'no'} |\n"
+                f"| `col + row` | {_sum.untyped_storage().nbytes() // _sum.element_size()} "
+                f"| {'yes' if _shares(_sum, _col) or _shares(_sum, _row) else '**no — new storage**'} |"
+            ),
+        ],
+        gap=1,
+    )
+    return
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    Read, not rewritten. The middle row shows both operands as `+` sees them, and the
+    strides say everything: `(1, 0)` and `(0, 1)`. A `0` on the stretched axis means that
+    stepping along it goes nowhere in memory. Every row of `row` is the same six numbers
+    being read again; every column of `col` is the same five. Neither has been copied — the
+    table shows each still holding its five or six elements and still sharing storage with
+    the vector it came from — and neither is contiguous, which the captions say. This is
+    `x[:1].expand(3, 4)` from the storage strip, met where it earns its keep.
+
+    The result is the first thing allocated. Thirty new numbers, stride `(6, 1)`, storage of
+    its own. `+` did what it always does — one addition per position — to operands that had
+    been reinterpreted before it ran. Broadcasting changed what was added, not how. And `+`
+    is no more matrix addition here than it is anywhere else: when two shapes already match,
+    "matrix addition" is only the name for the same elementwise loop.
+
+    It also settles a debt: the digit tensor of the notation section was built by exactly
+    this machinery — four vectors, each parked in its own axis by `None`, spread across one
+    another into four dimensions.
+    """)
+    return
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
     **Single-element tensors** If you have a one-element tensor, for example by aggregating all
     values of a tensor into one value, you can convert it to a Python numerical value using
     `item()`:
@@ -1196,10 +1300,14 @@ def _(mo):
 
 
 @app.cell
-def _(mo, show, tensor_2):
+def _(tensor_2):
     agg = tensor_2.sum()
     agg_item = agg.item()
+    return agg, agg_item
 
+
+@app.cell(hide_code=True)
+def _(agg, agg_item, mo, show, tensor_2):
     mo.hstack(
         [
             show(tensor_2, "tensor_2"),
