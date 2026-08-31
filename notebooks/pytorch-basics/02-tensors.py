@@ -273,12 +273,20 @@ def _(mo, ones_tensor, rand_tensor, show, zeros_tensor):
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
-    Six numbers can be read as numbers. Four thousand cannot, and do not need to be:
-    `torch.rand(64, 64)` is 4,096 of them, drawn instead of listed.
+    Six numbers can be read as numbers. Four thousand cannot, and do not need to be: the
+    left picture is the `torch.rand` from the cell above at image scale, 4,096 numbers
+    drawn instead of listed.
 
     That is not an analogy. An image *is* a tensor — one number per pixel, brightness as
     magnitude — so drawing a tensor as an image shows it as what it already is, and every
     image the later notebooks classify arrives as exactly this.
+
+    The right picture holds the same 4,096 slots, each storing its own position: `arange`
+    counts them off, `reshape` folds the count into 64 rows. It comes out a top-to-bottom
+    ramp because consecutive positions sit side by side within a row and each new row
+    starts 64 later — the first look at something this notebook keeps returning to: the
+    grid is one flat run of memory, laid into rows. Numbers that trace their own
+    whereabouts also return, in the indexing explorer and again in the notation section.
     """)
     return
 
@@ -286,7 +294,7 @@ def _(mo):
 @app.cell(hide_code=True)
 def _(mo, torch):
     _noise = torch.rand(64, 64)
-    _gradient = torch.linspace(0, 1, 64).expand(64, 64)
+    _counted = torch.arange(4096).reshape(64, 64)
     mo.hstack(
         [
             mo.vstack(
@@ -299,8 +307,8 @@ def _(mo, torch):
             ),
             mo.vstack(
                 [
-                    mo.image(_gradient, width=150, vmin=0, vmax=1, rounded=True),
-                    mo.md("<small>`torch.linspace(0, 1, 64).expand(64, 64)`</small>"),
+                    mo.image(_counted, width=150, vmin=0, vmax=4095, rounded=True),
+                    mo.md("<small>`torch.arange(4096).reshape(64, 64)` — each number is its own position</small>"),
                 ],
                 align="center",
                 gap=0.2,
