@@ -365,10 +365,15 @@ def _(mo, show, torch):
 def _(mo):
     mo.md(r"""
     Shape, dtype and device say what a tensor holds and where. **Stride** says how it is
-    read, and it explains the other three: `(4, 1)` means that stepping to the next row
-    moves four positions through memory, and stepping to the next column moves one. Hold on
-    to it. It is printed under every picture from here on, and a later section is about
-    nothing else.
+    read: `(4, 1)` means that stepping to the next row moves four positions through memory,
+    and stepping to the next column moves one.
+
+    And `(4, 1)` is not extra information — yet. A fresh tensor's stride is computed from
+    its shape: the last axis steps 1, and each axis to its left steps the product of the
+    sizes to its right, which for `(3, 4)` gives `(4, 1)`. Stride begins carrying news of
+    its own the moment it disagrees with what the shape predicts, and those disagreements
+    are where this notebook is headed. Hold on to it. It is printed under every picture
+    from here on, and a later section is about nothing else.
     """)
     return
 
@@ -569,7 +574,8 @@ def _(mo):
 
     Two of the captions also say **not contiguous**, the flag's first appearance. A tensor
     is contiguous when reading it in order walks its storage front to back, one step per
-    element, no gaps: `tensor_2[0]`, stride `(1,)`, is that definition made visible. The
+    element, no gaps — equivalently, when its stride is still the one its shape predicts.
+    `tensor_2[0]`, stride `(1,)`, is that definition made visible. The
     columns break it — both land on slots 0, 4, 8, 12, skipping three each time. Nothing
     about them is wrong; the flag describes how a tensor reads, not what it holds. It
     starts to cost only when an operation needs the elements as one unbroken run of
