@@ -1,0 +1,50 @@
+#!/usr/bin/env bash
+# q "why does the sampler reshuffle per epoch?"
+#
+# Captures one question for Marc without leaving the terminal: appends a line under
+# "## Open" in ~/src/orga/membrane/questions-for-marc.md and makes one pathspec-scoped
+# commit there, so the capture is the whole cost and the question is already Friday's
+# meeting content.
+#
+# The notebook column is a guess: the most recently modified NN-*.py in the working
+# directory, when there is one — run from notebooks/pytorch-basics it names the notebook
+# being read, run from anywhere else the column is "-".
+set -euo pipefail
+
+if [ $# -ne 1 ] || [ -z "$1" ]; then
+    echo 'usage: q "your question"' >&2
+    exit 64
+fi
+question=$1
+
+orga="$HOME/src/orga"
+file="$orga/membrane/questions-for-marc.md"
+if ! grep -q '^## Open$' "$file"; then
+    echo "q: no '## Open' heading in $file" >&2
+    exit 1
+fi
+
+notebook="-"
+newest=$(find "$PWD" -maxdepth 1 -name '[0-9][0-9]-*.py' -printf '%T@ %f\n' 2>/dev/null |
+    sort -rn | head -1 | cut -d' ' -f2-)
+if [ -n "$newest" ]; then
+    notebook="${newest%.py}"
+fi
+
+entry="- $(date +%F) · ${notebook} · ${question}"
+
+# The entry goes at the end of the Open section: printed just before the first heading
+# that follows "## Open", or at end-of-file when no heading follows.
+tmp=$(mktemp)
+awk -v entry="$entry" '
+    /^## / && seen_open && !placed { print entry; print ""; placed = 1 }
+    { print }
+    /^## Open$/ { seen_open = 1 }
+    END { if (!placed) print entry }
+' "$file" >"$tmp"
+cat "$tmp" >"$file"
+rm "$tmp"
+
+subject="membrane(questions): + ${question:0:50}"
+git -C "$orga" commit -q -m "$subject" -m "Membrane-Client: qcapture" -- membrane/questions-for-marc.md
+echo "captured → questions-for-marc.md · ${notebook}"
