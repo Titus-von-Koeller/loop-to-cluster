@@ -7,14 +7,17 @@ description: Judgment for working on the marimo notebooks under notebooks/ — s
 
 ## What this is for
 
-Two motions, and only these. **Polish**: a found notebook — an upstream tutorial worth
-keeping — becomes a coherent teaching document, by the standards below. **The loop**:
-Titus reads and asks; the session explains, in conversation; what the exchange reveals
-as a gap is folded back into the notebook where its narrative needs it, and the file
-stays one coherent argument in the session's care. The conversation is the instrument
-that finds gaps; the notebook is the surface where explanations land and persist.
-Machinery that would stand in for the conversation — logged predictions, telemetry,
-autonomous checking — is out of scope unless Titus asks for it.
+A notebook's life here has two phases, in order. **First, polish**: he aims a session
+at a found notebook — an upstream tutorial worth keeping — and it becomes a coherent
+teaching document, by the standards below, in as many passes as that takes, each pass
+checked on the rendered surface a reader actually sees (N6). **Then, the loop**: he
+studies the polished notebook and asks; the session explains, in conversation; what the
+exchange reveals as a gap is folded back into the notebook where its narrative needs
+it, and the file stays one coherent argument in the session's care for as long as he
+learns from it. The conversation is the instrument that finds gaps; the notebook is the
+surface where explanations land and persist. Machinery that would stand in for the
+conversation — logged predictions, telemetry, autonomous checking — is out of scope
+unless Titus asks for it.
 
 How to read this file: every entry is an **intent** — the invariant why, which changes
 only with Titus's consent — and an **expression**, today's way of serving it, which any
@@ -33,6 +36,11 @@ evidence the next expression is derived from. Expressions may be re-derived free
 within their intent. Intents change only by proposal to Titus — and proposing one that
 has outgrown its statement is part of the job, not an overstep. Prefer deleting a stale
 expression to patching it; never touch an intent without his go.
+
+This file is a floor, not a ceiling. Where you genuinely know a better move, make the
+disagreement visible — name the entry it contradicts, do better at expression level,
+propose at intent level. And when the work reveals something Titus would want to know
+that he did not ask about, say it: teaching unasked is in scope; silence is not.
 
 ## N1 · The file teaches
 
@@ -106,3 +114,18 @@ imagined anonymous reader; his one-paragraph correction named the actual system 
 two-agent loop where conversation finds the gaps — and outranked two research agents
 and a finished proposal. Depth prompts set a floor; when the honest finding is modest,
 machinery fills the gap unless caught.
+
+## N6 · The polish pass converges, and is seen
+
+**Intent**: a notebook he aims a session at gets better in passes until another pass
+would not tighten it — and "better" is judged on the rendered surface a reader actually
+sees, never on green checks alone.
+**Expression**: the go on "polish this" covers the whole arc — repeated passes, each
+reading the file whole, editing, verifying (gate, headless run), then *looking*: the
+vscode-keyhole skill screenshots the real UI and reads live notebook state, and when
+live rendering is needed, ask Titus to open the notebook. Each pass states what it
+changed and what it learned; a learning that generalizes moves to pedagogy.md, so the
+shelf compounds. Stop when a pass yields only preference-grade changes — report then,
+rather than polishing the polish.
+**Provenance**: granted 2026-09-01 — "improve the existing notebooks I aim you at in
+multiple passes, checking your work with the peekhole … iteratively."
