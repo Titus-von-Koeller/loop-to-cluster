@@ -25,27 +25,10 @@ def _():
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
-    [Learn the Basics](intro.html) \|\| [Quickstart](quickstart_tutorial.html) \|\|
-    [Tensors](tensorqs_tutorial.html) \|\| [Datasets & DataLoaders](data_tutorial.html) \|\|
-    **Transforms** \|\| [Build Model](buildmodel_tutorial.html) \|\|
-    [Autograd](autogradqs_tutorial.html) \|\| [Optimization](optimization_tutorial.html) \|\| [Save
-    & Load Model](saveloadrun_tutorial.html)
+    *PyTorch basics, 4 of 8 — before this: [Datasets & DataLoaders](03-datasets-and-dataloaders.py)
+    · after: [Build Model](05-build-model.py)*
 
     # Transforms
-
-    Data does not always come in its final processed form that is required for training machine
-    learning algorithms. We use **transforms** to perform some manipulation of the data and make it
-    suitable for training.
-
-    All TorchVision datasets have two parameters -`transform` to modify the features and
-    `target_transform` to modify the labels - that accept callables containing the transformation
-    logic. The [torchvision.transforms](https://pytorch.org/vision/stable/transforms.html) module
-    offers several commonly-used transforms out of the box.
-
-    The FashionMNIST features are in PIL Image format, and the labels are integers. For training,
-    we need the features as normalized tensors, and the labels as one-hot encoded tensors. To make
-    these transformations, we use the `torchvision.transforms.v2` API along with
-    `torch.nn.functional.one_hot`.
     """)
     return
 
@@ -63,6 +46,24 @@ def _(mo):
     > their own transform, questions captured — close it.
     >
     > **Capture** — `scripts/q "your question"` appends it to Friday's file for Marc.
+    """)
+    return
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    The last notebook passed `transform=v2.Compose([...])` to every dataset it built, and even
+    measured what it costs per sample — without ever saying what it does. This notebook is about
+    that argument. Training wants scaled float tensors; on disk sit PIL images and integer
+    labels; **transforms** are the callables that close the gap, applied inside `__getitem__` on
+    every access.
+
+    Every TorchVision dataset takes two of them: `transform` for the features and
+    `target_transform` for the labels. The
+    [torchvision.transforms](https://pytorch.org/vision/stable/transforms.html) module ships the
+    common ones. Below, the `torchvision.transforms.v2` API scales the images to `[0, 1]` floats,
+    and `torch.nn.functional.one_hot` turns each integer label into a ten-float vector.
     """)
     return
 
@@ -87,7 +88,7 @@ def _():
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
-    # ToImage() and ToDtype()
+    ## ToImage() and ToDtype()
 
     The `torchvision.transforms.v2` API replaces the legacy `ToTensor` transform with a two-step
     pipeline.
@@ -103,11 +104,10 @@ def _(mo):
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
-    ## The same picture, three times, in different numbers
+    ### The same picture, three times, in different numbers
 
-    This notebook describes transforms without ever showing one. Below is image 7 of the
-    training set at each stage of that two-step pipeline, with what it actually *is* at
-    each stage underneath.
+    Below is image 7 of the training set at each stage of that two-step pipeline, with what
+    it actually *is* at each stage underneath.
 
     The three pictures are identical, and that is the point worth taking: rendering
     normalizes, so the eye cannot tell 0-255 from 0.0-1.0. Only the numbers can. Forgetting
@@ -159,26 +159,21 @@ def _(datasets, mo, torch, v2):
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
-    # Lambda Transforms
+    ## Lambda transforms
 
-    Lambda transforms apply any user-defined lambda function. Here, we use
-    [torch.nn.functional.one_hot](https://pytorch.org/docs/stable/generated/torch.nn.functional.one_hot.html)
-    to turn the integer label into a one-hot encoded tensor of size 10 (the number of labels in our
-    dataset), then cast it to `float` to match the expected dtype.
+    A `v2.Lambda` wraps any user-defined callable into a transform. The `target_transform=` line
+    in the loading cell at the top uses one to apply
+    [torch.nn.functional.one_hot](https://pytorch.org/docs/stable/generated/torch.nn.functional.one_hot.html),
+    turning the integer label into a one-hot tensor of size 10 (the number of classes), then
+    casting it to `float` to match the expected dtype.
     """)
-    return
-
-
-@app.cell
-def _(F, torch, v2):
-    target_transform = v2.Lambda(lambda y: F.one_hot(torch.tensor(y), num_classes=10).float())
     return
 
 
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
-    ## What the label became
+    ### What the label became
 
     `ds` above was built with that `target_transform`, so its labels are not integers any
     more. Move the slider and watch the second half of the pair.
@@ -187,8 +182,15 @@ def _(mo):
 
 
 @app.cell
-def _(ds, mo, sample):
-    _image, _label = ds[sample.value]
+def _(mo):
+    label_sample = mo.ui.slider(0, 999, value=7, label="sample", show_value=True)
+    label_sample
+    return (label_sample,)
+
+
+@app.cell
+def _(ds, label_sample, mo):
+    _image, _label = ds[label_sample.value]
     _hot = int(_label.argmax())
     _names = [
         "T-shirt/top",
@@ -379,12 +381,17 @@ def _(mo):
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
-    # Further Reading
+    ## Where to go next
 
-    - [Getting started with transforms
-      v2](https://pytorch.org/vision/stable/auto_examples/transforms/plot_transforms_getting_started.html)
-    - [torchvision.transforms.v2
-      API](https://pytorch.org/vision/stable/transforms.html#v2-api-reference-recommended)
+    - The [v2 gallery](https://pytorch.org/vision/stable/auto_examples/transforms/plot_transforms_getting_started.html)
+      and [v2 API](https://pytorch.org/vision/stable/transforms.html#v2-api-reference-recommended)
+      cover what this notebook skipped: `Normalize` (mean/std standardization, the usual third
+      step after scaling), `CutMix`/`MixUp`, and the same transforms on detection boxes and video.
+    - v2 transforms are not tied to `__getitem__`: handed a batched tensor on the GPU —
+      `aug(torch.rand(64, 1, 28, 28, device="cuda"))` — they transform the whole batch on the
+      device. That is the escape hatch when per-sample CPU transforms become the loading
+      bottleneck the last notebook measured.
+    - Next: [Build Model](05-build-model.py), where the scaled tensors finally meet parameters.
     """)
     return
 
