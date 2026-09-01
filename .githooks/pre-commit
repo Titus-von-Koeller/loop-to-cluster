@@ -4,13 +4,25 @@
 # Bypass a single commit with: git commit --no-verify
 set -euo pipefail
 
-# git runs hooks from the repository root, so pixi resolves this project's manifest.
-if ! pixi run ruff check .; then
-    echo "pre-commit: ruff check failed" >&2
+# Checks run against the INDEX, not the working tree: a snapshot of exactly what this
+# commit will contain is checked out to a temp dir and checked there. Unstaged edits --
+# typically in-flight notebook work in an open editor -- can therefore never fail a
+# commit they are not part of; before this, they forced --no-verify bypasses and once
+# invited an accidental sweep-stage. checkout-index reads staged blobs, so a partially
+# staged file is checked as staged, not as it sits on disk.
+snapshot=$(mktemp -d)
+trap 'rm -rf "$snapshot"' EXIT
+git checkout-index --prefix="$snapshot/" -a
+
+# git runs hooks from the repository root, so pixi resolves this project's manifest;
+# ruff discovers its config upward from the checked files, finding the snapshot's own
+# pyproject.toml.
+if ! pixi run ruff check "$snapshot"; then
+    echo "pre-commit: ruff check failed on staged content" >&2
     exit 1
 fi
-if ! pixi run ruff format --check .; then
-    echo "pre-commit: ruff format --check failed (run: pixi run ruff format .)" >&2
+if ! pixi run ruff format --check "$snapshot"; then
+    echo "pre-commit: ruff format --check failed on staged content (run: pixi run ruff format .)" >&2
     exit 1
 fi
 
@@ -22,8 +34,8 @@ fi
 # The numbered files are the notebooks; _viz.py beside them is a plain module, and
 # marimo check rejects any .py it is handed that lacks a marimo.App. A new notebook
 # must match the 0*.py pattern to stay under this check.
-if ! pixi run marimo check --strict notebooks/pytorch-basics/0*.py; then
-    echo "pre-commit: marimo check failed" >&2
+if ! pixi run marimo check --strict "$snapshot"/notebooks/pytorch-basics/0*.py; then
+    echo "pre-commit: marimo check failed on staged content" >&2
     exit 1
 fi
 
