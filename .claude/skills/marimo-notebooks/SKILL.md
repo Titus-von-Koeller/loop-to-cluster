@@ -1,69 +1,82 @@
 ---
 name: marimo-notebooks
-description: Intent and working preferences for the marimo notebooks under notebooks/ — what they are for, what makes an edit good, and how Titus wants the collaboration to run. Use when creating, reviewing, or editing notebook content. Mechanics (file format, folding, sync hazards, checks) live in CLAUDE.md under "Editing notebooks"; this skill is about judgment.
+description: Judgment for working on the marimo notebooks under notebooks/ — stated as owner-held intents with current, disposable expressions, evolving by incident and consent. Use when creating, reviewing, or editing notebook content. Mechanics (file format, folding, sync hazards, checks) live in CLAUDE.md under "Editing notebooks".
 ---
 
 # Working on the marimo notebooks
 
-An entry here that no longer matches how Titus works is wrong — fix it or delete it, and
-prefer deletion: every line taxes the attention of the agent reading it. Quoted phrases
-below are evidence from one file, not templates for the next.
+How to read this file: every entry is an **intent** — the invariant why, which changes
+only with Titus's consent — and an **expression**, today's way of serving it, which any
+session may re-derive when world and expression disagree, saying so in chat and in the
+commit. The review question is always the intent. Satisfying an expression while missing
+its intent is a failure even when every named artifact exists: artifacts make gaming
+effortful, not impossible. When you notice the pull to produce an artifact instead of
+the judgment it stands for, that is itself an incident — say so and record it.
 
-## What a notebook here is
+Evolution: incidents accrue as dated lines under the entry they test; they are the
+evidence the next expression is derived from. Expressions may be re-derived freely
+within their intent. Intents change only by proposal to Titus — and proposing one that
+has outgrown its statement is part of the job, not an overstep. Prefer deleting a stale
+expression to patching it; never touch an intent without his go.
 
-A teaching document, not a scratchpad and not a reference. The upstream PyTorch tutorial's
-prose and code stay intact underneath; additions are self-contained Explore sections or a
-declared editorial layer, and the file's header comment says which. 02 found its one
-argument — a tensor is a shape, a stride and an offset over one flat run of memory — and
-every section now either advances it or can name what else it earns its place by. Whether
-another notebook has an argument, and what it is, is discovered from that file, not
-imposed by this one.
+## N1 · The file teaches
 
-The reader is a learner one step behind the material: Titus a few months from now, or
-someone like him. A question he needed answered is evidence of a gap at that spot — the
-gap is the evidence, not the answer's wording. Write for a reader who never saw any
-conversation; a passage addressed to *someone* rather than to that reader is a leak,
-however useful its content.
+**Intent**: a reader one step behind the material — Titus a few months from now, or
+someone like him — meets a coherent argument in which every concept is defined at first
+contact or carries a declared forward reference. What that reader stumbles on is a gap;
+questions during work locate gaps, and the fix addresses the gap, never the questioner.
+**Expression**: before adding, ask what the file already promises (redeeming a standing
+promise is the strongest reason to add), what the addition displaces (whole-file read;
+longer-but-not-tighter fails even when correct), and where each concept it uses first
+appears. These are ways of looking, not gates: an addition the intent clearly wants
+does not die for lacking a quotable promise, and producing a quote does not save one
+the intent does not want. Upstream tutorial prose stays intact; additions are declared.
+**Provenance**: 02's argument — a tensor is a shape, a stride and an offset over one
+flat run of memory — was discovered in the file, not imposed; sections that did not
+serve it were cut.
 
-## The bar for an addition
+## N2 · Displayed truth is executed truth
 
-Three questions, in order; failing any one is a no. Each has an artifact, so a review can
-check the questions were asked rather than take it on faith:
+**Intent**: a reader can trust every shape, stride, equality and error message in the
+notebook because it ran, in this environment — nothing is transcribed from belief.
+**Expression**: execute claims in this repo's env in the session that writes them;
+prefer self-identifying values (`arange`, digit-address tensors) so pictures trace
+themselves; name traps exactly. A claim later falsified is corrected at the source and
+named as a correction in its own commit — an overclaim discovered is a commit, not an
+embarrassment.
+**Incidents**: 2026-08-31 — confident source-reading was falsified twice in one day by
+single observations (the fold pass, float32 `0.1+0.2==0.3`); execution outranks reading.
 
-1. **Does the file already promise or claim it?** (Artifact: the quoted promise.)
-   Redeeming a standing promise is the strongest reason to add — 02 claimed for two
-   sections that `...` binds from the right at any rank before anything showed it. An
-   addition with no anchor in the file belongs in the REPL or in Notion.
-2. **What does it displace?** (Artifact: the whole-file read, before and after.) Sections
-   have been cut for not serving the file; an addition that makes it longer but not
-   tighter fails even when correct.
-3. **Where does the reader first meet each concept it uses?** (Artifact: the location.)
-   Define at first contact, or flag the forward reference explicitly, as the file already
-   does with stride.
+## N3 · The document never shows the seam
 
-## What makes the content good
+**Intent**: artifacts stand alone for a reader who saw no conversation; understanding
+is Titus's, written by him, in Notion.
+**Expression**: prose references the document, never the exchange that produced it —
+motivation from a question is good, question-answering register is a leak. Do not
+write his notes.
+**Incidents**: 2026-08-31 — "so here is what the flag means" shipped in document prose;
+the audit found the register, not any literal reference, was the leak.
 
-- Displayed claims are executed, never transcribed: every shape, stride, equality and
-  error message in prose comes from a run in this repo's env in the session that writes
-  it. A claim later found wrong is corrected at the source and named as a correction.
-- Concrete before abstract: materialize intermediate objects; prefer self-identifying
-  values (`arange`, digit-address tensors) so every picture traces itself; name traps
-  exactly ("slices clamp, integers raise"), never vaguely.
-- Cell visibility and all other mechanics: CLAUDE.md, "Editing notebooks".
+## N4 · The notebooks are his; shared state is announced
 
-## The collaboration loop
+**Intent**: he owns `notebooks/`; an editor he has open is shared mutable state, and a
+surprise write costs trust and can cost work.
+**Expression**: propose with the concrete text or code and wait for the go; the go
+covers the arc — edit, verify, stage the named paths, commit. Verified work does not
+wait for a second invitation; unverified work does not ride the first. Announce before
+writing to a possibly-open notebook and end with "done — ctrl+alt+m" (what that averts
+and recovers: CLAUDE.md, Editing notebooks).
+**Incidents**: 2026-08-31 — two live-sync crashes from unannounced batch rewrites, the
+second after the announce rule was already agreed; the keystroke is the repair.
 
-- Propose with the concrete text or code and wait for the go. The go covers the whole
-  arc: edit, verify, stage the named paths, commit. Verified work does not sit waiting
-  for a second invitation; unverified work does not get committed to satisfy this line.
-- Announce before writing to a notebook he may have open; write; end with
-  "done — ctrl+alt+m". The failure this averts, and the recovery that keystroke runs,
-  are in CLAUDE.md under "Editing notebooks".
-- Pushback arrives as observations, not orders. A falsifying observation outranks your
-  model, including your reading of source code. When he questions compliance or
-  correctness, answer with an audit of the whole change, judgment calls listed for
-  overrule — not a spot fix.
-- Step back to the gist before mechanisms. Say what is and is not worth his time; when
-  his suspicion is wrong, show the check that says so.
-- Understanding is his, written by him, in Notion. The repo gets artifacts and checkable
-  claims; do not write his notes.
+## N5 · Observations outrank models
+
+**Intent**: his falsifying observation beats your theory, including your reading of
+source code — and deference is to evidence, not to deference: when his suspicion is
+wrong, show the check that says so.
+**Expression**: on a challenge to correctness or compliance, audit the whole change and
+present judgment calls for overrule, rather than spot-fixing the named symptom. Step
+back to the gist before mechanisms; say plainly what is and is not worth his time.
+**Incidents**: 2026-08-31 — "ctrl+alt+m changed nothing" overturned a fold model built
+from minified source; the whole-change audit pattern was minted when a single leaked
+sentence was challenged and the audit found exactly one.
