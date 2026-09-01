@@ -522,43 +522,52 @@ def _(DataLoader, datasets, mo, time_it, torch, v2):
     }
 
     def _timed(transform, num_workers, batches=100):
+        """Time the first batch (worker spawn) apart from the steady batches after it."""
         _ds = datasets.FashionMNIST(root="data", train=True, transform=transform)
         _batches = iter(DataLoader(_ds, batch_size=64, num_workers=num_workers))
         _start = time.perf_counter()
-        for _ in range(batches):
+        next(_batches)
+        _first = time.perf_counter() - _start
+        _start = time.perf_counter()
+        for _ in range(batches - 1):
             next(_batches)
-        return time.perf_counter() - _start
+        return _first, time.perf_counter() - _start
 
-    _boot = _timed(_pipelines["float32 only"], num_workers=4, batches=1)
-    _rows = [mo.stat(f"{_boot:.2f} s", label="first parallel loader (forkserver boot), paid once", bordered=True)]
+    _rows = []
     for _name, _transform in _pipelines.items():
-        _serial = _timed(_transform, num_workers=0)
-        _parallel = _timed(_transform, num_workers=4)
+        _, _serial = _timed(_transform, num_workers=0)
+        _spawn, _steady = _timed(_transform, num_workers=4)
         _rows.append(
             mo.hstack(
                 [
                     mo.stat(f"{_serial:.2f} s", label=f"{_name} — workers=0", bordered=True),
-                    mo.stat(f"{_parallel:.2f} s", label=f"{_name} — workers=4", bordered=True),
-                    mo.stat(f"{_serial / _parallel:.1f}×", label="speedup", bordered=True),
+                    mo.stat(f"{_spawn:.2f} s", label="workers=4 — first batch (spawn)", bordered=True),
+                    mo.stat(f"{_steady:.2f} s", label="workers=4 — the 99 after", bordered=True),
+                    mo.stat(f"{_serial / _steady:.1f}×", label="steady speedup", bordered=True),
                 ],
                 justify="start",
                 gap=1,
             )
         )
-    mo.vstack([mo.md("100 batches of 64 each, measured just now:"), *_rows], gap=1)
+    mo.vstack([mo.md("100 batches of 64 each, measured just now — the first batch shown apart:"), *_rows], gap=1)
     return
 
 
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
-    Two traps, met here rather than in the wild. The startup stat exists because Python 3.14
-    boots workers through a *forkserver* by default — under the old Linux default, `fork`,
-    `num_workers` felt free, which is why older tutorials never mention a cost. And everything a
-    worker touches — the dataset object and its transforms — travels to it by pickle: `Squares`
-    above, a class defined in a notebook cell, dies with `module '__mp_main__' has no attribute
-    'Squares'` the moment it meets `num_workers > 0`, while the importable `FashionMNIST` travels
-    fine.
+    Two traps, met here rather than in the wild. The spawn column is not a one-time cost: every
+    fresh multi-worker loader spawns its workers again, and a training loop builds a fresh
+    iterator every epoch — `persistent_workers=True` exists to amortize exactly that. What each
+    spawn costs depends on what the workers must import. Python 3.14 boots them through a
+    *forkserver* that preloads only the program's main module: a plain script whose top line is
+    `import torch` pays ~1.3 s once and ~0.04 s per loader after, while this notebook's kernel —
+    whose main module does not import torch — pays the full second on every spawn (both
+    measured in this repository). Under the old Linux default, `fork`, none of this was visible,
+    which is why older tutorials never mention it. And everything a worker touches — the dataset
+    object and its transforms — travels to it by pickle: `Squares` above, a class defined in a
+    notebook cell, dies with `module '__mp_main__' has no attribute 'Squares'` the moment it
+    meets `num_workers > 0`, while the importable `FashionMNIST` travels fine.
     """)
     return
 
