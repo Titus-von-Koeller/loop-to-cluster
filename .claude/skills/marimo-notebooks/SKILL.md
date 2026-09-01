@@ -5,6 +5,17 @@ description: Judgment for working on the marimo notebooks under notebooks/ — s
 
 # Working on the marimo notebooks
 
+## What this is for
+
+Two motions, and only these. **Polish**: a found notebook — an upstream tutorial worth
+keeping — becomes a coherent teaching document, by the standards below. **The loop**:
+Titus reads and asks; the session explains, in conversation; what the exchange reveals
+as a gap is folded back into the notebook where its narrative needs it, and the file
+stays one coherent argument in the session's care. The conversation is the instrument
+that finds gaps; the notebook is the surface where explanations land and persist.
+Machinery that would stand in for the conversation — logged predictions, telemetry,
+autonomous checking — is out of scope unless Titus asks for it.
+
 How to read this file: every entry is an **intent** — the invariant why, which changes
 only with Titus's consent — and an **expression**, today's way of serving it, which any
 session may re-derive when world and expression disagree, saying so in chat and in the
@@ -90,3 +101,8 @@ sentence was challenged and the audit found exactly one.
 2026-09-01, via a sibling session's handoff — "just remove it": the removal was his
 call, its boundary silently the agent's; and a 33-vs-1 commit ratio narrated as
 misallocation was in fact his deliberate investment in learning agentic engineering.
+2026-09-01 — a "make a breakthrough" round produced calibration machinery for an
+imagined anonymous reader; his one-paragraph correction named the actual system — a
+two-agent loop where conversation finds the gaps — and outranked two research agents
+and a finished proposal. Depth prompts set a floor; when the honest finding is modest,
+machinery fills the gap unless caught.

@@ -18,11 +18,15 @@ applied to the author.
 
 ## Commit the model before the truth runs
 
+In this repo the committed model surfaces in conversation — a question asked, a guess
+ventured, an "I still don't understand." That channel is the collaboration itself and
+needs no instrument; the techniques here are for the surface where corrections land.
+
 - **Predict, then reveal.** Ask for the guess before showing — "what's the best way to
   spread out your recalls?" precedes the answer (Case, remember/); "predict the shape and
-  the frozen digit before running; the mismatch is the lesson" (this repo, so far only in
-  conversation). A reveal without a committed guess is a display, and displays get nodded
-  at.
+  the frozen digit before running; the mismatch is the lesson" (this repo). In prose, as
+  a nudge before the exhibit — a reveal without any committed guess is a display, and
+  displays get nodded at.
 - **The reader causes the phenomenon.** In Polygons the reader drags shapes under a mild
   rule and personally produces segregation; the surprise is the gap between what they
   predicted and what they caused. Strongest form of ownership; costs the most to build.
@@ -84,8 +88,10 @@ when a reader is lost at the abstract rung, hand them back a single concrete ins
 - **The argument is the filter** (this repo): every toy serves the file's one claim, or
   it goes. "Interactive pictures" scattered on prose is the diluted form Victor disowned.
 
-## The open frontier (not yet expressed in any notebook here)
+## Withdrawn: the calibration loop
 
-Prediction checkpoints that log the reader's guess against the executed truth, making a
-calibration record of understanding — the reader's own estimate-vs-actual corpus, and the
-notebook's incident stream for evolution. Proposed, not yet consented or built.
+A proposed instrument — prediction widgets logging guess-vs-truth into a calibration
+corpus — was declined as off-center: it optimized for an imagined anonymous reader, where
+the actual system is a two-agent loop in which conversation finds the gaps and the
+notebook is where explanations persist. Kept as the genre temptation it is: when a round
+of learning-experience thinking starts producing machinery, ask whose reader it serves.
