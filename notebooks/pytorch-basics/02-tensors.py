@@ -78,77 +78,13 @@ def _():
 
 
 @app.cell(hide_code=True)
-def _(mo, torch):
-    # One way of looking at a tensor, used by every cell in this notebook. altair and
-    # pandas arrive here rather than with numpy and torch, because they serve the drawing
-    # and nothing else.
-    #
-    # Magnitude is carried by lightness and only by lightness, so the picture survives being
-    # read by someone who cannot separate red from green, and survives being printed gray.
-    # Hue carries sign and nothing else. There are no axes and no chart title: the numbers
-    # are in the squares and the caption says what the object is.
+def _():
+    # The viewing vocabulary is shared with the sibling notebooks: one module, evolved in
+    # place, never forked into a file. What show() draws, and the color policy every
+    # notebook inherits, live in _viz.py.
     import altair as alt
     import pandas as pd
-
-    RAMP = ["#dbe7f7", "#a8c6ec", "#6b9ede", "#2a78d6", "#17457c"]
-    POLARITY = ["#8f3413", "#d95926", "#eaa886", "#e8e8e6", "#93bae9", "#2a78d6", "#173f6e"]
-
-    def show(tensor, title=None, cell=54, facts=True):
-        """Render a small tensor as its own numbers, colored by magnitude."""
-        values = torch.as_tensor(tensor).detach().cpu()
-        grid = values.reshape(1, 1) if values.dim() == 0 else values if values.dim() == 2 else values.reshape(1, -1)
-        numbers = [[float(v) for v in row] for row in grid.tolist()]
-        signed = min(min(row) for row in numbers) < 0
-        limit = max((max(abs(v) for v in row) for row in numbers), default=1.0) or 1.0
-        digits = ".0f" if not values.dtype.is_floating_point else ".2f"
-
-        frame = pd.DataFrame(
-            [{"col": j, "row": i, "v": v} for i, row in enumerate(numbers) for j, v in enumerate(row)]
-        )
-        # The gap between squares is left transparent, so it takes the color of whatever
-        # theme the notebook is being read in rather than a white I chose.
-        at = {
-            "x": alt.X("col:O", axis=None, scale=alt.Scale(paddingInner=0.06)),
-            "y": alt.Y("row:O", axis=None, scale=alt.Scale(paddingInner=0.06)),
-        }
-        # Ink on a square is chosen against that square's fill, which is known here, rather
-        # than against the page, which is not. The crossovers are measured, not guessed: white
-        # only overtakes near-black at 0.73 of the sequential ramp, and at 0.71 of the
-        # diverging one, taking the later of its two arms so neither switches early.
-        on_dark = f"abs(datum.v) > {0.71 * limit}" if signed else f"datum.v > {0.73 * limit}"
-        picture = (
-            alt.Chart(frame)
-            .mark_rect()
-            .encode(
-                **at,
-                color=alt.Color(
-                    "v:Q",
-                    scale=alt.Scale(range=POLARITY, domain=[-limit, limit])
-                    if signed
-                    else alt.Scale(range=RAMP, domain=[0, limit]),
-                    legend=None,
-                ),
-                tooltip=[alt.Tooltip("v:Q", format=".4f", title="value"), "row:O", "col:O"],
-            )
-            + alt.Chart(frame)
-            .mark_text(fontSize=13, fontWeight=500)
-            .encode(
-                **at,
-                text=alt.Text("v:Q", format=digits),
-                color=alt.condition(on_dark, alt.value("#ffffff"), alt.value("#15181d")),
-            )
-        ).properties(width=cell * len(numbers[0]), height=cell * len(numbers))
-
-        caption = (
-            f"`{tuple(values.shape)}` · `{str(values.dtype).removeprefix('torch.')}` · "
-            f"stride `{values.stride()}`" + ("" if values.is_contiguous() else " · **not contiguous**")
-        )
-        parts = (
-            ([mo.md(f"**{title}**")] if title else [])
-            + [picture]
-            + ([mo.md(f"<small>{caption}</small>")] if facts else [])
-        )
-        return mo.vstack(parts, align="center", gap=0.2)
+    from _viz import show
 
     return alt, pd, show
 
