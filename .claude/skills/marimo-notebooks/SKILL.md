@@ -1,131 +1,118 @@
 ---
 name: marimo-notebooks
-description: Judgment for working on the marimo notebooks under notebooks/ — stated as owner-held intents with current, disposable expressions, evolving by incident and consent. Use when creating, reviewing, or editing notebook content. Mechanics (file format, folding, sync hazards, checks) live in CLAUDE.md under "Editing notebooks".
+description: Judgment for working on the marimo notebooks under notebooks/ — owner-held intents with current, disposable expressions. Use when creating, reviewing, or editing notebook content. Mechanics (file format, folding, sync hazards, checks) live in CLAUDE.md under "Editing notebooks"; teaching and design technique lives in pedagogy.md beside this file.
 ---
 
 # Working on the marimo notebooks
 
 ## What this is for
 
-A notebook's life here has two phases, in order. **First, polish**: he aims a session
-at a found notebook — an upstream tutorial worth keeping — and it becomes a coherent
-teaching document, by the standards below, in as many passes as that takes, each pass
+A notebook's life here has two phases, per notebook and in order. **First, polish**:
+Titus aims a session at a found notebook — a tutorial worth keeping — and it becomes a
+maximally clear teaching document in as many autonomous passes as that takes, each pass
 checked on the rendered surface a reader actually sees (N6). **Then, the loop**: he
 studies the polished notebook and asks; the session explains, in conversation; what the
-exchange reveals as a gap is folded back into the notebook where its narrative needs
-it, and the file stays one coherent argument in the session's care for as long as he
-learns from it. The conversation is the instrument that finds gaps; the notebook is the
-surface where explanations land and persist. Machinery that would stand in for the
-conversation — logged predictions, telemetry, autonomous checking — is out of scope
-unless Titus asks for it.
+exchange reveals as a gap is folded back into the notebook where its narrative needs it.
+The conversation is the instrument that finds gaps; the notebook is the surface where
+explanations land and persist. One notebook can be in the loop while agents polish
+others.
+
+The reader is Titus, learning the topic for the first time, then refining the file
+together once he is reading it. Usefulness to anyone else is welcome and strictly
+secondary; no decision favors a hypothetical other reader over him.
 
 How to read this file: every entry is an **intent** — the invariant why, which changes
 only with Titus's consent — and an **expression**, today's way of serving it, which any
 session may re-derive when world and expression disagree, saying so in chat and in the
-commit. The review question is always the intent. Satisfying an expression while missing
-its intent is a failure even when every named artifact exists: artifacts make gaming
-effortful, not impossible. When you notice the pull to produce an artifact instead of
-the judgment it stands for, that is itself an incident — say so and record it.
+commit. The review question is always the intent; satisfying an expression while missing
+its intent is a failure even when every named artifact exists. Noticing the pull to
+produce an artifact instead of the judgment it stands for is evidence the expression
+needs re-deriving — say so.
 
-The technique shelf — hypotheses about what makes these notebooks teach, with provenance
-from this repo's practice, marimo-team/learn, and the explorable-explanations canon —
-is `pedagogy.md` beside this file; it evolves under the same rules.
+Constraint is a cost, and this file stays minimal on purpose: state ends rather than
+prescribe behavior, delete an entry that stops earning its place, and treat any urge to
+add a rule as a claim that must beat the alternative of trusting judgment. The file is a
+floor, not a ceiling: where you genuinely know a better move, make the disagreement
+visible — name the entry, do better at expression level, propose at intent level. When
+the work reveals something Titus would want to know that he did not ask about, say it:
+teaching unasked is in scope; silence is not.
 
-Evolution: incidents accrue as dated lines under the entry they test; they are the
-evidence the next expression is derived from. Expressions may be re-derived freely
-within their intent. Intents change only by proposal to Titus — and proposing one that
-has outgrown its statement is part of the job, not an overstep. Prefer deleting a stale
-expression to patching it; never touch an intent without his go.
-
-This file is a floor, not a ceiling. Where you genuinely know a better move, make the
-disagreement visible — name the entry it contradicts, do better at expression level,
-propose at intent level. And when the work reveals something Titus would want to know
-that he did not ask about, say it: teaching unasked is in scope; silence is not.
+Lessons live here as timeless statements; git history carries when and why each arrived.
 
 ## N1 · The file teaches
 
-**Intent**: a reader one step behind the material — Titus a few months from now, or
-someone like him — meets a coherent argument in which every concept is defined at first
-contact or carries a declared forward reference. What that reader stumbles on is a gap;
-questions during work locate gaps, and the fix addresses the gap, never the questioner.
-**Expression**: before adding, ask what the file already promises (redeeming a standing
-promise is the strongest reason to add), what the addition displaces (whole-file read;
-longer-but-not-tighter fails even when correct), and where each concept it uses first
-appears. These are ways of looking, not gates: an addition the intent clearly wants
-does not die for lacking a quotable promise, and producing a quote does not save one
-the intent does not want. Upstream tutorial prose stays intact; additions are declared.
-**Provenance**: 02's argument — a tensor is a shape, a stride and an offset over one
-flat run of memory — was discovered in the file, not imposed; sections that did not
-serve it were cut.
+**Intent**: the reader meets a coherent narrative in which every concept is defined at
+first contact or carries a declared forward reference. What the reader stumbles on is a
+gap; questions during the loop locate gaps, and the fix addresses the gap, never the
+questioner.
+**Expression**: the found tutorial's intent — what it set out to make someone
+understand — is the guidance for what the notebook communicates; its narrative, prose,
+presentation and clarity are ours to surpass. `git diff 891febb -- <notebook>` holds
+the inherited text whenever the original is worth consulting. Interactive devices,
+found or invented, are welcome plot devices wherever they serve that intent. Before
+adding, ask what the addition displaces (whole-file read; longer-but-not-tighter fails
+even when correct) and where each concept it uses first appears.
 
 ## N2 · Displayed truth is executed truth
 
-**Intent**: a reader can trust every shape, stride, equality and error message in the
+**Intent**: the reader can trust every shape, stride, equality and error message in the
 notebook because it ran, in this environment — nothing is transcribed from belief.
 **Expression**: execute claims in this repo's env in the session that writes them;
-prefer self-identifying values (`arange`, digit-address tensors) so pictures trace
-themselves; name traps exactly. A claim later falsified is corrected at the source and
-named as a correction in its own commit — an overclaim discovered is a commit, not an
-embarrassment.
-**Incidents**: 2026-08-31 — confident source-reading was falsified twice in one day by
-single observations (the fold pass, float32 `0.1+0.2==0.3`); execution outranks reading.
+prefer self-identifying values so pictures trace themselves; name traps exactly. A
+claim later falsified is corrected at the source and named as a correction in its own
+commit — an overclaim discovered is a commit, not an embarrassment.
 
-## N3 · The document never shows the seam
+## N3 · Self-contained documents
 
-**Intent**: artifacts stand alone for a reader who saw no conversation; understanding
-is Titus's, written by him, in Notion.
-**Expression**: prose references the document, never the exchange that produced it —
-motivation from a question is good, question-answering register is a leak. Do not
-write his notes.
-**Incidents**: 2026-08-31 — "so here is what the flag means" shipped in document prose;
-the audit found the register, not any literal reference, was the leak.
+**Intent**: notebooks and these skill files stand alone for a reader who saw no
+conversation; understanding is Titus's, written by him, in Notion.
+**Expression**: prose references documents, files, commits and factual reasons — never
+any exchange that produced them: no quoted dialogue, no narrated back-and-forth. In
+notebooks, question-answering register is a leak even without a literal reference.
+Commit messages describe the change and its factual reason; a hook bypass forced by
+uncommitted work of his is noted as "unrelated WIP by Titus in the tree," nothing more
+specific. Do not write his notes.
 
-## N4 · The notebooks are his; shared state is announced
+## N4 · Ours to teach with, his to steer
 
-**Intent**: he owns `notebooks/`; an editor he has open is shared mutable state, and a
-surprise write costs trust and can cost work.
-**Expression**: propose with the concrete text or code and wait for the go; the go
-covers the arc — edit, verify, stage the named paths, commit. Verified work does not
-wait for a second invitation; unverified work does not ride the first. Announce before
-writing to a possibly-open notebook and end with "done — ctrl+alt+m" (what that averts
-and recovers: CLAUDE.md, Editing notebooks).
-**Incidents**: 2026-08-31 — two live-sync crashes from unannounced batch rewrites, the
-second after the announce rule was already agreed; the keystroke is the repair.
+**Intent**: the notebooks are shared work; the editing rhythm follows the phase, and an
+editor he has open is shared mutable state where a surprise write can cost work.
+**Expression**: during initial polish, edit autonomously — the aim is the go, and it
+covers the whole arc: edit, verify, stage the named paths, commit. Once a notebook is
+in the loop, edit only around a prompt: his, or a proposal he approves. Verified work
+does not wait for a second invitation; unverified work does not ride the first.
+Announce before writing to a possibly-open notebook and end with "done — ctrl+alt+m"
+(mechanics: CLAUDE.md, Editing notebooks).
 
 ## N5 · Observations outrank models
 
 **Intent**: his falsifying observation beats your theory, including your reading of
-source code — and deference is to evidence, not to deference: when his suspicion is
-wrong, show the check that says so.
-**Expression**: on a challenge to correctness or compliance, audit the whole change and
+source code — and deference is to evidence: when his suspicion is wrong, show the check
+that says so.
+**Expression**: execution outranks source-reading, and a single live observation
+outranks both. On a challenge to correctness or compliance, audit the whole change and
 present judgment calls for overrule, rather than spot-fixing the named symptom. Step
 back to the gist before mechanisms; say plainly what is and is not worth his time. Your
 reading of his instruction is also a model — a hypothesis only he can test: when the
 reading decides how far a deletion or change reaches, ask first; report a measurement
 you cannot explain as the number and the question, never the number and a story.
-**Incidents**: 2026-08-31 — "ctrl+alt+m changed nothing" overturned a fold model built
-from minified source; the whole-change audit pattern was minted when a single leaked
-sentence was challenged and the audit found exactly one.
-2026-09-01, via a sibling session's handoff — "just remove it": the removal was his
-call, its boundary silently the agent's; and a 33-vs-1 commit ratio narrated as
-misallocation was in fact his deliberate investment in learning agentic engineering.
-2026-09-01 — a "make a breakthrough" round produced calibration machinery for an
-imagined anonymous reader; his one-paragraph correction named the actual system — a
-two-agent loop where conversation finds the gaps — and outranked two research agents
-and a finished proposal. Depth prompts set a floor; when the honest finding is modest,
-machinery fills the gap unless caught.
+
+A depth prompt — "make a breakthrough" — is a real bar, not a style request: work at it
+until the effort itself is considerable, and if the bar is not cleared, present what
+was tried and why the attempt was rigorous. Filling the gap between finding and bar
+with machinery or narrative is the one dishonor; the easy path is taken only when it is
+the strongest move for the stated intent, said in so many words.
 
 ## N6 · The polish pass converges, and is seen
 
-**Intent**: a notebook he aims a session at gets better in passes until another pass
-would not tighten it — and "better" is judged on the rendered surface a reader actually
-sees, never on green checks alone.
-**Expression**: the go on "polish this" covers the whole arc — repeated passes, each
-reading the file whole, editing, verifying (gate, headless run), then *looking*: the
-vscode-keyhole skill screenshots the real UI and reads live notebook state, and when
-live rendering is needed, ask Titus to open the notebook. Each pass states what it
-changed and what it learned; a learning that generalizes moves to pedagogy.md, so the
-shelf compounds. Stop when a pass yields only preference-grade changes — report then,
-rather than polishing the polish.
-**Provenance**: granted 2026-09-01 — "improve the existing notebooks I aim you at in
-multiple passes, checking your work with the peekhole … iteratively."
+**Intent**: an aimed notebook gets better in passes until another pass would not
+tighten it — and "better" is judged on the rendered surface the reader actually sees,
+never on green checks alone.
+**Expression**: each pass reads the file whole, edits, verifies (gate, headless run),
+then looks — structured reads for facts, screenshots for layout and aesthetics — via
+the vscode-keyhole skill against his real editor, under a standing license to watch
+over his shoulder at any time; use a headless render when his editor is closed, and ask
+him to open the notebook when the native surface is needed. Each pass states what it
+changed and what it learned; a learning that generalizes moves to pedagogy.md. Stop
+when a pass yields only preference-grade changes — report then, rather than polishing
+the polish.
