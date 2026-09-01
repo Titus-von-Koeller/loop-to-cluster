@@ -97,8 +97,8 @@ without running anything. The content check is executing the file itself —
 means every cell ran, and a failing cell exits nonzero (both directions measured).
 
 **The upstream baseline is commit `891febb`** — the eight tutorials exactly as converted.
-`git diff 891febb -- <notebook>` separates additions from modifications of tutorial prose;
-a substring check misses an appended sentence, the diff does not.
+`git diff 891febb -- <notebook>` shows everything ours against everything inherited; the
+original's text is provenance to consult, not a boundary to respect.
 
 ## Claims
 
