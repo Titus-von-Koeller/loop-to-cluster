@@ -53,19 +53,19 @@ def _(mo):
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
-    Code for processing data samples can get messy and hard to maintain; we ideally want our
-    dataset code to be decoupled from our model training code for better readability and
-    modularity. PyTorch provides two data primitives: `torch.utils.data.DataLoader` and
-    `torch.utils.data.Dataset` that allow you to use pre-loaded datasets as well as your own data.
-    `Dataset` stores the samples and their corresponding labels, and `DataLoader` wraps an iterable
-    around the `Dataset` to enable easy access to the samples.
+    In the quickstart, the training loop never touched a file: data arrived as ready-made
+    `(64, 1, 28, 28)` batches, one `for` iteration at a time. On disk, FashionMNIST is 60,000
+    individual samples. This notebook is about the two pieces PyTorch puts between those facts —
+    and keeps deliberately separate from the model and its training loop, so that dataset code
+    stays swappable without touching the loop:
 
-    PyTorch domain libraries provide a number of pre-loaded datasets (such as FashionMNIST) that
-    subclass `torch.utils.data.Dataset` and implement functions specific to the particular data.
-    They can be used to prototype and benchmark your model. You can find them here: [Image
-    Datasets](https://pytorch.org/vision/stable/datasets.html), [Text
-    Datasets](https://pytorch.org/text/stable/datasets.html), and [Audio
-    Datasets](https://pytorch.org/audio/stable/datasets.html)
+    - `torch.utils.data.Dataset` stores the samples and their labels, and answers one question:
+      *give me sample `i`*.
+    - `torch.utils.data.DataLoader` wraps any `Dataset` and turns single samples into shuffled,
+      batched, optionally parallel-loaded minibatches.
+
+    TorchVision ships many ready-made `Dataset` subclasses to prototype and benchmark against;
+    FashionMNIST below is one of its [image datasets](https://pytorch.org/vision/stable/datasets.html).
     """)
     return
 
@@ -256,85 +256,33 @@ def _(Dataset):
                 _label = self.target_transform(_label)
             return (image, _label)
 
-    return decode_image, os, pd
+    return
 
 
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
-    # `__init__`
+    ### What each of the three methods does
 
-    The \_\_init\_\_ function is run once when instantiating the Dataset object. We initialize the
-    directory containing the images, the annotations file, and both transforms (covered in more
-    detail in the next section).
-
-    The labels.csv file looks like: :
+    `__init__` runs once, when the dataset is constructed. Here it reads the annotations file
+    into a DataFrame and stores the image directory and both transforms — no image is loaded
+    yet. The labels.csv file looks like:
 
         tshirt1.jpg, 0
         tshirt2.jpg, 0
         ......
         ankleboot999.jpg, 9
+
+    `__len__` returns the number of samples — here, the number of CSV rows. Everything that
+    needs the dataset's size, from `len(dataset)` to the sampler deciding how many indices an
+    epoch has, asks this.
+
+    `__getitem__(idx)` does the real per-sample work: find the image's location on disk, decode
+    the file to a tensor with `decode_image`, look up the label in the CSV data, apply both
+    transforms if given, and return the `(image, label)` tuple. All the cost of data loading
+    lives in this call — a fact the DataLoader section below comes back to when it puts worker
+    processes behind exactly this method.
     """)
-    return
-
-
-@app.cell
-def _(pd):
-    def __init__(self, annotations_file, img_dir, transform=None, target_transform=None):
-        self.img_labels = pd.read_csv(annotations_file)
-        self.img_dir = img_dir
-        self.transform = transform
-        self.target_transform = target_transform
-
-    return
-
-
-@app.cell(hide_code=True)
-def _(mo):
-    mo.md(r"""
-    # `__len__`
-
-    The \_\_len\_\_ function returns the number of samples in our dataset.
-
-    Example:
-    """)
-    return
-
-
-@app.cell
-def _():
-    def __len__(self):
-        return len(self.img_labels)
-
-    return
-
-
-@app.cell(hide_code=True)
-def _(mo):
-    mo.md(r"""
-    # `__getitem__`
-
-    The \_\_getitem\_\_ function loads and returns a sample from the dataset at the given index
-    `idx`. Based on the index, it identifies the image's location on disk, converts that to a
-    tensor using `decode_image`, retrieves the corresponding label from the csv data in
-    `self.img_labels`, calls the transform functions on them (if applicable), and returns the
-    tensor image and corresponding label in a tuple.
-    """)
-    return
-
-
-@app.cell
-def _(decode_image, os):
-    def __getitem__(self, idx):
-        img_path = os.path.join(self.img_dir, self.img_labels.iloc[idx, 0])
-        image = decode_image(img_path)
-        _label = self.img_labels.iloc[idx, 1]
-        if self.transform:
-            image = self.transform(image)
-        if self.target_transform:
-            _label = self.target_transform(_label)
-        return (image, _label)
-
     return
 
 
