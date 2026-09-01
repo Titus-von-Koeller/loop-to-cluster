@@ -13,6 +13,10 @@ its intent is a failure even when every named artifact exists: artifacts make ga
 effortful, not impossible. When you notice the pull to produce an artifact instead of
 the judgment it stands for, that is itself an incident — say so and record it.
 
+The technique shelf — hypotheses about what makes these notebooks teach, with provenance
+from this repo's practice, marimo-team/learn, and the explorable-explanations canon —
+is `pedagogy.md` beside this file; it evolves under the same rules.
+
 Evolution: incidents accrue as dated lines under the entry they test; they are the
 evidence the next expression is derived from. Expressions may be re-derived freely
 within their intent. Intents change only by proposal to Titus — and proposing one that
