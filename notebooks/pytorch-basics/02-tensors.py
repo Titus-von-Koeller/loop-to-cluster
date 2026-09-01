@@ -458,8 +458,9 @@ def _(mo):
     ### The first consequence: the column that is not a column
 
     `tensor_2[:, 0]` reads aloud as "every row, column zero", so it feels like it should
-    give you a column standing upright. It does not, however, and the below table of entries shows why: the
-    integer `0`, means select one entry of that dimension, and thereby made dimension 1 disappear. What comes back has shape `(4,)` — four numbers
+    give you a column standing upright. It does not, however, and the below table of
+    entries shows why: the integer `0`, means select one entry of that dimension, and
+    thereby made dimension 1 disappear. What comes back has shape `(4,)` — four numbers
     in *one* dimension.
 
     A one-dimensional tensor has no orientation. Neither upright nor flat; these words only
