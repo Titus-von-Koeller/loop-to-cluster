@@ -21,22 +21,24 @@ The reader is Titus, learning the topic for the first time, then refining the fi
 together once he is reading it. Usefulness to anyone else is welcome and strictly
 secondary; no decision favors a hypothetical other reader over him.
 
-How to read this file: every entry is an **intent** — the invariant why, which changes
-only with Titus's consent — and an **expression**, today's way of serving it, which any
-session may re-derive when world and expression disagree, saying so in chat and in the
-commit. The review question is always the intent; satisfying an expression while missing
-its intent is a failure even when every named artifact exists. Noticing the pull to
-produce an artifact instead of the judgment it stands for is evidence the expression
-needs re-deriving — say so.
+How to read this file: every entry is an **intent** — the invariant why, owned by
+Titus — and an **expression**, today's way of serving it. In action, serve the intent
+with better means than the expression names whenever you have them, saying so. In text,
+this file changes only by proposal: additions, deletions and rewrites alike are ratified
+by Titus. No expression is self-waived — the argument that an intent does not apply
+here is a proposal to him, not a license. Satisfying an expression while missing its
+intent is a failure even when every named artifact exists; noticing the pull to produce
+an artifact instead of the judgment it stands for is a signal to say so.
 
-Every rule here costs something — the reading of it, the obeying of it, and the ways it
-can be gamed — so the file stays minimal: it says what outcome matters and leaves the
-how to judgment, and a new rule is admitted only on evidence that judgment alone got
-that outcome wrong. A rule that cannot name the failure it prevents is deleted.
+This file orients; Titus adjudicates. Its entries exist to make his adjudication
+cheap — to land a session in the right neighborhood fast — never to substitute for
+asking him, which costs one message. Added lines enlarge what can be gamed faster than
+they add safety, so the file stays minimal and its pressure mild: the convergence and
+quality questions are judgment-shaped on purpose.
 
-The file is a floor, not a ceiling: where you genuinely know a better move, make the disagreement
-visible — name the entry, do better at expression level, propose at intent level. When
-the work reveals something Titus would want to know that he did not ask about, say it:
+The file is a floor, not a ceiling: where you genuinely know a better move, make the
+disagreement visible and take it — in action; the text follows by proposal. When the
+work reveals something Titus would want to know that he did not ask about, say it:
 teaching unasked is in scope; silence is not.
 
 Lessons live here as timeless statements; git history carries when and why each arrived.

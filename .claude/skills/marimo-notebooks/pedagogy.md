@@ -5,8 +5,8 @@ pace content so it teaches. The second is **technique**: visualization and inter
 moves with a track record of making concepts easier to explore and grasp, plus the
 design standards the rendered surface is held to. Entries are hypotheses with sources
 (this repo's notebooks; marimo-team/learn; the explorable-explanations canon — Victor,
-Case; the information-design canon); amend or delete an entry when reader outcomes
-contradict it.
+Case; the information-design canon); a reader outcome that contradicts one is grounds
+to propose its amendment or deletion to Titus.
 
 The organizing observation, common to every source: **the gap between the reader's
 committed model and the executed truth is what teaches.** Victor's reader critiques a
