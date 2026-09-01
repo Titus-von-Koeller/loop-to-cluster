@@ -420,8 +420,9 @@ def _(mo):
       ordered. On a dataset stored grouped by class, and many are, that is the difference
       between training and not.
     - **drop_last** decides what happens to the remainder. 60,000 images in batches of 64
-      leaves a final batch of 48. Keeping it means one batch has a different shape from
-      all the others; dropping it means throwing away those 48 images every epoch.
+      leaves a final batch of 32, since 60,000 = 937 × 64 + 32. Keeping it means one batch
+      has a different shape from all the others; dropping it means throwing away those 32
+      images every epoch.
 
     That last one stops being cosmetic once there is more than one GPU: ranks that
     disagree about how many batches exist will hang at the collective that ends the epoch,
