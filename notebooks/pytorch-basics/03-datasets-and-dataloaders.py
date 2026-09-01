@@ -25,11 +25,8 @@ def _():
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
-    [Learn the Basics](intro.html) \|\| [Quickstart](quickstart_tutorial.html) \|\|
-    [Tensors](tensorqs_tutorial.html) \|\| **Datasets & DataLoaders** \|\|
-    [Transforms](transforms_tutorial.html) \|\| [Build Model](buildmodel_tutorial.html) \|\|
-    [Autograd](autogradqs_tutorial.html) \|\| [Optimization](optimization_tutorial.html) \|\| [Save
-    & Load Model](saveloadrun_tutorial.html)
+    *PyTorch basics, 3 of 8 — before this: [Tensors](02-tensors.py) · after:
+    [Transforms](04-transforms.py)*
 
     # Datasets & DataLoaders
     """)
@@ -76,7 +73,7 @@ def _(mo):
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
-    # Loading a Dataset
+    ## Loading a dataset
 
     Here is an example of how to load the
     [Fashion-MNIST](https://research.zalando.com/project/fashion_mnist/fashion_mnist/) dataset from
@@ -86,10 +83,10 @@ def _(mo):
 
     We load the [FashionMNIST Dataset](https://pytorch.org/vision/stable/datasets.html#fashion-mnist)
     with the following parameters:
-    - `root` is the path where the train/test data is stored,
-    - `train` specifies training or test dataset,
-    - `download=True` downloads the data from the internet if it's not available at `root`.
-    - `transform` and `target_transform` specify the feature and label transformations
+    - `root` is the path where the train/test data is stored.
+    - `train` selects the training or the test split.
+    - `download=True` downloads the data from the internet if it is not available at `root`.
+    - `transform` and `target_transform` specify the feature and label transformations.
     """)
     return
 
@@ -121,7 +118,7 @@ def _():
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
-    # Iterating and Visualizing the Dataset
+    ## Iterating and visualizing the dataset
 
     We can index `Datasets` manually like a list: `training_data[index]`. We use `matplotlib` to
     visualize some samples in our training data.
@@ -159,7 +156,7 @@ def _(plt, torch, training_data):
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
-    ## The dataset as something you can page through
+    ### The dataset as something you can page through
 
     Nine random samples per re-run is enough to prove the dataset loads, and not enough to
     give you a feel for it. Pick classes and page through them instead. Sandal, Sneaker
@@ -219,11 +216,11 @@ def _(mo):
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
-    # Creating a Custom Dataset for your files
+    ## Creating a custom Dataset for your files
 
     A custom Dataset class must implement three functions:
-    <span class="title-ref">\_\_init\_\_</span>, <span class="title-ref">\_\_len\_\_</span>, and
-    <span class="title-ref">\_\_getitem\_\_</span>. Take a look at this implementation; the
+    `__init__`, `__len__`, and
+    `__getitem__`. Take a look at this implementation; the
     FashionMNIST images are stored in a directory `img_dir`, and their labels are stored separately
     in a CSV file `annotations_file`.
 
@@ -352,7 +349,7 @@ def _(mo):
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
-    # Preparing your data for training with DataLoaders
+    ## Preparing your data for training with DataLoaders
 
     The `Dataset` retrieves our dataset's features and labels one sample at a time. While training
     a model, we typically want to pass samples in "minibatches", reshuffle the data at every epoch
@@ -375,7 +372,7 @@ def _(test_data, training_data):
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
-    # Iterate through the DataLoader
+    ## Iterating through the DataLoader
 
     We have loaded that dataset into the `DataLoader` and can iterate through the dataset as
     needed. Each iteration below returns a batch of `train_features` and `train_labels` (containing
@@ -404,7 +401,7 @@ def _(plt, train_dataloader):
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
-    ## The three arguments that decide what a batch is
+    ### The three arguments that decide what a batch is
 
     `DataLoader(training_data, batch_size=64, shuffle=True)` hides three separate
     decisions. Change them and watch what arrives.
