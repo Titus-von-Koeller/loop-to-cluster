@@ -12,10 +12,6 @@
 #
 # The training cell added below is the one thing here expensive enough to want a guard,
 # and it has one: mo.stop on a run button, so autorun re-runs it only after a click.
-#
-# Cells under an "Explore" heading are additions; everything else is the upstream
-# tutorial as converted.
-
 import marimo
 
 __generated_with = "0.24.0"
@@ -132,7 +128,7 @@ def _():
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
-    ## Explore — the model this notebook is about to train
+    ## The model this notebook is about to train
 
     The prerequisite cell builds it silently. Returning it draws marimo's tree, which is
     worth one look here for the line the other notebooks do not have cause to point at:
@@ -349,7 +345,7 @@ def _(
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
-    ## Explore — the same loop, with the curve drawn as it runs
+    ## The same loop, with the curve drawn as it runs
 
     A hundred and twenty printed loss values are a time series rendered as text. The cell
     below runs the identical loop and draws it instead: training loss every twenty
@@ -526,7 +522,7 @@ def _(
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
-    ## Explore — what the three optimizers actually do, on a surface you can turn
+    ## What the three optimizers actually do, on a surface you can turn
 
     In 669,706 dimensions the difference between SGD and Adam is a number on a chart. In
     two, it is a shape. The surface below is a narrow valley — `0.05x² + y²`, twenty times

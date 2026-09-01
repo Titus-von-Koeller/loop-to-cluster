@@ -9,12 +9,6 @@
 # metadata is merged over the project config at the highest precedence, so a notebook
 # opts in on its own. `auto_instantiate` cannot be set here (marimo strips it from script
 # metadata), so opening this file still runs nothing.
-#
-# The upstream tutorial's prose and code are all still here. Additions take two forms:
-# sections under an "Explore" heading are the self-contained ones, and an editorial layer
-# runs through the rest — the framing cell at the top, the drawn tensors and their stride
-# captions, the images aside, the callout under the arithmetic, and the closing section.
-
 import marimo
 
 __generated_with = "0.24.0"
@@ -58,13 +52,7 @@ def _(mo):
     ---
 
     Every tensor here is drawn rather than printed, so that what changes is visible. Under
-    each picture is what the object *is*: its shape, its dtype, and its **stride** — the
-    last of which turns out to be the whole story.
-
-    The notebook builds toward one claim, and it is worth having in mind from the start: a
-    tensor is not its numbers. It is a shape, a stride and an offset over one flat run of
-    memory — and creating, indexing, joining, multiplying and sharing with NumPy are all
-    consequences of that.
+    each picture is what the object *is*: its shape, its dtype, and its **stride**.
     """)
     return
 
@@ -220,8 +208,8 @@ def _(mo):
     The right picture holds the same 4,096 slots, each storing its own position: `arange`
     counts them off, `reshape` folds the count into 64 rows. It comes out a top-to-bottom
     ramp because consecutive positions sit side by side within a row and each new row
-    starts 64 later — the first look at something this notebook keeps returning to: the
-    grid is one flat run of memory, laid into rows. Numbers that trace their own
+    starts 64 later — the first look at a fact worth holding on to: the grid is one flat
+    run of memory, laid into rows. Numbers that trace their own
     whereabouts also return, in the indexing explorer and again in the notation section.
     """)
     return
@@ -381,7 +369,7 @@ def _(mo):
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
-    ## Explore — the notation
+    ## The notation
 
     Indexing a tensor is four separate pieces of notation wearing one pair of brackets. The
     whole grammar is small, so here it is, and then the expressions read as arithmetic
@@ -470,11 +458,11 @@ def _(mo):
     ### The first consequence: the column that is not a column
 
     `tensor_2[:, 0]` reads aloud as "every row, column zero", so it feels like it should
-    give you a column standing upright. It does not, and the table of entries says why: the
-    integer `0` made dimension 1 disappear. What comes back has shape `(4,)` — four numbers
+    give you a column standing upright. It does not, however, and the below table of entries shows why: the
+    integer `0`, means select one entry of that dimension, and thereby made dimension 1 disappear. What comes back has shape `(4,)` — four numbers
     in *one* dimension.
 
-    A one-dimensional tensor has no orientation. Neither upright nor flat; the words only
+    A one-dimensional tensor has no orientation. Neither upright nor flat; these words only
     mean something once there are two dimensions to tell apart. `tensor_2[0]`, the first
     *row*, comes back with the identical shape `(4,)`. The row and the column are the same
     kind of object, which is why they are drawn the same way.
@@ -736,7 +724,7 @@ def _(mo):
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
-    ## Explore — what a tensor actually is
+    ## What a tensor actually is
 
     Every slice in the previous section reported itself as a view or a copy, and the
     caption under every picture has been quietly printing a `stride` you were told to hold
@@ -935,7 +923,7 @@ def _(mo, show, t1, tensor_2):
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
-    ## Explore — `cat` against `stack`
+    ## `cat` against `stack`
 
     The difference is easy to see once the shapes are side by side, and it is worth ten
     seconds now, because it is the difference between a batch of 64 images and a single
@@ -1051,7 +1039,7 @@ def _(mo, show, tensor_2, torch, y1, y2, y3, z1, z2, z3):
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
-    ## Explore — matrix multiplication you can drag
+    ## Matrix multiplication you can drag
 
     Drag horizontally inside a cell of `A` to change it; every panel recomputes.
 
@@ -1100,7 +1088,7 @@ def _(editable, mo, show, torch):
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
-    ## Explore — broadcasting, one dimension at a time
+    ## Broadcasting, one dimension at a time
 
     Equal shapes multiply elementwise, which is the easy case. The rule underneath governs
     every other one. Shapes are lined up from the *right*; a missing dimension counts as 1,
@@ -1409,17 +1397,17 @@ def _(mo):
 
     ## Where this leaves you
 
-    The bridge is not a feature. It is the last consequence of the sentence at the top: a
-    tensor is a shape, a stride and an offset over a run of memory, so a NumPy array and a
-    tensor can be two descriptions of one run, and writing through either is writing to the
-    same bytes. Nothing was copied and nothing was synchronized.
+    The bridge is not a feature. A tensor is a shape, a stride and an offset over a run of
+    memory, so a NumPy array and a tensor can be two descriptions of one run, and writing
+    through either is writing to the same bytes. Nothing was copied and nothing was
+    synchronized.
 
-    The same sentence answers the rest of the notebook. `x.T` is free because it swaps two
-    strides. `view` refuses where `reshape` copies because no stride pattern reads a
-    transposed matrix as a flat one. A slice is a view and a boolean mask is a gather.
-    `expand` costs nothing because a stride of zero reads the same memory repeatedly.
+    `x.T` is free because it swaps two strides. `view` refuses where `reshape` copies
+    because no stride pattern reads a transposed matrix as a flat one. A slice is a view
+    and a boolean mask is a gather. `expand` costs nothing because a stride of zero reads
+    the same memory repeatedly.
 
-    Three things planted here are collected later. **dtype** — `Optimization` is where
+    Three things return later. **dtype** — `Optimization` is where
     16-bit starts paying and the `eps` column starts mattering. **Contiguity** — the moment
     training goes to more than one GPU, the collectives that exchange gradients want a
     linear buffer, and the copy that makes one is not free. And **`torch.stack`**, which is

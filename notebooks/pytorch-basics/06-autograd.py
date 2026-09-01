@@ -9,10 +9,6 @@
 # metadata is merged over the project config at the highest precedence, so a notebook
 # opts in on its own. `auto_instantiate` cannot be set here (marimo strips it from script
 # metadata), so opening this file still runs nothing.
-#
-# Cells under an "Explore" heading are additions; everything else is the upstream
-# tutorial as converted.
-
 import marimo
 
 __generated_with = "0.24.0"
@@ -132,7 +128,7 @@ def _(loss, z):
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
-    ## Explore — the graph itself, walked and drawn
+    ## The graph itself, walked and drawn
 
     The section above says a graph exists and prints two of its nodes. It is reachable:
     every tensor that required grad carries `.grad_fn`, and every `grad_fn` carries
@@ -241,7 +237,7 @@ def _(b, loss, w):
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
-    ## Explore — check that gradient by hand
+    ## Check that gradient by hand
 
     `backward()` filled in fifteen numbers and there is no reason yet to believe them.
     This model is small enough to differentiate on paper, so the cell below computes the
@@ -373,7 +369,7 @@ def _(b, torch, w, x):
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
-    ## Explore — the same three switches, drawn
+    ## The same three switches, drawn
 
     `True` then `False` is the whole result above, which understates it. The switches
     rebuild the identical forward pass and redraw the graph.

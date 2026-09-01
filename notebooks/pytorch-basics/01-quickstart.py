@@ -9,10 +9,6 @@
 # metadata is merged over the project config at the highest precedence, so a notebook
 # opts in on its own. `auto_instantiate` cannot be set here (marimo strips it from script
 # metadata), so opening this file still runs nothing.
-#
-# Cells under an "Explore" heading are additions; everything else is the upstream
-# tutorial as converted.
-
 import marimo
 
 __generated_with = "0.24.0"
@@ -179,7 +175,7 @@ def _(nn, torch):
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
-    ## Explore — the same object, rendered rather than printed
+    ## The same object, rendered rather than printed
 
     `print(model)` produced the text above. Returning the module instead hands it to
     marimo's formatter: parameter counts per layer, dtype and device, and a color per
@@ -411,7 +407,7 @@ def _(mo):
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
-    ## Explore — all ten thousand test images, not just the first
+    ## All ten thousand test images, not just the first
 
     The cell above predicts `test_data[0]` and prints one line. The same three lines run
     over the whole test set below, once, and everything after it is a *view* onto those

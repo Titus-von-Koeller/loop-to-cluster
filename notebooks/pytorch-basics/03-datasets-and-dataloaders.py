@@ -9,10 +9,6 @@
 # metadata is merged over the project config at the highest precedence, so a notebook
 # opts in on its own. `auto_instantiate` cannot be set here (marimo strips it from script
 # metadata), so opening this file still runs nothing.
-#
-# Cells under an "Explore" heading are additions; everything else is the upstream
-# tutorial as converted.
-
 import marimo
 
 __generated_with = "0.24.0"
@@ -163,7 +159,7 @@ def _(plt, torch, training_data):
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
-    ## Explore — the dataset as something you can page through
+    ## The dataset as something you can page through
 
     Nine random samples per re-run is enough to prove the dataset loads, and not enough to
     give you a feel for it. Pick classes and page through them instead. Sandal, Sneaker
@@ -408,7 +404,7 @@ def _(plt, train_dataloader):
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
-    ## Explore — the three arguments that decide what a batch is
+    ## The three arguments that decide what a batch is
 
     `DataLoader(training_data, batch_size=64, shuffle=True)` hides three separate
     decisions. Change them and watch what arrives.

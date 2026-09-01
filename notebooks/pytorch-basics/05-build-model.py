@@ -9,10 +9,6 @@
 # metadata is merged over the project config at the highest precedence, so a notebook
 # opts in on its own. `auto_instantiate` cannot be set here (marimo strips it from script
 # metadata), so opening this file still runs nothing.
-#
-# Cells under an "Explore" heading are additions; everything else is the upstream
-# tutorial as converted.
-
 import marimo
 
 __generated_with = "0.24.0"
@@ -147,7 +143,7 @@ def _(NeuralNetwork, device):
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
-    ## Explore — two better pictures of the same model
+    ## Two better pictures of the same model
 
     `print(model)` gives the constructor arguments back. marimo formats an `nn.Module`
     itself, which adds what the constructor does not say: how many parameters each layer
@@ -307,7 +303,7 @@ def _(hidden1, nn):
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
-    ## Explore — what ReLU did, as a picture
+    ## What ReLU did, as a picture
 
     Sixty numbers printed twice is accurate and unreadable. The same two tensors drawn on
     one shared color scale: three rows, one per image in the minibatch, twenty columns,
@@ -447,7 +443,7 @@ def _(model):
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
-    ## Explore — the parameters as a table, and where their values came from
+    ## The parameters as a table, and where their values came from
 
     The loop above prints six blocks of numbers. The same six as a table are easier to
     total, and the totals are the ones that decide whether a model fits on a card.

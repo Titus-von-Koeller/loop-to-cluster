@@ -5,10 +5,10 @@ looks is decided once and evolves once — evolve this module, never fork it int
 The accepted cost is that a notebook no longer runs as a standalone file.
 
 Color policy: magnitude is carried by lightness and only by lightness; hue never carries
-identity alone. Categorical hues come from Okabe and Ito's palette, built for the red-green
-deficiency the primary reader has; continuous scales are cividis (sequential) and
-blue-orange (diverging), designed under the same constraint. A hand-tuned hex value in a
-notebook is a bug.
+identity alone. Categorical hues come from Okabe and Ito's palette, and continuous scales
+are cividis (sequential) and blue-orange (diverging) — established palettes whose hue
+pairs stay reliably separable under red-green color-vision deficiency and whose pictures
+survive grayscale. A hand-tuned hex value in a notebook is a bug.
 """
 
 import altair as alt

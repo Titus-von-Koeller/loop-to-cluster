@@ -9,10 +9,6 @@
 # metadata is merged over the project config at the highest precedence, so a notebook
 # opts in on its own. `auto_instantiate` cannot be set here (marimo strips it from script
 # metadata), so opening this file still runs nothing.
-#
-# Cells under an "Explore" heading are additions; everything else is the upstream
-# tutorial as converted.
-
 import marimo
 
 __generated_with = "0.24.0"
@@ -89,7 +85,7 @@ def _(models, torch):
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
-    ## Explore — what 528 megabytes is made of
+    ## What 528 megabytes is made of
 
     That cell downloaded a real trained model and wrote it to disk, and both facts pass
     without comment. VGG16 is a useful thing to look at precisely because it is old enough
@@ -220,7 +216,7 @@ def _(torch):
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
-    ## Explore — the two files, on disk
+    ## The two files, on disk
 
     The tutorial says saving a `state_dict` is best practice and that the other way
     "relies on the actual class definition to be available". Both files now exist, so the

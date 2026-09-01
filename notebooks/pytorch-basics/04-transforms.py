@@ -9,10 +9,6 @@
 # metadata is merged over the project config at the highest precedence, so a notebook
 # opts in on its own. `auto_instantiate` cannot be set here (marimo strips it from script
 # metadata), so opening this file still runs nothing.
-#
-# Cells under an "Explore" heading are additions; everything else is the upstream
-# tutorial as converted.
-
 import marimo
 
 __generated_with = "0.24.0"
@@ -107,7 +103,7 @@ def _(mo):
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
-    ## Explore — the same picture, three times, in different numbers
+    ## The same picture, three times, in different numbers
 
     This notebook describes transforms without ever showing one. Below is image 7 of the
     training set at each stage of that two-step pipeline, with what it actually *is* at
@@ -182,7 +178,7 @@ def _(F, torch, v2):
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
-    ## Explore — what the label became
+    ## What the label became
 
     `ds` above was built with that `target_transform`, so its labels are not integers any
     more. Move the slider and watch the second half of the pair.
@@ -240,7 +236,7 @@ def _(ds, mo, sample):
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
-    ## Explore — a transform pipeline with the parameters exposed
+    ## A transform pipeline with the parameters exposed
 
     Every transform in the v2 API has a functional twin: `RandomRotation` picks an angle
     and calls `functional.rotate`, so driving `rotate` from a slider is the same operation
