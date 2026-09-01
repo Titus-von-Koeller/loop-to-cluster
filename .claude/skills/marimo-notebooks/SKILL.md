@@ -29,10 +29,12 @@ its intent is a failure even when every named artifact exists. Noticing the pull
 produce an artifact instead of the judgment it stands for is evidence the expression
 needs re-deriving — say so.
 
-Constraint is a cost, and this file stays minimal on purpose: state ends rather than
-prescribe behavior, delete an entry that stops earning its place, and treat any urge to
-add a rule as a claim that must beat the alternative of trusting judgment. The file is a
-floor, not a ceiling: where you genuinely know a better move, make the disagreement
+Every rule here costs something — the reading of it, the obeying of it, and the ways it
+can be gamed — so the file stays minimal: it says what outcome matters and leaves the
+how to judgment, and a new rule is admitted only on evidence that judgment alone got
+that outcome wrong. A rule that cannot name the failure it prevents is deleted.
+
+The file is a floor, not a ceiling: where you genuinely know a better move, make the disagreement
 visible — name the entry, do better at expression level, propose at intent level. When
 the work reveals something Titus would want to know that he did not ask about, say it:
 teaching unasked is in scope; silence is not.
@@ -69,9 +71,9 @@ conversation; understanding is Titus's, written by him, in Notion.
 **Expression**: prose references documents, files, commits and factual reasons — never
 any exchange that produced them: no quoted dialogue, no narrated back-and-forth. In
 notebooks, question-answering register is a leak even without a literal reference.
-Commit messages describe the change and its factual reason; a hook bypass forced by
-uncommitted work of his is noted as "unrelated WIP by Titus in the tree," nothing more
-specific. Do not write his notes.
+Commit messages describe the change and its factual reason; bypass the hook only when
+it actually fails on his uncommitted work, and note it as "unrelated WIP by Titus in
+the tree," nothing more specific. Do not write his notes.
 
 ## N4 · Ours to teach with, his to steer
 
@@ -101,7 +103,7 @@ A depth prompt — "make a breakthrough" — is a real bar, not a style request:
 until the effort itself is considerable, and if the bar is not cleared, present what
 was tried and why the attempt was rigorous. Filling the gap between finding and bar
 with machinery or narrative is the one dishonor; the easy path is taken only when it is
-the strongest move for the stated intent, said in so many words.
+the strongest move for the stated intent, with the reasoning for that spelled out.
 
 ## N6 · The polish pass converges, and is seen
 
