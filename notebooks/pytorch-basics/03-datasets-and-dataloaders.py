@@ -112,7 +112,7 @@ def _():
         download=True,
         transform=v2.Compose([v2.ToImage(), v2.ToDtype(torch.float32, scale=True)]),
     )
-    return Dataset, plt, test_data, torch, training_data
+    return Dataset, datasets, plt, test_data, torch, training_data, v2
 
 
 @app.cell(hide_code=True)
@@ -308,13 +308,54 @@ def _(mo):
     return
 
 
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    ### Everything it needs is `__len__` and `__getitem__`
+
+    `DataLoader` never learns what a sample *means*: it asks the dataset for its length, asks for
+    samples by index, and stacks what comes back. Before pointing one at 60,000 images, hand it
+    the smallest `Dataset` that satisfies the contract, and predict: ten samples in batches of
+    four — how many batches, and what exactly arrives in each?
+    """)
+    return
+
+
 @app.cell
-def _(test_data, training_data):
+def _(Dataset):
     from torch.utils.data import DataLoader
 
+    class Squares(Dataset):
+        """Sample i is the pair (i, i * i) -- every value names its own position."""
+
+        def __len__(self):
+            return 10
+
+        def __getitem__(self, idx):
+            return idx, idx * idx
+
+    for _indices, _squares in DataLoader(Squares(), batch_size=4):
+        print(_indices.tolist(), _squares.tolist(), "  <-", type(_indices).__name__, str(_indices.dtype))
+    return DataLoader, Squares
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    Three things happened without being asked for: the four `(index, square)` pairs came back as
+    *one* pair of tensors, because the default **collate** step stacks samples column-wise; the
+    plain Python ints were promoted to `torch.int64` tensors along the way; and the epoch ended
+    with a short batch of two, because ten does not divide by four. All three reappear at scale
+    below.
+    """)
+    return
+
+
+@app.cell
+def _(DataLoader, test_data, training_data):
     train_dataloader = DataLoader(training_data, batch_size=64, shuffle=True)
-    test_dataloader = DataLoader(test_data, batch_size=64, shuffle=True)
-    return DataLoader, train_dataloader
+    test_dataloader = DataLoader(test_data, batch_size=64)
+    return (train_dataloader,)
 
 
 @app.cell(hide_code=True)
@@ -322,27 +363,26 @@ def _(mo):
     mo.md(r"""
     ## Iterating through the DataLoader
 
-    We have loaded that dataset into the `DataLoader` and can iterate through the dataset as
-    needed. Each iteration below returns a batch of `train_features` and `train_labels` (containing
-    `batch_size=64` features and labels respectively). Because we specified `shuffle=True`, after
-    we iterate over all batches the data is shuffled (for finer-grained control over the data
-    loading order, take a look at
-    [Samplers](https://pytorch.org/docs/stable/data.html#data-loading-order-and-sampler)).
+    The same call, pointed at the real dataset. The training loader shuffles; the test loader
+    keeps file order, since evaluation reads every sample exactly once either way. Each iteration
+    returns one batch — `train_features` and `train_labels`, 64 of each — and `shuffle=True`
+    re-permutes the order every epoch (for finer-grained control over loading order, take a look
+    at [Samplers](https://pytorch.org/docs/stable/data.html#data-loading-order-and-sampler)).
     """)
     return
 
 
 @app.cell
-def _(plt, train_dataloader):
+def _(labels_map, plt, train_dataloader):
     # Display image and label.
     train_features, train_labels = next(iter(train_dataloader))
     print(f"Feature batch shape: {train_features.size()}")
     print(f"Labels batch shape: {train_labels.size()}")
     _img = train_features[0].squeeze()
-    _label = train_labels[0]
+    _label = int(train_labels[0])
     plt.imshow(_img, cmap="gray")
     plt.show()
-    print(f"Label: {_label}")
+    print(f"Label: {_label} = {labels_map[_label]}")
     return
 
 
@@ -359,7 +399,8 @@ def _(mo):
       factor-of-64 error waiting to happen in a progress bar.
     - **shuffle** decides whether the sampler walks the dataset in file order or permutes
       it each epoch. FashionMNIST is already stored well mixed — all ten classes appear in
-      the first 64 images — so the class counts below barely move when you turn it off.
+      the first 64 images, which is also how the quickstart got away with never passing
+      `shuffle` at all — so the class counts below barely move when you turn it off.
       What does change is that every epoch then sees the identical sequence of batches,
       and consecutive gradients stay correlated in whatever way the file happens to be
       ordered. On a dataset stored grouped by class, and many are, that is the difference
@@ -406,6 +447,9 @@ def _(
     _images, _labels = next(iter(explore_loader))
     _remainder = len(training_data) % batch_size_choice.value
     _last = "same as the rest" if _remainder == 0 or drop_last_choice.value else f"{_remainder} images"
+    _epoch1 = next(iter(explore_loader.batch_sampler))[:6]
+    _epoch2 = next(iter(explore_loader.batch_sampler))[:6]
+    _order = "a fresh permutation every epoch" if shuffle_choice.value else "file order, identical every epoch"
 
     _strip = [
         mo.vstack(
@@ -430,11 +474,92 @@ def _(
                 justify="start",
                 gap=1,
             ),
+            mo.md(f"The sampler starts epoch 1 at `{_epoch1}…`, epoch 2 at `{_epoch2}…` — {_order}."),
             mo.md("The first batch, up to the first 24 images:"),
             mo.hstack(_strip, justify="start", wrap=True, gap=0.5),
         ],
         gap=1,
     )
+    return
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    ### The argument that decides who does the work
+
+    Every batch so far was assembled in this notebook's own process: `DataLoader` called
+    `__getitem__` 64 times, collated the results, and only then handed the batch over — all time
+    the training step spends waiting. `num_workers=n` moves that work into `n` child processes,
+    which prefetch batches ahead of whoever is consuming them.
+
+    Whether that pays depends on what `__getitem__` costs — guess before pressing. FashionMNIST
+    sits in memory as uint8 tensors and its transform only converts one sample to float32: do
+    four workers help? And a heavier pipeline — a rotation and a blur per sample, the shape of
+    real augmentation — is the same question with a different answer.
+    """)
+    return
+
+
+@app.cell
+def _(mo):
+    time_it = mo.ui.run_button(label="time four loaders — a few seconds")
+    time_it
+    return (time_it,)
+
+
+@app.cell
+def _(DataLoader, datasets, mo, time_it, torch, v2):
+    mo.stop(not time_it.value, mo.md("*Nothing here is precomputed — press the button.*"))
+
+    import time
+
+    _pipelines = {
+        "float32 only": v2.Compose([v2.ToImage(), v2.ToDtype(torch.float32, scale=True)]),
+        "rotation + blur": v2.Compose(
+            [v2.ToImage(), v2.RandomRotation(15), v2.GaussianBlur(9), v2.ToDtype(torch.float32, scale=True)]
+        ),
+    }
+
+    def _timed(transform, num_workers, batches=100):
+        _ds = datasets.FashionMNIST(root="data", train=True, transform=transform)
+        _batches = iter(DataLoader(_ds, batch_size=64, num_workers=num_workers))
+        _start = time.perf_counter()
+        for _ in range(batches):
+            next(_batches)
+        return time.perf_counter() - _start
+
+    _boot = _timed(_pipelines["float32 only"], num_workers=4, batches=1)
+    _rows = [mo.stat(f"{_boot:.2f} s", label="first parallel loader (forkserver boot), paid once", bordered=True)]
+    for _name, _transform in _pipelines.items():
+        _serial = _timed(_transform, num_workers=0)
+        _parallel = _timed(_transform, num_workers=4)
+        _rows.append(
+            mo.hstack(
+                [
+                    mo.stat(f"{_serial:.2f} s", label=f"{_name} — workers=0", bordered=True),
+                    mo.stat(f"{_parallel:.2f} s", label=f"{_name} — workers=4", bordered=True),
+                    mo.stat(f"{_serial / _parallel:.1f}×", label="speedup", bordered=True),
+                ],
+                justify="start",
+                gap=1,
+            )
+        )
+    mo.vstack([mo.md("100 batches of 64 each, measured just now:"), *_rows], gap=1)
+    return
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    Two traps, met here rather than in the wild. The startup stat exists because Python 3.14
+    boots workers through a *forkserver* by default — under the old Linux default, `fork`,
+    `num_workers` felt free, which is why older tutorials never mention a cost. And everything a
+    worker touches — the dataset object and its transforms — travels to it by pickle: `Squares`
+    above, a class defined in a notebook cell, dies with `module '__mp_main__' has no attribute
+    'Squares'` the moment it meets `num_workers > 0`, while the importable `FashionMNIST` travels
+    fine.
+    """)
     return
 
 
@@ -449,9 +574,17 @@ def _(mo):
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
-    # Further Reading
+    ## Where to go next
 
-    - [torch.utils.data API](https://pytorch.org/docs/stable/data.html)
+    - [torch.utils.data](https://pytorch.org/docs/stable/data.html) documents what this notebook
+      skipped: `Sampler`s, custom `collate_fn`s, `IterableDataset` for data with no length,
+      memory pinning for faster host-to-GPU copies.
+    - The moment training spans more than one GPU, the loader is where it shows first: a
+      `DistributedSampler` hands each rank its own disjoint shard of every epoch's indices, and
+      `drop_last` stops being cosmetic (the hang described above). That is this repository's
+      road; the tutorial's next stop is [Transforms](04-transforms.py).
+    - The `datasets` library at Hugging Face serves the same two-method contract, so a
+      `DataLoader` consumes its datasets directly.
     """)
     return
 
