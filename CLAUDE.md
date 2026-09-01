@@ -91,6 +91,16 @@ broken merge over the good file, and can silently drop `hide_code` from any cell
 fallback when the whole session is confused. After any editor save, `git diff` and look
 for decorator churn.
 
+`ctrl+alt+m` assumes the notebook's session is live and resyncs on reopen. A notebook that sat
+open but never ran when the rewrite landed can wedge the extension for the whole window session
+instead: its first run collides as above, and after a kernel restart or session shutdown the
+reopened editor never re-attaches — cells queue, mark stale, the kernel idles at zero CPU. Only
+the window reload clears it (established by walking a full recovery attempt). Before rewriting a
+notebook that is open in a tab but has no live kernel, close the tab; failing that, verify
+headless and let the first editor run wait for the reload. In the meantime,
+`pixi run marimo run <nb>.py --headless --no-token -p <port>` plus VSCode's Simple Browser is a
+fully rendered, interactive stand-in for the wedged editor surface.
+
 **Checks.** `pixi run marimo check --strict` catches duplicate names and unparsable cells
 without running anything. The content check is executing the file itself —
 `CUDA_VISIBLE_DEVICES=0 pixi run python notebooks/pytorch-basics/<nb>.py` — where exit 0
@@ -134,6 +144,10 @@ breaks every other page as soon as the order changes. Propose rather than write.
 Straight to `main`, never a branch: more than one agent works here, so a branch only diverges from
 what the other is committing. Stage paths explicitly — `git add <paths>`, never `git add -A`.
 **Ask before staging anything under `scripts/` or `notebooks/`**; those are Titus's.
+
+**Push every commit or commit batch to origin immediately.** Unpushed local-only commits are a
+single-disk risk for no benefit. A push that fails (no key, no network) is reported in the
+summary, never left silent.
 
 ## Style
 
