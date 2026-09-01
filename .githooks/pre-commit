@@ -19,7 +19,10 @@ fi
 # app._unparsable_cell, which is itself valid Python and commits without complaint. Both
 # have happened here. --strict because the notebooks are clean of warnings today and the
 # cheapest time to keep them that way is now. Takes about a second.
-if ! pixi run marimo check --strict notebooks/; then
+# The numbered files are the notebooks; _viz.py beside them is a plain module, and
+# marimo check rejects any .py it is handed that lacks a marimo.App. A new notebook
+# must match the 0*.py pattern to stay under this check.
+if ! pixi run marimo check --strict notebooks/pytorch-basics/0*.py; then
     echo "pre-commit: marimo check failed" >&2
     exit 1
 fi
