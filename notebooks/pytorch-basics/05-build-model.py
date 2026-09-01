@@ -332,6 +332,7 @@ def _(mo):
 def _(hidden1, nn):
     import altair as alt
     import pandas as pd
+    from _viz import ACCENT, BASE, DIVERGING_SCHEME
 
     def activation_map(values, title, limit):
         """Draw a small 2D activation tensor on a fixed diverging scale."""
@@ -350,7 +351,7 @@ def _(hidden1, nn):
                 y=alt.Y("image:O", title=None, axis=None),
                 color=alt.Color(
                     "value:Q",
-                    scale=alt.Scale(scheme="redblue", domain=[-limit, limit]),
+                    scale=alt.Scale(scheme=DIVERGING_SCHEME, domain=[-limit, limit]),
                     legend=None,
                 ),
                 tooltip=[alt.Tooltip("value:Q", format=".3f"), "image:O", "unit:O"],
@@ -359,7 +360,7 @@ def _(hidden1, nn):
         )
 
     after_relu = nn.ReLU()(hidden1)
-    return activation_map, after_relu, alt, pd
+    return ACCENT, BASE, activation_map, after_relu, alt, pd
 
 
 @app.cell
@@ -499,7 +500,7 @@ def _(mo, model):
 
 
 @app.cell
-def _(alt, mo, model, pd):
+def _(ACCENT, BASE, alt, mo, model, pd):
     import math
 
     _first = next(parameter for name, parameter in model.named_parameters() if name.endswith("0.weight")).detach()
@@ -507,7 +508,7 @@ def _(alt, mo, model, pd):
     _values = pd.DataFrame({"weight": _first.cpu().flatten().tolist()})
     _histogram = (
         alt.Chart(_values)
-        .mark_bar(color="#4c78a8")
+        .mark_bar(color=BASE)
         .encode(
             x=alt.X("weight:Q", bin=alt.Bin(maxbins=60), title="weight value"),
             y=alt.Y("count()", title="count"),
@@ -516,7 +517,7 @@ def _(alt, mo, model, pd):
     )
     _limits = (
         alt.Chart(pd.DataFrame({"edge": [-_bound, _bound]}))
-        .mark_rule(color="#e45756", strokeDash=[6, 4], strokeWidth=2)
+        .mark_rule(color=ACCENT, strokeDash=[6, 4], strokeWidth=2)
         .encode(x="edge:Q")
     )
     mo.vstack(
@@ -552,7 +553,7 @@ def _(mo):
 
 
 @app.cell
-def _(alt, hidden_width, mo, pd):
+def _(ACCENT, BASE, alt, hidden_width, mo, pd):
     def _parameter_count(width):
         # 784 -> width -> width -> 10, each Linear carrying one bias per output.
         return 784 * width + width + width * width + width + width * 10 + 10
@@ -570,13 +571,13 @@ def _(alt, hidden_width, mo, pd):
     _curve["parameters"] = [_parameter_count(w) for w in _curve["width"]]
     _chart = (
         alt.Chart(_curve)
-        .mark_line(color="#4c78a8")
+        .mark_line(color=BASE)
         .encode(x=alt.X("width:Q", title="hidden width"), y=alt.Y("parameters:Q", title="parameters"))
         .properties(width=420, height=200)
     )
     _here = (
         alt.Chart(pd.DataFrame({"width": [_width], "parameters": [_parameter_count(_width)]}))
-        .mark_point(size=120, filled=True, color="#e45756")
+        .mark_point(size=120, filled=True, color=ACCENT)
         .encode(x="width:Q", y="parameters:Q")
     )
     mo.vstack([_sentence, _chart + _here])

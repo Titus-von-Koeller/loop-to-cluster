@@ -412,12 +412,13 @@ def _(mo):
 def _():
     import altair as alt
     import pandas as pd
+    from _viz import ACCENT, BASE, OKABE_ITO
 
     def loss_curves(history, checkpoints):
         """Train loss against test loss, on one pair of axes."""
         layers = [
             alt.Chart(pd.DataFrame(history))
-            .mark_line(color="#4c78a8", opacity=0.8)
+            .mark_line(color=BASE, opacity=0.8)
             .encode(
                 x=alt.X("batches:Q", title="batches seen"),
                 y=alt.Y("loss:Q", title="loss", scale=alt.Scale(zero=False)),
@@ -427,12 +428,12 @@ def _():
             frame = pd.DataFrame(checkpoints)
             layers.append(
                 alt.Chart(frame)
-                .mark_line(color="#e45756", point=True)
+                .mark_line(color=ACCENT, point=True)
                 .encode(x="batches:Q", y="loss:Q", tooltip=["epoch:Q", "loss:Q", "accuracy:Q"])
             )
         return alt.layer(*layers).properties(width=560, height=260)
 
-    return alt, loss_curves, pd
+    return OKABE_ITO, alt, loss_curves, pd
 
 
 @app.cell
@@ -576,7 +577,7 @@ def _(mo):
 
 
 @app.cell
-def _(mo, torch, valley_rate, valley_steps):
+def _(OKABE_ITO, mo, torch, valley_rate, valley_steps):
     import numpy as np
     import plotly.graph_objects as plot
 
@@ -596,9 +597,12 @@ def _(mo, torch, valley_rate, valley_steps):
         return torch.stack(path)
 
     runs = {
-        "SGD": ("#e45756", descend(lambda p: torch.optim.SGD(p, lr=valley_rate.value))),
-        "momentum 0.9": ("#f2a154", descend(lambda p: torch.optim.SGD(p, lr=valley_rate.value, momentum=0.9))),
-        "Adam": ("#54a24b", descend(lambda p: torch.optim.Adam(p, lr=valley_rate.value))),
+        "SGD": (OKABE_ITO["vermillion"], descend(lambda p: torch.optim.SGD(p, lr=valley_rate.value))),
+        "momentum 0.9": (
+            OKABE_ITO["orange"],
+            descend(lambda p: torch.optim.SGD(p, lr=valley_rate.value, momentum=0.9)),
+        ),
+        "Adam": (OKABE_ITO["green"], descend(lambda p: torch.optim.Adam(p, lr=valley_rate.value))),
     }
 
     _grid_x, _grid_y = np.meshgrid(np.linspace(-5, 5, 90), np.linspace(-2, 2, 60))
