@@ -94,7 +94,11 @@ for decorator churn.
 **Checks.** `pixi run marimo check --strict` catches duplicate names and unparsable cells
 without running anything. The content check is executing the file itself —
 `CUDA_VISIBLE_DEVICES=0 pixi run python notebooks/pytorch-basics/<nb>.py` — where exit 0
-means every cell ran.
+means every cell ran, and a failing cell exits nonzero (both directions measured).
+
+**The upstream baseline is commit `891febb`** — the eight tutorials exactly as converted.
+`git diff 891febb -- <notebook>` separates additions from modifications of tutorial prose;
+a substring check misses an appended sentence, the diff does not.
 
 ## Claims
 
