@@ -188,7 +188,7 @@ def _(mo):
     return (label_sample,)
 
 
-@app.cell
+@app.cell(hide_code=True)
 def _(ds, label_sample, mo):
     _image, _label = ds[label_sample.value]
     _hot = int(_label.argmax())
@@ -210,28 +210,32 @@ def _(ds, label_sample, mo):
     mo.hstack(
         [
             mo.image(_image.squeeze(0), width=110, vmin=0, vmax=1, rounded=True),
-            mo.md(
-                f"""
-                label as stored: `{_hot}` — {_names[_hot]}
-
-                label as the model receives it: {_cells}
-
-                `dtype={_label.dtype}`, `shape={tuple(_label.shape)}`
-
-                Ten floats where one integer would do, and `nn.CrossEntropyLoss` accepts
-                either: given class indices it looks the right logit up, given a
-                probability vector it takes the full cross entropy. For a one-hot vector
-                those are the same arithmetic and the same number to the last decimal —
-                so this transform costs a tensor per sample and buys nothing here. It
-                earns its place when the target stops being one-hot: label smoothing,
-                mixup and distillation all hand the loss a vector that is not a single 1.
-                """
+            mo.vstack(
+                [
+                    mo.md(f"label as stored: `{_hot}` — {_names[_hot]}"),
+                    mo.md(f"label as the model receives it: {_cells}"),
+                    mo.md(f"`dtype={_label.dtype}`, `shape={tuple(_label.shape)}`"),
+                ],
+                gap=0.4,
             ),
         ],
         justify="start",
         align="center",
         gap=2,
     )
+    return
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    Ten floats where one integer would do, and `nn.CrossEntropyLoss` accepts either: given
+    class indices it looks the right logit up, given a probability vector it takes the full
+    cross entropy. For a one-hot vector those are the same arithmetic and the same number to
+    the last decimal — so this transform costs a tensor per sample and buys nothing here. It
+    earns its place when the target stops being one-hot: label smoothing, mixup and
+    distillation all hand the loss a vector that is not a single 1.
+    """)
     return
 
 
