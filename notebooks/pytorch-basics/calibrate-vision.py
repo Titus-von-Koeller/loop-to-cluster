@@ -206,5 +206,67 @@ def _(LOG, datetime, get_responses, json, mo, set_responses, timezone, trial_for
     return (answer_squares,)
 
 
+@app.cell(hide_code=True)
+def _(get_responses, mo, pd):
+    _log = get_responses()
+    if not _log:
+        _out = mo.md("*No responses yet — the analysis fills in as you answer.*")
+    else:
+        _frame = pd.DataFrame(_log)
+        _frame["pair"] = _frame.apply(lambda r: " / ".join(sorted([r.base, r.odd_color])), axis=1)
+        _acc = _frame.correct.mean()
+        _by_pair = (
+            _frame.groupby(["palette", "pair"]).agg(n=("correct", "size"), accuracy=("correct", "mean")).reset_index()
+        )
+        _tested = _by_pair[_by_pair.n >= 3].sort_values("accuracy")
+        _by_palette = (
+            _frame.groupby("palette")
+            .agg(trials=("correct", "size"), accuracy=("correct", "mean"))
+            .reset_index()
+            .sort_values("accuracy")
+        )
+        _by_ground = _frame.groupby("ground").correct.mean()
+        _out = mo.vstack(
+            [
+                mo.hstack(
+                    [
+                        mo.stat(f"{len(_frame):,}", label="responses", bordered=True),
+                        mo.stat(f"{100 * _acc:.0f}%", label="overall accuracy (chance 25%)", bordered=True),
+                        *[
+                            mo.stat(f"{100 * v:.0f}%", label=f"on the {g} ground", bordered=True)
+                            for g, v in _by_ground.items()
+                        ],
+                    ],
+                    justify="start",
+                    gap=1,
+                ),
+                mo.md("**Palettes, hardest first for your eyes** (accuracy over all their tested pairs):"),
+                mo.ui.table(_by_palette, selection=None),
+                mo.md("**Most confused pairs so far** (at least three trials each):"),
+                mo.ui.table(_tested.head(12), selection=None) if len(_tested) else mo.md("*none with n ≥ 3 yet*"),
+            ],
+            gap=0.8,
+        )
+    _out
+    return
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    ## Reading the numbers, and what happens to them
+
+    A pair at 25% is invisible to you; at 100% it is trivially yours; sequential ramps live or
+    die by their *adjacent* pairs, categorical palettes by their worst pair anywhere. Grounds
+    are logged because simultaneous contrast shifts discrimination — the same pair can pass on
+    one page and fail on the other. Trials accumulate in `calibration-responses.jsonl`, which is
+    committed like any measurement: future sessions (and future exhibits) read it to weight
+    palette choices by *your measured* confusions instead of the population model. When enough
+    trials exist, the next step is written in the queue: fit your personal confusion axis from
+    the misses and re-rank the theme gallery's dropdown with it.
+    """)
+    return
+
+
 if __name__ == "__main__":
     app.run()
