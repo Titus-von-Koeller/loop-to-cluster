@@ -35,7 +35,7 @@ def _(mo):
 
     Protocol: glance, decide within about a second, click — hesitation measures reasoning, not
     perception. Sixty-plus trials make a sitting; every response appends to
-    `calibration-responses.json` beside this file, so sittings accumulate across days, themes,
+    `calibration-responses.jsonl` beside this file, so sittings accumulate across days, themes,
     and ambient light. The screen itself is uncalibrated for now (parked in the queue) — that
     limits absolute claims, not relative ones: which pairs and which palettes fail *you* on
     *this* screen is exactly what accumulates below.
@@ -111,14 +111,14 @@ def _():
         (name, a, b) for name, hexes in PALETTES.items() for i, a in enumerate(hexes) for b in hexes[i + 1 :] if a != b
     ]
     GROUNDS = {"day": "#fdf0ed", "night": "#1c1e26"}
-    LOG = Path(__file__).parent / "calibration-responses.json"
+    LOG = Path(__file__).parent / "calibration-responses.jsonl"
 
     return GROUNDS, LOG, PAIRS, datetime, json, pd, random, timezone
 
 
 @app.cell(hide_code=True)
 def _(LOG, json, mo):
-    _existing = json.loads(LOG.read_text()) if LOG.exists() else []
+    _existing = [json.loads(_line) for _line in LOG.read_text().splitlines() if _line.strip()] if LOG.exists() else []
     get_responses, set_responses = mo.state(_existing)
     return get_responses, set_responses
 
@@ -147,9 +147,11 @@ def _(GROUNDS, LOG, PAIRS, datetime, get_responses, json, mo, random, set_respon
             "choice": choice,
             "correct": choice == odd,
         }
-        _new = [*get_responses(), _entry]
-        LOG.write_text(json.dumps(_new, indent=0))
-        set_responses(_new)
+        # Append-only, one record per line: concurrent sessions (a browser tab beside the
+        # native editor) interleave instead of overwriting each other's history.
+        with LOG.open("a") as _f:
+            _f.write(json.dumps(_entry) + "\n")
+        set_responses([*get_responses(), _entry])
 
     _squares = "".join(
         f'<span style="display:inline-block;width:72px;height:72px;border-radius:8px;'
@@ -224,7 +226,7 @@ def _(mo):
     A pair at 25% is invisible to you; at 100% it is trivially yours; sequential ramps live or
     die by their *adjacent* pairs, categorical palettes by their worst pair anywhere. Grounds
     are logged because simultaneous contrast shifts discrimination — the same pair can pass on
-    one page and fail on the other. Trials accumulate in `calibration-responses.json`, which is
+    one page and fail on the other. Trials accumulate in `calibration-responses.jsonl`, which is
     committed like any measurement: future sessions (and future exhibits) read it to weight
     palette choices by *your measured* confusions instead of the population model. When enough
     trials exist, the next step is written in the queue: fit your personal confusion axis from
