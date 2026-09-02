@@ -269,10 +269,13 @@ def _(LOG, datetime, get_responses, json, mo, set_responses, timezone, trial_for
           const wrap = document.createElement("div");
           wrap.style.cssText = `background:${model.get("ground")};padding:22px;` +
             `border-radius:10px;display:flex;justify-content:center;align-items:center;` +
-            `gap:28px;width:100%;box-sizing:border-box;aspect-ratio:1.618/1`;
+            `gap:64px;width:100%;box-sizing:border-box;aspect-ratio:1.618/1`;
           model.get("colors").forEach((c, i) => {
             const sq = document.createElement("div");
-            sq.style.cssText = `width:72px;height:72px;border-radius:8px;background:${c};` +
+            // Fixed pixels on purpose: patch size is a stimulus parameter (spatial
+            // summation), so it must not follow the window. 104/64 puts the row at ~1/phi
+            // of the column the notebooks use.
+            sq.style.cssText = `width:104px;height:104px;border-radius:10px;background:${c};` +
               `cursor:pointer`;
             sq.onclick = () => {
               model.set("clicks", model.get("clicks") + 1);
@@ -318,6 +321,8 @@ def _(LOG, answer_squares, datetime, get_responses, json, set_responses, timezon
             "odd_position": _now["odd_position"],
             "choice": choice,
             "correct": choice == _now["odd_position"],
+            # Patch size is a stimulus parameter; log it so size changes stay analyzable.
+            "size_px": 104,
         }
         # Append-only, one record per line: concurrent sessions interleave instead of
         # overwriting each other's history.
