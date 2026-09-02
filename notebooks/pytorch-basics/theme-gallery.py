@@ -15,7 +15,7 @@ __generated_with = "0.24.0"
 app = marimo.App()
 
 
-@app.cell
+@app.cell(hide_code=True)
 def _():
     import marimo as mo
 
