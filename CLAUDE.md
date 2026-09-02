@@ -27,9 +27,8 @@ that would go stale. `pixi.toml` records why each dependency comes from PyPI rat
 conda-forge; one reason is the torch ABI and it still holds.
 
 Skill directories are watched live: adds, removals, and `SKILL.md` edits are picked up within
-the session (docs: live change detection; an older build cached edits until restart — the
-sentence that stood here). Only plugin-backed pieces of a skill folder — `hooks/`, `.mcp.json`,
-`agents/` — still need `/reload-plugins`.
+the session. Only plugin-backed pieces of a skill folder — `hooks/`, `.mcp.json`, `agents/` —
+need `/reload-plugins`.
 
 marimo finds `[tool.marimo]` with `find_nearest_pyproject_toml`, which walks *upward* from the
 working directory, so a kernel started in `notebooks/pytorch-basics/` still picks up this repo's
