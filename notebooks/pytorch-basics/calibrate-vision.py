@@ -136,7 +136,13 @@ def _(GROUNDS, LOG, PAIRS, datetime, get_responses, json, mo, random, set_respon
     _colors = [_a] * 4
     _colors[_odd] = _b
 
-    def _record(choice, odd=_odd, palette=_palette, a=_a, b=_b, ground=_ground_name):
+    def _record(choice, n=_n, odd=_odd, palette=_palette, a=_a, b=_b, ground=_ground_name):
+        # VSCode's native renderer repaints state-driven reruns unreliably: a stale trial can
+        # stay on screen and its old buttons keep firing. A click only counts if it belongs to
+        # the trial the backend currently poses — measured live when four stale duplicates of
+        # one trial reached the log.
+        if n != len(get_responses()):
+            return
         _entry = {
             "ts": datetime.now(timezone.utc).isoformat(timespec="seconds"),
             "palette": palette,

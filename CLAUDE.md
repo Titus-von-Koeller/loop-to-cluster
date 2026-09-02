@@ -73,8 +73,9 @@ damage. A window reload (`ctrl+alt+shift+m`) resets that memory and refolds on t
 activation — but only the cells the editor has materialized, so on a long notebook some
 cells stay expanded and, the memory now marking them folded, are never retried. The
 reliable spot fix is per cell: the collapse chevron, or the "marimo: Hide cell code"
-command, which also persists. A polish pass ends with a fold audit: any cell whose code
-the narrative does not ask the reader to read carries `hide_code=True` in the file. Display
+command, which also persists. Every notebook edit ends with a fold audit — not only polish
+passes: any cell whose code the narrative does not ask the reader to read carries
+`hide_code=True` in the file, checked before the commit that carries the edit. Display
 logic and narrative code do not share a cell: where they are mixed, split — the content cell
 stays visible and may end by rendering the object it made, the display-assembly cell folds.
 Names flow between cells, so the split costs nothing. The standing exception remains the
