@@ -222,11 +222,12 @@ and their interpretation are in calibrate-vision.py's closing section.
 
 ## Notion
 
-Notion is where understanding lives, and this repo does not mirror it — a second copy drifts, and
-a stale copy gets read as authoritative by whoever finds it first. Titus edits the pages, so a
-passage that differs from what you expected has been *edited*, not damaged: name it and confirm
-before touching it. Refer to a topic by name, never by number, since a numbered cross-reference
-breaks every other page as soon as the order changes. Propose rather than write.
+Notion is Titus's own knowledgebase: sessions do not read from it as authority or write to it
+at all unless he explicitly asks, per request. Where this file says results or understanding
+"live in Notion," that means he writes them there — it is never an instruction to touch it.
+This repo does not mirror Notion either: a second copy drifts, and a stale copy gets read as
+authoritative by whoever finds it first. Refer to a topic by name, never by number, since a
+numbered cross-reference breaks every other page as soon as the order changes.
 
 ## Commits
 
