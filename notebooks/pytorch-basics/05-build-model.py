@@ -15,7 +15,7 @@ __generated_with = "0.24.0"
 app = marimo.App()
 
 
-@app.cell
+@app.cell(hide_code=True)
 def _():
     import marimo as mo
 
@@ -309,9 +309,10 @@ def _(mo):
 
     Sixty numbers printed twice is accurate and unreadable. The same two tensors drawn on
     one shared color scale: three rows, one per image in the minibatch, twenty columns,
-    one per output unit. Blue is positive, red negative, white zero.
+    one per output unit. Blue is positive, orange negative, and zero is the neutral
+    near-white between them.
 
-    Every red square in the first becomes white in the second and nothing else moves. That
+    Every orange square in the first goes neutral in the second and nothing else moves. That
     is the entire operation — `max(x, 0)`, elementwise — and it is the whole reason the
     network is not equivalent to a single matrix. Stack two linear layers with nothing
     between them and their product is another linear layer; the model would have the depth
@@ -330,7 +331,7 @@ def _(mo):
 def _():
     import altair as alt
     import pandas as pd
-    from _viz import ACCENT, BASE, DIVERGING_SCHEME
+    from _viz import ACCENT, BASE, POLARITY
 
     def activation_map(values, title, limit):
         """Draw a small 2D activation tensor on a fixed diverging scale."""
@@ -341,15 +342,18 @@ def _():
                 for column, value in enumerate(line)
             ]
         )
+        # The gaps between squares stay transparent (band padding, not strokes) and the
+        # fills come from the shared diverging ramp, so the picture obeys the reader's
+        # theme the way _viz.show() does.
         return (
             alt.Chart(cells)
-            .mark_rect(stroke="white", strokeWidth=1)
+            .mark_rect()
             .encode(
-                x=alt.X("unit:O", title=None, axis=None),
-                y=alt.Y("image:O", title=None, axis=None),
+                x=alt.X("unit:O", title=None, axis=None, scale=alt.Scale(paddingInner=0.06)),
+                y=alt.Y("image:O", title=None, axis=None, scale=alt.Scale(paddingInner=0.06)),
                 color=alt.Color(
                     "value:Q",
-                    scale=alt.Scale(scheme=DIVERGING_SCHEME, domain=[-limit, limit]),
+                    scale=alt.Scale(range=POLARITY, domain=[-limit, limit]),
                     legend=None,
                 ),
                 tooltip=[alt.Tooltip("value:Q", format=".3f"), "image:O", "unit:O"],
@@ -532,8 +536,8 @@ def _(ACCENT, BASE, alt, mo, model, pd, torch):
             mo.md(
                 f"fan_in = {_first.shape[1]}, so the bound is ±{_bound:.4f}. "
                 f"Measured: min {_first.min():.4f}, max {_first.max():.4f}, "
-                f"standard deviation {_first.std():.4f} — which is bound/√3 = {_bound / math.sqrt(3):.4f}, "
-                "exactly what a uniform distribution gives."
+                f"standard deviation {_first.std():.4f} — against the bound/√3 = "
+                f"{_bound / math.sqrt(3):.4f} a uniform distribution predicts."
             ),
         ]
     )
