@@ -204,10 +204,12 @@ def _(GROUNDS, PAIRS, np, random):
 
         Candidate stimuli are built from a palette color plus an offset along the opponent
         axes at magnitudes bracketing the current threshold estimate; the winner maximizes
-        mutual information between the response and the posterior — which parks trials near
-        the ~75%-correct zone, where each answer says the most. 15% of trials stay plain
-        palette pairs, as anchors against model misspecification. Deterministic given the
-        shared log.
+        mutual information between the response and the posterior — which parks trials
+        where each answer says the most (with a tight posterior that is often harder than
+        75%: most trials *should* feel nearly indistinguishable). 5% of trials stay plain
+        palette pairs, as anchors against model misspecification — no more, because the
+        slip rate is already pinned by the log and easy trials carry almost no
+        information. Deterministic given the shared log.
         """
         _rng = random.Random(n * 2654435761 % (2**31))
         # Blocked, not alternating: flipping the page every click churns light/dark
@@ -215,7 +217,7 @@ def _(GROUNDS, PAIRS, np, random):
         # adapted state while still balancing the two grounds over a sitting.
         _ground = ("day", "night")[(n // 16) % 2]
         _pal, _a, _b = _rng.choice(PAIRS)
-        if _rng.random() < 0.15:
+        if _rng.random() < 0.05:
             if _rng.random() < 0.5:
                 _a, _b = _b, _a
             _base, _odd, _kind = _a, _b, _pal
@@ -240,15 +242,32 @@ def _(GROUNDS, PAIRS, np, random):
             def _entropy(q):
                 return -(q * np.log(q + 1e-12) + (1 - q) * np.log(1 - q + 1e-12))
 
+            def _eig_at(_dv, _m):
+                _cand = _to_hex(_base_o + _dv * _m)
+                if _cand == _a:
+                    return -1.0, None
+                _pth = p_correct(np.abs(_base_o - opp(_cand)), _ground)
+                _pbar = float((_post * _pth).sum())
+                return _entropy(_pbar) - float((_post * _entropy(_pth)).sum()), _cand
+
+            # Two-stage search per direction: a coarse sweep over the full magnitude range
+            # localizes the informative zone, then a fine sweep around that winner finds the
+            # optimum. The coarse grid alone steps by ~2.8x, so whenever the threshold falls
+            # between its steps the chosen trial lands either trivially easy or invisibly
+            # hard — measured at ~28% of achievable information lost per trial.
             _best, _best_hex = -1.0, None
             for _dv in _dirs:
+                _dir_best, _dir_m = -1.0, None
                 for _m in np.geomspace(_TAUS[0] * 0.5, _TAUS[-1] * 1.5, 6):
-                    _cand = _to_hex(_base_o + _dv * _m)
-                    if _cand == _a:
-                        continue
-                    _pth = p_correct(np.abs(_base_o - opp(_cand)), _ground)
-                    _pbar = float((_post * _pth).sum())
-                    _eig = _entropy(_pbar) - float((_post * _entropy(_pth)).sum())
+                    _eig, _cand = _eig_at(_dv, _m)
+                    if _eig > _dir_best:
+                        _dir_best, _dir_m = _eig, _m
+                    if _eig > _best:
+                        _best, _best_hex = _eig, _cand
+                if _dir_m is None:
+                    continue
+                for _m in np.geomspace(_dir_m / 2.5, _dir_m * 2.5, 8):
+                    _eig, _cand = _eig_at(_dv, _m)
                     if _eig > _best:
                         _best, _best_hex = _eig, _cand
             _base, _odd, _kind = _a, _best_hex, "probe"
@@ -383,19 +402,37 @@ def _(GRID, get_responses, mo, np, pd, posterior_for):
         )
         _by_ground = _frame.groupby("ground").correct.mean()
         _post = posterior_for(_log)
-        _wrg, _wby, _td, _tn, _lapse = (float((GRID[_i] * _post).sum()) for _i in range(5))
+        _lapse = float((GRID[4] * _post).sum())
+
+        # The identified quantities are per-axis THRESHOLDS tau/sqrt(w): raw weights ride a
+        # ridge to the grid ceiling (only w/tau^2 enters the likelihood), thresholds do not.
+        # Geometric mean over the joint (weight, tau) marginal, since both axes are log-spaced.
+        def _thresh(_w_ax, _tau_ax):
+            _m = _post.sum(axis=tuple(_i for _i in range(5) if _i not in (_w_ax, _tau_ax)))
+            _w = np.unique(GRID[_w_ax])
+            _t = np.unique(GRID[_tau_ax])
+            return float(np.exp((_m * np.log(_t[None, :] / np.sqrt(_w[:, None]))).sum()))
+
+        _lum_d = float(np.exp((_post.sum(axis=(0, 1, 3, 4)) * np.log(np.unique(GRID[2]))).sum()))
+        _lum_n = float(np.exp((_post.sum(axis=(0, 1, 2, 4)) * np.log(np.unique(GRID[3]))).sum()))
+        _rg_d = _thresh(0, 2)
+        _rg_n = _thresh(0, 3)
+        _by_d = _thresh(1, 2)
+        _by_n = _thresh(1, 3)
         _out = mo.vstack(
             [
                 mo.md(
-                    "**What the model has learned about your eyes** (lightness sensitivity = 1; "
-                    "a smaller weight means that axis needs a larger difference before you see it):"
+                    "**What the model has learned about your eyes** — the just-visible opponent-space "
+                    "difference per axis and ground (smaller is finer discrimination):"
                 ),
                 mo.hstack(
                     [
-                        mo.stat(f"{_wrg:.2f}", label="red–green weight", bordered=True),
-                        mo.stat(f"{_wby:.2f}", label="blue–yellow weight", bordered=True),
-                        mo.stat(f"{_td:.3f}", label="threshold, day ground", bordered=True),
-                        mo.stat(f"{_tn:.3f}", label="threshold, night ground", bordered=True),
+                        mo.stat(f"{_lum_d:.3f}", label="lightness · day", bordered=True),
+                        mo.stat(f"{_lum_n:.3f}", label="lightness · night", bordered=True),
+                        mo.stat(f"{_rg_d:.3f}", label="red–green · day", bordered=True),
+                        mo.stat(f"{_rg_n:.3f}", label="red–green · night", bordered=True),
+                        mo.stat(f"{_by_d:.3f}", label="blue–yellow · day", bordered=True),
+                        mo.stat(f"{_by_n:.3f}", label="blue–yellow · night", bordered=True),
                         mo.stat(f"{100 * _lapse:.1f}%", label="your fitted slip rate", bordered=True),
                     ],
                     justify="start",
@@ -430,14 +467,22 @@ def _(mo):
     ## Reading the numbers, and what happens to them
 
     A pair at 25% is invisible to you; at 100% it is trivially yours; sequential ramps live or
-    die by their *adjacent* pairs, categorical palettes by their worst pair anywhere. Two notes
-    on reading the tiles above: the raw axis *weights* are not comparable across axes (their
-    units are arbitrary, so a weight will happily chase the grid's edge) — the identified
-    quantity is each axis's *threshold*, τ/√w; and everything measured here is at the trial
-    patch size. Findings at 440 trials: slip rate ~0.6%, and every candidate palette's worst
-    pair sits at the lapse-limited ceiling on both grounds — at exhibit scale, palette choice is
-    freed from color-vision constraints and belongs to aesthetics, ground contrast, and
-    luminance monotonicity. What that does **not** settle is glyph scale: color discrimination
+    die by their *adjacent* pairs, categorical palettes by their worst pair anywhere. The tiles
+    report each axis's identified *threshold* τ/√w (the raw fitted weights are not comparable
+    across axes — their units are arbitrary, so a weight will happily chase the grid's edge);
+    everything measured here is at the trial patch size. Findings at 602 trials, where this
+    stage **converged** (68% credible intervals on all six thresholds within ±5%, so further
+    104-pixel trials sharpen nothing the grid can still resolve): slip rate ≤0.5%; night ground
+    reads 25–30% finer than day on every axis; red–green threshold ~0.017 day / ~0.012 night,
+    blue–yellow ~0.041 / ~0.028, lightness ~0.058 / ~0.040 (thresholds are in each axis's own
+    opponent units — compare grounds within an axis, not axes against each other). Every
+    candidate palette's worst pair sits at the lapse-limited ceiling on both
+    grounds — at exhibit scale, palette choice is freed from color-vision constraints and
+    belongs to aesthetics, ground contrast, and luminance monotonicity. A note on how trials
+    *feel*: an information-optimal trial sits near your threshold, so most should look nearly
+    indistinguishable — a run of "I'm mostly guessing" is the instrument working, not failing;
+    the model expects and absorbs those misses. What that does **not** settle is glyph scale:
+    color discrimination
     collapses for small fields, editor tokens are ~10px, and text-sized stimuli are this
     instrument's queued next stage — the measurement that actually decides the editor theme. Grounds
     are logged because simultaneous contrast shifts discrimination — the same pair can pass on

@@ -188,10 +188,11 @@ documentation bug.
   luminance/warmth (2-3 params, not per-ground axes) so the fit generalizes to unseen
   grounds. Answers "which page maximizes his discrimination" and feeds the theme program's
   ground choice directly. Note: discrimination is one criterion; reading comfort (halation,
-  fatigue) is separate and needs its own probe. Early signal from fixed grounds: night is
-  ~20% finer than day (tau 0.041 vs 0.050) at 440 trials.
+  fatigue) is separate and needs its own probe. Signal from the converged fixed-ground stage:
+  night reads 25-30% finer than day on every axis (602 trials).
 - Calibration observer-model refinements (v1 shipped: Weibull over weighted LMS-opponent
-  distance, exact grid posterior, info-gain-generated stimuli): move the space to CAM16-UCS,
+  distance, exact grid posterior, info-gain-generated stimuli with two-stage magnitude search,
+  5% anchors, threshold tiles): move the space to CAM16-UCS,
   fit slope and lapse instead of fixing them, allow red-green asymmetry, and go GPU
   (numpyro/BoTorch) when trials pass a few thousand — heavy tools sanctioned by Titus.
 - The theme gallery's sequential prose still describes the retired blue RAMP; update it to

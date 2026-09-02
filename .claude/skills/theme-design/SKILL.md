@@ -38,6 +38,13 @@ interact, and choose the best combination — every step from measurement.
   fields, and editor tokens are ~10px. Editor-theme decisions wait for text-sized stimuli.
 - The background is a variable to search, not only a condition to control (queued: threshold
   as a smooth function of ground luminance and warmth).
+- An information-optimal 4AFC trial sits near threshold: to the observer, most trials should
+  feel nearly indistinguishable, and "I'm mostly guessing" is the instrument working. The
+  occasional easy trial is an anchor (5%) — with lapse pinned by a long log, easy trials carry
+  almost no information, so keep the anchor share minimal.
+- Greedy one-step EIG needs a dense candidate set to deliver: a coarse magnitude grid (~2.8x
+  steps) lost ~28% of achievable information per trial when the threshold fell between steps;
+  a two-stage coarse-then-fine sweep per direction recovers it.
 - A surface's beauty is allowed to vote and never to overrule the instruments; Titus's eyes
   outrank both — his comparison across a gallery row is the final measurement.
 - Results live with their instrument or in Titus's Notion (his hands only); CLAUDE.md carries
@@ -45,6 +52,10 @@ interact, and choose the best combination — every step from measurement.
 
 ## Standing verdicts (dated, superseded by newer measurements in the instruments)
 
+- 2026-09-02, 602 trials: the exhibit-scale (104px) stage is **converged** — 68% CIs on all
+  six per-axis thresholds within ±5%, further clicking at this scale is low-yield. Numbers and
+  reading guidance live in calibrate-vision.py's closing prose. The next informative data is
+  glyph-scale (queued, decides the editor theme) and the ground search.
 - 2026-09-02, 440 trials: every candidate palette's worst pair is lapse-limited-visible at
   104px on both grounds — exhibit-scale palette choice is free of CVD constraints for Titus.
   Sequential house ramp is cividis (applied system-wide with re-measured ink crossovers);
