@@ -87,6 +87,19 @@ they are mixed, split — the content cell stays visible and may end by renderin
 made, the display-assembly cell folds. Names flow between cells, so the split costs nothing.
 The standing exception remains the mutation demos, whose render timing is the demonstration.
 
+**Interactive cells.** Mechanics that cost a day to learn: a UI element is inert unless bound
+to a global name (`mo.ui.array` for groups); a button's `on_change` fires only if its value
+changes (`value=0, on_click=lambda v: v + 1`); `mo.ui.anywidget` takes no `on_change` — watch
+its `.value` from a downstream cell, and dedupe (first click of a fresh widget counts).
+No surface reliably repaints the cell the user just interacted with, so displays that must
+change live in their own cells, controls stay static or trial-agnostic, and recorded data is
+derived from state at event time — never from a rendering's closure — with a state-generation
+guard so a stale surface drops a click instead of mis-recording. UI elements interpolate into
+`mo.md` f-strings (how controls sit on a styled ground); multi-paragraph `mo.md` inside an
+`hstack` lays its paragraphs out horizontally in the VSCode renderer — use explicit stacks.
+Interactive instruments are verified by clicking them in a real browser (`marimo run` +
+`xdg-open`); the embedded surfaces lie (driving-notes in the vscode-keyhole skill).
+
 **Never rewrite a notebook on disk while it is open in the editor.** The extension syncs
 cells by id in transactions, and an external rewrite produces
 `ValueError: Cell 'X' already exists` or spurious multiple-definition errors that exist
@@ -193,6 +206,12 @@ documentation bug.
   two interact (shared grounds, simultaneous contrast, accent-vs-data-hue collisions) and
   determine the best combination. Builds on calibrate-vision data; the deliverable is a ranked,
   measured recommendation plus the override files to apply it.
+
+**Stopping agents gracefully.** When work must stop (credits, interruption), message running
+agents "commit what is verified, then stop" instead of killing them: a kill converts in-flight
+verified work back into future spend. Kill only when spend must stop this instant, then stash
+uncommitted edits and park a resume point in the queue (measured: one killed agent's full
+re-read, versus two whose partial commits survived).
 
 **A go is standing.** Once Titus has aimed work — "go", or "go on the things you proposed" —
 sessions keep moving through it and through the queue autonomously; the proposals block gates
