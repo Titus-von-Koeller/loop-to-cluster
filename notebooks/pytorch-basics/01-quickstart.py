@@ -15,7 +15,7 @@ __generated_with = "0.24.0"
 app = marimo.App()
 
 
-@app.cell
+@app.cell(hide_code=True)
 def _():
     import marimo as mo
 
@@ -25,15 +25,13 @@ def _():
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
-    [Learn the Basics](intro.html) \|\| **Quickstart** \|\| [Tensors](tensorqs_tutorial.html) \|\|
-    [Datasets & DataLoaders](data_tutorial.html) \|\| [Transforms](transforms_tutorial.html) \|\|
-    [Build Model](buildmodel_tutorial.html) \|\| [Autograd](autogradqs_tutorial.html) \|\|
-    [Optimization](optimization_tutorial.html) \|\| [Save & Load Model](saveloadrun_tutorial.html)
+    *PyTorch basics, 1 of 8 — after: [Tensors](02-tensors.py)*
 
     # Quickstart
 
-    This section runs through the API for common tasks in machine learning. Refer to the links in
-    each section to dive deeper.
+    One complete pass, at speed: load a dataset, build a network, train it, save it, and
+    look at exactly what it gets wrong. Each section compresses a later notebook in this
+    series; the *read more* links point there.
 
     ## Working with data
 
@@ -119,7 +117,7 @@ def _(DataLoader, test_data, training_data):
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
-    Read more about [loading data in PyTorch](data_tutorial.html).
+    Read more in [Datasets & DataLoaders](03-datasets-and-dataloaders.py).
     """)
     return
 
@@ -135,7 +133,7 @@ def _(mo):
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
-    # Creating Models
+    ## Creating Models
 
     To define a neural network in PyTorch, we create a class that inherits from
     [nn.Module](https://pytorch.org/docs/stable/generated/torch.nn.Module.html). We define the
@@ -175,7 +173,7 @@ def _(nn, torch):
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
-    ## The same object, rendered rather than printed
+    ### The same object, rendered rather than printed
 
     `print(model)` produced the text above. Returning the module instead hands it to
     marimo's formatter: parameter counts per layer, dtype and device, and a color per
@@ -195,7 +193,7 @@ def _(model):
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
-    Read more about [building neural networks in PyTorch](buildmodel_tutorial.html).
+    Read more in [Build Model](05-build-model.py).
     """)
     return
 
@@ -211,7 +209,7 @@ def _(mo):
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
-    # Optimizing the Model Parameters
+    ## Optimizing the Model Parameters
 
     To train a model, we need a [loss
     function](https://pytorch.org/docs/stable/nn.html#loss-functions) and an
@@ -315,7 +313,7 @@ def _(
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
-    Read more about [Training your model](optimization_tutorial.html).
+    Read more in [Optimization](07-optimization-loop.py).
     """)
     return
 
@@ -331,7 +329,7 @@ def _(mo):
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
-    # Saving Models
+    ## Saving Models
 
     A common way to save a model is to serialize the internal state dictionary (containing the
     model parameters).
@@ -349,7 +347,7 @@ def _(model, torch):
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
-    # Loading Models
+    ## Loading Models
 
     The process for loading a model includes re-creating the model structure and loading the state
     dictionary into it.
@@ -399,7 +397,7 @@ def _(device, model_1, test_data, torch):
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
-    Read more about [Saving & Loading your model](saveloadrun_tutorial.html).
+    Read more in [Save & Load Model](08-save-load-run.py).
     """)
     return
 
