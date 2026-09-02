@@ -269,12 +269,13 @@ def _(LOG, datetime, get_responses, json, mo, set_responses, timezone, trial_for
           const wrap = document.createElement("div");
           wrap.style.cssText = `background:${model.get("ground")};padding:22px;` +
             `border-radius:10px;display:flex;justify-content:center;align-items:center;` +
-            `gap:64px;width:100%;box-sizing:border-box;aspect-ratio:1.618/1`;
+            `gap:12px;width:100%;box-sizing:border-box;aspect-ratio:1.618/1`;
           model.get("colors").forEach((c, i) => {
             const sq = document.createElement("div");
-            // Fixed pixels on purpose: patch size is a stimulus parameter (spatial
-            // summation), so it must not follow the window. 104/64 puts the row at ~1/phi
-            // of the column the notebooks use.
+            // Fixed pixels on purpose: patch size AND separation are stimulus parameters
+            // (spatial summation; near-abutting fields give the most sensitive
+            // comparison, and match how adjacent glyphs and chart marks are actually
+            // read). Both are logged with every response.
             sq.style.cssText = `width:104px;height:104px;border-radius:10px;background:${c};` +
               `cursor:pointer`;
             sq.onclick = () => {
@@ -323,6 +324,7 @@ def _(LOG, answer_squares, datetime, get_responses, json, set_responses, timezon
             "correct": choice == _now["odd_position"],
             # Patch size is a stimulus parameter; log it so size changes stay analyzable.
             "size_px": 104,
+            "gap_px": 12,
         }
         # Append-only, one record per line: concurrent sessions interleave instead of
         # overwriting each other's history.
