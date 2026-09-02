@@ -499,18 +499,25 @@ def _(mo, model):
 
 
 @app.cell(hide_code=True)
-def _(ACCENT, BASE, alt, mo, model, pd):
+def _(ACCENT, BASE, alt, mo, model, pd, torch):
     import math
 
-    _first = next(parameter for name, parameter in model.named_parameters() if name.endswith("0.weight")).detach()
+    _first = (
+        next(parameter for name, parameter in model.named_parameters() if name.endswith("0.weight")).detach().cpu()
+    )
     _bound = 1 / math.sqrt(_first.shape[1])
-    _values = pd.DataFrame({"weight": _first.cpu().flatten().tolist()})
+    # Binned here rather than by altair: handing the chart all 401,408 raw weights trips
+    # altair's 5,000-row limit outside marimo and ships the lot to the browser inside it.
+    # Sixty pre-counted bars are the same picture.
+    _counts, _edges = torch.histogram(_first.flatten(), bins=60)
+    _bins = pd.DataFrame({"start": _edges[:-1].tolist(), "end": _edges[1:].tolist(), "count": _counts.tolist()})
     _histogram = (
-        alt.Chart(_values)
+        alt.Chart(_bins)
         .mark_bar(color=BASE)
         .encode(
-            x=alt.X("weight:Q", bin=alt.Bin(maxbins=60), title="weight value"),
-            y=alt.Y("count()", title="count"),
+            x=alt.X("start:Q", bin="binned", title="weight value"),
+            x2="end:Q",
+            y=alt.Y("count:Q", title="count"),
         )
         .properties(width=460, height=200, title=f"{tuple(_first.shape)} weights, fresh from nn.Linear")
     )
