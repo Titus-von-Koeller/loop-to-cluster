@@ -146,55 +146,36 @@ def _(GROUNDS, PAIRS, random):
 
 @app.cell(hide_code=True)
 def _(get_responses, mo, trial_for):
-    # Display only, no UI elements: marimo does not reliably repaint the cell a user just
-    # interacted with (measured on the native renderer, the Simple Browser, and Chrome), so
-    # the picture that must change lives apart from the buttons that change it.
+    # The trial number doubles as a staleness indicator: if it ever disagrees with the
+    # squares below, the surface lagged and clicks are being dropped by the guard.
     _n = len(get_responses())
-    _t = trial_for(_n)
-    _colors = [_t["base"]] * 4
-    _colors[_t["odd_position"]] = _t["odd_color"]
-
-    def _ink(c):
-        # Label ink by square brightness — the numeral is a label, not data.
-        r, g, b = (int(c.lstrip("#")[i : i + 2], 16) for i in (0, 2, 4))
-        return "#15181d" if (0.2126 * r + 0.7152 * g + 0.0722 * b) > 110 else "#ffffff"
-
-    _squares = "".join(
-        f'<span style="display:inline-flex;align-items:center;justify-content:center;'
-        f"width:72px;height:72px;border-radius:8px;margin:0 14px;background:{c};"
-        f'color:{_ink(c)};font:600 20px sans-serif">{i + 1}</span>'
-        for i, c in enumerate(_colors)
-    )
-    mo.vstack(
-        [
-            mo.md(f"**Trial {_n + 1}** — which square is the odd one out?"),
-            mo.Html(
-                f'<div style="background:{_t["ground_hex"]};padding:36px 22px;border-radius:10px;'
-                f'display:inline-block">{_squares}</div>'
-            ),
-        ],
-        gap=0.8,
-    )
+    mo.md(f"**Trial {_n + 1}** — click the odd square (Ctrl-1 … Ctrl-4 also answer).")
     return
 
 
 @app.cell(hide_code=True)
 def _(LOG, datetime, get_responses, json, mo, set_responses, timezone, trial_for):
-    def _record(choice):
-        # The trial is derived from the response count at click time, never from a closure:
-        # the buttons are static and trial-agnostic, so a stale rendering cannot mis-record —
-        # what gets scored is always the trial the display cell currently poses.
-        _n = len(get_responses())
-        _t = trial_for(_n)
+    _n = len(get_responses())
+    _t = trial_for(_n)
+    _colors = [_t["base"]] * 4
+    _colors[_t["odd_position"]] = _t["odd_color"]
+
+    def _record(choice, n=_n):
+        # The squares are the buttons, so they re-render per trial — which reintroduces the
+        # stale-surface risk. The guard converts it from data corruption into a dropped
+        # click: a rendering whose trial is no longer current records nothing.
+        if n != len(get_responses()):
+            return
+        _now = trial_for(n)
         _entry = {
             "ts": datetime.now(timezone.utc).isoformat(timespec="seconds"),
-            "palette": _t["palette"],
-            "base": _t["base"],
-            "odd_color": _t["odd_color"],
-            "ground": _t["ground"],
-            "odd_position": _t["odd_position"],
+            "palette": _now["palette"],
+            "base": _now["base"],
+            "odd_color": _now["odd_color"],
+            "ground": _now["ground"],
+            "odd_position": _now["odd_position"],
             "choice": choice,
-            "correct": choice == _t["odd_position"],
+            "correct": choice == _now["odd_position"],
         }
         # Append-only, one record per line: concurrent sessions interleave instead of
         # overwriting each other's history.
@@ -202,85 +183,27 @@ def _(LOG, datetime, get_responses, json, mo, set_responses, timezone, trial_for
             _f.write(json.dumps(_entry) + "\n")
         set_responses([*get_responses(), _entry])
 
-    # UI elements must live in a global binding to be interactive; a cell-local list renders
-    # but never registers. These buttons are created once and never re-render — each carries a
-    # click-incremented value so its on_change fires on every press.
-    answer_buttons = mo.ui.array(
+    # Each button carries its own patch of ground so the color is judged against the theme
+    # page it will live on; the page gaps between buttons are the compromise this buys.
+    answer_squares = mo.ui.array(
         [
             mo.ui.button(
-                label=str(i + 1),
+                label=(
+                    f'<span style="display:inline-block;padding:16px 12px;'
+                    f'background:{_t["ground_hex"]};border-radius:10px">'
+                    f'<span style="display:inline-block;width:64px;height:64px;'
+                    f'border-radius:8px;background:{_c}"></span></span>'
+                ),
                 value=0,
                 on_click=lambda v: v + 1,
-                on_change=lambda _, i=i: _record(i),
-                keyboard_shortcut=f"Ctrl-{i + 1}",
+                on_change=lambda _, i=_i: _record(i),
+                keyboard_shortcut=f"Ctrl-{_i + 1}",
             )
-            for i in range(4)
+            for _i, _c in enumerate(_colors)
         ]
     )
-    mo.hstack([answer_buttons[_i] for _i in range(4)], justify="start", gap=3.4)
-    return (answer_buttons,)
-
-
-@app.cell(hide_code=True)
-def _(get_responses, mo, pd):
-    _log = get_responses()
-    if not _log:
-        _out = mo.md("*No responses yet — the analysis fills in as you answer.*")
-    else:
-        _frame = pd.DataFrame(_log)
-        _frame["pair"] = _frame.apply(lambda r: " / ".join(sorted([r.base, r.odd_color])), axis=1)
-        _acc = _frame.correct.mean()
-        _by_pair = (
-            _frame.groupby(["palette", "pair"]).agg(n=("correct", "size"), accuracy=("correct", "mean")).reset_index()
-        )
-        _tested = _by_pair[_by_pair.n >= 3].sort_values("accuracy")
-        _by_palette = (
-            _frame.groupby("palette")
-            .agg(trials=("correct", "size"), accuracy=("correct", "mean"))
-            .reset_index()
-            .sort_values("accuracy")
-        )
-        _by_ground = _frame.groupby("ground").correct.mean()
-        _out = mo.vstack(
-            [
-                mo.hstack(
-                    [
-                        mo.stat(f"{len(_frame):,}", label="responses", bordered=True),
-                        mo.stat(f"{100 * _acc:.0f}%", label="overall accuracy (chance 25%)", bordered=True),
-                        *[
-                            mo.stat(f"{100 * v:.0f}%", label=f"on the {g} ground", bordered=True)
-                            for g, v in _by_ground.items()
-                        ],
-                    ],
-                    justify="start",
-                    gap=1,
-                ),
-                mo.md("**Palettes, hardest first for your eyes** (accuracy over all their tested pairs):"),
-                mo.ui.table(_by_palette, selection=None),
-                mo.md("**Most confused pairs so far** (at least three trials each):"),
-                mo.ui.table(_tested.head(12), selection=None) if len(_tested) else mo.md("*none with n ≥ 3 yet*"),
-            ],
-            gap=0.8,
-        )
-    _out
-    return
-
-
-@app.cell(hide_code=True)
-def _(mo):
-    mo.md(r"""
-    ## Reading the numbers, and what happens to them
-
-    A pair at 25% is invisible to you; at 100% it is trivially yours; sequential ramps live or
-    die by their *adjacent* pairs, categorical palettes by their worst pair anywhere. Grounds
-    are logged because simultaneous contrast shifts discrimination — the same pair can pass on
-    one page and fail on the other. Trials accumulate in `calibration-responses.jsonl`, which is
-    committed like any measurement: future sessions (and future exhibits) read it to weight
-    palette choices by *your measured* confusions instead of the population model. When enough
-    trials exist, the next step is written in the queue: fit your personal confusion axis from
-    the misses and re-rank the theme gallery's dropdown with it.
-    """)
-    return
+    mo.hstack([answer_squares[_j] for _j in range(4)], justify="start", gap=1)
+    return (answer_squares,)
 
 
 if __name__ == "__main__":
