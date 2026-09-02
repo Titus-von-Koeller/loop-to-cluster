@@ -459,8 +459,8 @@ def _(mo):
             "cubehelix",
             "Blues (Brewer)",
             "YlGnBu (Brewer)",
-            "turbo — contested",
-            "jet — the specimen",
+            "turbo",
+            "jet",
         ],
         value="RAMP (house)",
         label="sequential ramp",
@@ -481,8 +481,8 @@ def _(INK_DARK, INK_LIGHT, RAMP, alt, luminance, mo, pd, ramp_choice, sample_cma
         "cubehelix": sample_cmap("cubehelix", 5),
         "Blues (Brewer)": sample_cmap("Blues", 5),
         "YlGnBu (Brewer)": sample_cmap("YlGnBu", 5),
-        "turbo — contested": sample_cmap("turbo", 5),
-        "jet — the specimen": sample_cmap("jet", 5),
+        "turbo": sample_cmap("turbo", 5),
+        "jet": sample_cmap("jet", 5),
     }
     _ramp = _ramps[ramp_choice.value]
     _values = torch.arange(48).reshape(6, 8)
