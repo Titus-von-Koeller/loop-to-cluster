@@ -160,15 +160,15 @@ def _(GROUNDS, PAIRS, np, random):
     # weights are relative to lightness (fixed 1); thresholds are per ground, on a scale
     # set by the palette pairs' own distance distribution.
     _dref = np.array([np.linalg.norm(opp(_a) - opp(_b)) for _pal, _a, _b in PAIRS])
-    _TAUS = np.geomspace(float(np.quantile(_dref, 0.05)) / 6, float(np.quantile(_dref, 0.9)), 8)
+    _TAUS = np.geomspace(float(np.quantile(_dref, 0.05)) / 10, float(np.quantile(_dref, 0.9)), 12)
     # Lapse is a fitted axis, not a constant: the model can attribute rare misses to the
     # finger instead of the eyes, and stimulus placement marginalizes over that belief —
     # an accidental miss or lucky guess costs a few misplaced trials, never a bad path,
     # because the posterior is global and self-correcting.
     GRID = np.stack(
         np.meshgrid(
-            np.geomspace(0.05, 3.0, 10),
-            np.geomspace(0.1, 3.0, 8),
+            np.geomspace(0.05, 12.0, 12),
+            np.geomspace(0.05, 6.0, 10),
             _TAUS,
             _TAUS,
             np.array([0.005, 0.02, 0.05, 0.1]),
