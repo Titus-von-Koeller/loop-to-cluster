@@ -48,10 +48,11 @@ def show(tensor, title=None, cell=54, facts=True):
         "y": alt.Y("row:O", axis=None, scale=alt.Scale(paddingInner=0.06)),
     }
     # Ink on a square is chosen against that square's fill, which is known here, rather
-    # than against the page, which is not. The crossovers are measured, not guessed: white
-    # only overtakes near-black at 0.73 of the sequential ramp, and at 0.71 of the
-    # diverging one, taking the later of its two arms so neither switches early.
-    on_dark = f"abs(datum.v) > {0.71 * limit}" if signed else f"datum.v > {0.73 * limit}"
+    # than against the page, which is not. The crossovers are measured, not guessed: the
+    # sequential ramp (cividis) runs dark-to-light, so white ink wins BELOW 0.48 of the
+    # scale; the diverging ramp is dark at both extremes, so white wins above 0.71 of
+    # either arm, taking the later of the two so neither switches early.
+    on_dark = f"abs(datum.v) > {0.71 * limit}" if signed else f"datum.v < {0.48 * limit}"
     picture = (
         alt.Chart(frame)
         .mark_rect()

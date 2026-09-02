@@ -29,7 +29,10 @@ ACCENT = OKABE_ITO["vermillion"]
 SEQUENTIAL_SCHEME = "cividis"
 DIVERGING_SCHEME = "blueorange"
 
-RAMP = ["#dbe7f7", "#a8c6ec", "#6b9ede", "#2a78d6", "#17457c"]
+# cividis at 0, .25, .5, .75, 1 (matplotlib 3.11.1) — the CVD-optimized sequential map,
+# replacing the original single-hue blue ramp. Dark end is LOW: ink logic in _viz flips
+# to white below 0.48 of the scale (measured against these values).
+RAMP = ["#00224e", "#434e6c", "#7d7c78", "#bcae6c", "#fee838"]
 POLARITY = ["#8f3413", "#d95926", "#eaa886", "#e8e8e6", "#93bae9", "#2a78d6", "#173f6e"]
 
 # Ink for text set on a known square fill — never on the page, whose color belongs to the

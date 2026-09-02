@@ -70,9 +70,9 @@ def _():
     # notebook inherits, live in _viz.py.
     import altair as alt
     import pandas as pd
-    from _viz import INK_DARK, INK_LIGHT, RAMP, show
+    from _viz import BASE, INK_DARK, INK_LIGHT, POLARITY, RAMP, show
 
-    return INK_DARK, INK_LIGHT, RAMP, alt, pd, show
+    return BASE, INK_DARK, INK_LIGHT, POLARITY, RAMP, alt, pd, show
 
 
 @app.cell(hide_code=True)
@@ -554,7 +554,7 @@ def _(mo):
 
 
 @app.cell(hide_code=True)
-def _(INK_DARK, INK_LIGHT, RAMP, alt, mo, pd, show, slicing, torch):
+def _(BASE, INK_DARK, INK_LIGHT, POLARITY, alt, mo, pd, show, slicing, torch):
     t2_sliced = torch.arange(48).reshape(6, 8)
     try:
         _result = slicing.value(t2_sliced)
@@ -604,7 +604,9 @@ def _(INK_DARK, INK_LIGHT, RAMP, alt, mo, pd, show, slicing, torch):
             **_position,
             color=alt.Color(
                 "picked:N",
-                scale=alt.Scale(domain=[False, True], range=[RAMP[0], RAMP[3]]),
+                # Selection is categorical, not magnitude: the diverging ramp's neutral
+                # midpoint for unpicked, the house BASE for picked.
+                scale=alt.Scale(domain=[False, True], range=[POLARITY[3], BASE]),
                 legend=None,
             ),
             tooltip=[alt.Tooltip("value:Q", title="value"), "row:O", "col:O"],
@@ -846,7 +848,7 @@ def _(INK_DARK, INK_LIGHT, RAMP, alt, mo, operation, pd, show, torch):
                 **at,
                 text=alt.Text("value:Q", format=".0f"),
                 color=alt.condition(
-                    f"datum.order > {0.73 * (base.numel() - 1):.2f}", alt.value(INK_LIGHT), alt.value(INK_DARK)
+                    f"datum.order < {0.48 * (base.numel() - 1):.2f}", alt.value(INK_LIGHT), alt.value(INK_DARK)
                 ),
             )
         )
