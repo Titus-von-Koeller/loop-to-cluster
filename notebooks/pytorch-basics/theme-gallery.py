@@ -363,6 +363,132 @@ def _(RAMP, alt, mo, pd):
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
+    ## The editor theme, under the same instruments
+
+    The reading theme deserves the trial it hosts. Below, the two Horizon variants actually
+    installed on this machine — sampled from the extension's own JSON, alpha composited onto
+    each theme's page before measuring — with the WCAG contrast ratio printed under every
+    accent, on that theme's own ground, as designed and under deuteranopia. AA for body-size
+    text is 4.5:1; ratios below it are flagged.
+
+    As measured on `horizon-theme-vscode 1.0.1`: the **night variant clears AA for every role**
+    (strings 9.7:1, functions 6.4:1, links 4.7:1), but the **day variant fails it on three of
+    five accents** — strings at 2.8:1, links at 3.3:1, functions at 3.7:1 against the warm
+    page. And the palette's two pink-family roles, links (345°) and variables (346°), are one
+    degree of hue apart — a distinction that rides the weakest axis of red-green vision even
+    before any simulation. The warm paper ground and the day/night pairing are genuine
+    strengths; the day theme's accent contrast is where a replacement or an override would
+    earn its keep.
+    """)
+    return
+
+
+@app.cell(hide_code=True)
+def _(OKABE_ITO, alt, luminance, mo, pd, simulate):
+    import json as _json
+    import re as _re
+    from pathlib import Path as _Path
+
+    _theme_files = {
+        "Horizon Bright Bold — day": "horizon-bright-bold.json",
+        "Horizon Bold — night": "horizon-bold.json",
+    }
+    _roots = list(_Path.home().glob(".vscode/extensions/*horizon*/themes/"))
+
+    def _load(name):
+        raw = (_roots[0] / name).read_text()
+        return _json.loads(_re.sub(r"//[^\n\"]*$", "", raw, flags=_re.M))
+
+    def _composite(hex_color, page):
+        """An 8-digit hex carries alpha; what the eye meets is the blend onto the page."""
+        raw = hex_color.lstrip("#")
+        rgb = [int(raw[i : i + 2], 16) for i in (0, 2, 4)]
+        alpha = int(raw[6:8], 16) / 255 if len(raw) == 8 else 1.0
+        bg = [int(page.lstrip("#")[i : i + 2], 16) for i in (0, 2, 4)]
+        return "#" + "".join(f"{round(alpha * c + (1 - alpha) * b):02x}" for c, b in zip(rgb, bg, strict=True))
+
+    def _contrast(fg, bg):
+        _hi, _lo = sorted([luminance(fg), luminance(bg)], reverse=True)
+        return (_hi + 0.05) / (_lo + 0.05)
+
+    _wanted = ["keyword", "string", "variable", "entity.name.function", "comment"]
+    _rows = []
+    if _roots:
+        for _label, _file in _theme_files.items():
+            _t = _load(_file)
+            _page_color = _t["colors"]["editor.background"]
+            _accents = {"link": _t["colors"].get("textLink.foreground")}
+            for _entry in _t.get("tokenColors", []):
+                _scopes = _entry.get("scope", [])
+                _scopes = [_scopes] if isinstance(_scopes, str) else _scopes
+                _color = _entry.get("settings", {}).get("foreground")
+                if _color:
+                    for _want in _wanted:
+                        _short = _want.split(".")[-1]
+                        if _short not in _accents and any(_s == _want or _s.startswith(_want) for _s in _scopes):
+                            _accents[_short] = _color
+            for _mode in ("as designed", "deuteranopia"):
+                for _i, (_role, _color) in enumerate(_accents.items()):
+                    _flat = _composite(_color, _page_color)
+                    _rows.append(
+                        {
+                            "theme": _label,
+                            "mode": _mode,
+                            "i": _i,
+                            "role": _role,
+                            "fill": simulate(_flat, _mode),
+                            "page": simulate(_page_color, _mode),
+                            "ratio": round(_contrast(_flat, _page_color), 1),
+                            "low": _contrast(_flat, _page_color) < 4.5,
+                        }
+                    )
+
+    if not _rows:
+        _out = mo.md("*No Horizon theme found under `~/.vscode/extensions` on this machine.*")
+    else:
+        _frame = pd.DataFrame(_rows)
+        _at = {
+            "x": alt.X("i:O", axis=None, scale=alt.Scale(paddingInner=0.25)),
+            "y": alt.Y("mode:N", axis=alt.Axis(title=None, domain=False, ticks=False)),
+        }
+        _charts = []
+        for _label in _theme_files:
+            _sub = _frame[_frame.theme == _label]
+            _ground = (
+                alt.Chart(_sub)
+                .mark_rect()
+                .encode(x=alt.value(0), x2=alt.value(6 * 78), **{"y": _at["y"]}, color=alt.Color("page:N", scale=None))
+            )
+            _swatch = (
+                alt.Chart(_sub).mark_rect(width=58, height=24).encode(**_at, color=alt.Color("fill:N", scale=None))
+            )
+            # Role names and ratios are set in the accent's own color on the theme's own
+            # page: their legibility right here is the measurement, re-performed by your eyes.
+            _names = (
+                alt.Chart(_sub)
+                .mark_text(fontSize=10, dy=22, fontWeight=500)
+                .encode(**_at, text="role:N", color=alt.Color("fill:N", scale=None))
+            )
+            _ratios = (
+                alt.Chart(_sub)
+                .mark_text(fontSize=11, dy=36, fontWeight=600)
+                .encode(
+                    **_at,
+                    text=alt.Text("ratio:Q", format=".1f"),
+                    color=alt.condition(
+                        "datum.low", alt.value(OKABE_ITO["vermillion"]), alt.Color("fill:N", scale=None)
+                    ),
+                )
+            )
+            _charts.append((_ground + _swatch + _names + _ratios).properties(width=6 * 78, height=180, title=_label))
+        _out = mo.vstack([mo.ui.altair_chart(_c, chart_selection=False, legend_selection=False) for _c in _charts])
+    _out
+    return
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
     ## Where the rules come from
 
     The system in `_viz.py` is assembled from results, not tastes. The lineage, and what each
