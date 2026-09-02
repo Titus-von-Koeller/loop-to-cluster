@@ -180,13 +180,15 @@ documentation bug.
   until you're done"). Protocol: one subagent per notebook (01, 05, 06, 07, 08), each reads
   "Editing notebooks" here plus the marimo-notebooks skill and pedagogy.md, verifies
   headlessly (never by driving VSCode windows Titus may be using), commits and pushes per
-  notebook with `git pull --rebase` before push. State: 01 and 05 partially committed and
-  pushed (01 magnitude claim and 05 histogram binning already corrected); 06 needs a full
-  redo; 07 was mid-verification (known: prose says "120 printed loss values", actual is
-  100); the git stash "WIP from stopped polish agents" holds salvage material for
-  01-phase-3 and 08 — read it with `git stash show -p`, never pop it, drop it only after
-  both notebooks land. After compaction or interruption: check `git log --oneline` for
-  which notebooks have landed, relaunch agents for the rest, same instructions.
+  notebook with `git pull --rebase` before push. State: 01 (fcbbed4), 05 (108479e) and
+  08 (ee20cb2) are DONE and pushed; 06 (full redo) and 07 (mid-verification finding: prose
+  says "120 printed loss values", actual is 100) have agents in flight. The salvage stash
+  is dropped — both its halves landed. After compaction or interruption: check
+  `git log --oneline` for which notebooks have landed, relaunch agents for the rest, same
+  instructions. When all five land: fold the agents' reported rule-learnings into the
+  skills in one batch (ANSI in exception strings, stash-salvage mechanics, forward links
+  are claims about their targets, unseeded-RNG "exactly" claims, Vega scheme orientation
+  vs POLARITY).
 - Code-reading efficiency in the editor across languages: research + measure (semantic
   highlighting, token-color overrides per the Horizon findings, font/ligature choices), using
   the calibration data as it accumulates. Named 2026-09-02.
