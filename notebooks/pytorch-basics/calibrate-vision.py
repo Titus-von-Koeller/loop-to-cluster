@@ -158,7 +158,20 @@ def _(GROUNDS, LOG, PAIRS, datetime, get_responses, json, mo, random, set_respon
         f'margin:0 14px;background:{c}"></span>'
         for c in _colors
     )
-    _buttons = [mo.ui.button(label=str(i + 1), on_change=lambda _, i=i: _record(i)) for i in range(4)]
+    # UI elements must live in a global binding to be interactive; a cell-local list renders
+    # but never registers. mo.ui.array is that binding for a homogeneous group, and each
+    # button needs a value that changes (on_click) for its on_change to fire.
+    answer_buttons = mo.ui.array(
+        [
+            mo.ui.button(
+                label=str(i + 1),
+                value=0,
+                on_click=lambda v: v + 1,
+                on_change=lambda _, i=i: _record(i),
+            )
+            for i in range(4)
+        ]
+    )
     mo.vstack(
         [
             mo.md(f"**Trial {_n + 1}** — which square is the odd one out?"),
@@ -166,11 +179,11 @@ def _(GROUNDS, LOG, PAIRS, datetime, get_responses, json, mo, random, set_respon
                 f'<div style="background:{_ground};padding:36px 22px;border-radius:10px;'
                 f'display:inline-block">{_squares}</div>'
             ),
-            mo.hstack(_buttons, justify="start", gap=3.4),
+            mo.hstack([answer_buttons[_i] for _i in range(4)], justify="start", gap=3.4),
         ],
         gap=0.8,
     )
-    return
+    return (answer_buttons,)
 
 
 @app.cell(hide_code=True)
