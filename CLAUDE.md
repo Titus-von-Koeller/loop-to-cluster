@@ -206,7 +206,10 @@ documentation bug.
   contrast instruments) and the best *graphing* theme independently; then characterize how the
   two interact (shared grounds, simultaneous contrast, accent-vs-data-hue collisions) and
   determine the best combination. Builds on calibrate-vision data; the deliverable is a ranked,
-  measured recommendation plus the override files to apply it.
+  measured recommendation plus the override files to apply it. Titus explicitly deferred the
+  glyph-scale build on 2026-09-02 ("not a green light for now") — his focus is the learning
+  notebooks; the applied best-guess theming (Horizon + measured overrides, cividis house ramp,
+  Okabe-Ito categorical) stands until he re-opens this. A question about the stage is not a go.
 
 **Stopping agents gracefully.** When work must stop (credits, interruption), message running
 agents "commit what is verified, then stop" instead of killing them: a kill converts in-flight
