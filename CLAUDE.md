@@ -168,13 +168,12 @@ documentation bug.
   the calibration data as it accumulates. Named 2026-09-02.
 - Screen calibration (hardware/ICC) — named 2026-09-02 as "another day"; until then the
   vision-calibration data is relative-to-this-screen, which its prose says.
-- Calibration stage two, the trait model: replace independent per-pair posteriors with a
-  parametric observer model (a learned metric over color space — discriminability as a
-  function of direction and magnitude of the color difference, per ground), stimuli chosen
-  by expected information gain over the model's parameters. That generalizes across pairs,
-  hones in on the underlying confusion axes, and removes the per-pair sampler's starvation
-  risk; QUEST+ (questplus on PyPI) is the reference machinery if trials become continuous
-  staircases between colors.
+- Calibration observer-model refinements (v1 shipped: Weibull over weighted LMS-opponent
+  distance, exact grid posterior, info-gain-generated stimuli): move the space to CAM16-UCS,
+  fit slope and lapse instead of fixing them, allow red-green asymmetry, and go GPU
+  (numpyro/BoTorch) when trials pass a few thousand — heavy tools sanctioned by Titus.
+- The theme gallery's sequential prose still describes the retired blue RAMP; update it to
+  the cividis house ramp once the swap survives Titus's reading.
 - When calibration-responses.jsonl has enough trials: fit Titus's personal confusion axis from
   the misses and re-rank the theme gallery's dropdown with measured rather than simulated
   discriminability.

@@ -33,6 +33,14 @@ def _(mo):
     evaluation (the editor theme's own accents included). Click the odd one out. Chance is 25%;
     a pair you can no longer beat chance on is, for you, one color.
 
+    What is being optimized is not your score but your **threshold surface**: a Bayesian
+    observer model (a Weibull psychometric over weighted opponent-space distance — the QUEST+
+    family) learns how far apart two colors must be, per direction (red–green, blue–yellow,
+    lightness) and per ground, before you can tell them apart. Each trial is *generated* to be
+    maximally informative about that model, which parks it near your ~75%-correct zone —
+    **feeling hard means it is working**, and every answer moves the whole surface, not one
+    pair's tally. A fraction of trials stay easy palette pairs, as anchors and breathers.
+
     Protocol: glance, decide within about a second, click — hesitation measures reasoning, not
     perception. Sixty-plus trials make a sitting; every response appends to
     `calibration-responses.jsonl` beside this file, so sittings accumulate across days, themes,
@@ -52,6 +60,7 @@ def _():
     from pathlib import Path
 
     import matplotlib as mpl
+    import numpy as np
     import pandas as pd
     from _palette import OKABE_ITO, POLARITY, RAMP
     from cmcrameri import cm as cmc
@@ -113,7 +122,7 @@ def _():
     GROUNDS = {"day": "#fdf0ed", "night": "#1c1e26"}
     LOG = Path(__file__).parent / "calibration-responses.jsonl"
 
-    return GROUNDS, LOG, PAIRS, datetime, json, pd, random, timezone
+    return GROUNDS, LOG, PAIRS, datetime, json, np, pd, random, timezone
 
 
 @app.cell(hide_code=True)
@@ -124,52 +133,111 @@ def _(LOG, json, mo):
 
 
 @app.cell(hide_code=True)
-def _(GROUNDS, PAIRS, random):
-    def _pair_key(palette, a, b):
-        return (palette, *sorted((a, b)))
+def _(GROUNDS, PAIRS, np, random):
+    # The observer model. sRGB -> cone-opponent space: linearize, project to LMS
+    # (Hunt-Pointer-Estevez on D65 XYZ), cube-root compress, then opponent axes —
+    # lum = L+M, rg = L-M, by = S-(L+M)/2. Deliberately approximate; the fitted weights
+    # absorb each axis's scale. Probability correct in 4AFC is a Weibull psychometric over
+    # the weighted opponent distance, with a 2% lapse ceiling.
+    _SRGB2XYZ = np.array([[0.4124, 0.3576, 0.1805], [0.2126, 0.7152, 0.0722], [0.0193, 0.1192, 0.9505]])
+    _XYZ2LMS = np.array([[0.4002, 0.7076, -0.0808], [-0.2263, 1.1653, 0.0457], [0.0, 0.0, 0.9182]])
+    _OPP = np.array([[1.0, 1.0, 0.0], [1.0, -1.0, 0.0], [-0.5, -0.5, 1.0]])
+    _RGB2LMS = _XYZ2LMS @ _SRGB2XYZ
+    _LMS2RGB = np.linalg.inv(_RGB2LMS)
+    _OPP_INV = np.linalg.inv(_OPP)
+
+    def opp(hex_color):
+        c = np.array([int(hex_color.lstrip("#")[i : i + 2], 16) / 255 for i in (0, 2, 4)])
+        lin = np.where(c <= 0.04045, c / 12.92, ((c + 0.055) / 1.055) ** 2.4)
+        return _OPP @ np.cbrt(np.clip(_RGB2LMS @ lin, 0.0, None))
+
+    def _to_hex(opp_vec):
+        lin = np.clip(_LMS2RGB @ (_OPP_INV @ opp_vec) ** 3, 0.0, 1.0)
+        srgb = np.where(lin <= 0.0031308, lin * 12.92, 1.055 * lin ** (1 / 2.4) - 0.055)
+        return "#" + "".join(f"{round(255 * v):02x}" for v in srgb)
+
+    # Parameter grid, QUEST+-style: exact discrete posterior, no sampler to tune. Axis
+    # weights are relative to lightness (fixed 1); thresholds are per ground, on a scale
+    # set by the palette pairs' own distance distribution.
+    _dref = np.array([np.linalg.norm(opp(_a) - opp(_b)) for _pal, _a, _b in PAIRS])
+    _TAUS = np.geomspace(float(np.quantile(_dref, 0.05)) / 6, float(np.quantile(_dref, 0.9)), 8)
+    GRID = np.stack(np.meshgrid(np.geomspace(0.05, 3.0, 10), np.geomspace(0.1, 3.0, 8), _TAUS, _TAUS, indexing="ij"))
+
+    def p_correct(delta, ground):
+        """P(correct) over the whole grid for one trial's opponent delta."""
+        _d2 = delta[0] ** 2 + GRID[0] * delta[1] ** 2 + GRID[1] * delta[2] ** 2
+        _tau = GRID[2] if ground == "day" else GRID[3]
+        return 0.25 + 0.73 * (1.0 - np.exp(-_d2 / _tau**2))
+
+    def posterior_for(responses):
+        _logp = np.zeros(GRID.shape[1:])
+        for _r in responses:
+            _p = p_correct(np.abs(opp(_r["base"]) - opp(_r["odd_color"])), _r["ground"])
+            _logp += np.log(_p if _r["correct"] else 1.0 - _p)
+        _logp -= _logp.max()
+        _post = np.exp(_logp)
+        return _post / _post.sum()
 
     def trial_for(n, responses):
-        """The nth trial: Bayesian uncertainty sampling over per-pair Beta posteriors.
+        """The nth trial, generated to maximize expected information about the model.
 
-        Each pair's accuracy carries a Beta(1+correct, 1+wrong) posterior; the next trial
-        goes to the pair whose posterior variance is largest — untested pairs first, then
-        the ones the responses keep failing, so measurement concentrates where your eyes
-        are least readable. Deterministic given n and the first n responses, so every
-        surface poses the same trial. (For continuous just-noticeable-difference
-        staircases between two colors, the right tool is QUEST+ — parked in the queue.)
+        Candidate stimuli are built from a palette color plus an offset along the opponent
+        axes at magnitudes bracketing the current threshold estimate; the winner maximizes
+        mutual information between the response and the posterior — which parks trials near
+        the ~75%-correct zone, where each answer says the most. 15% of trials stay plain
+        palette pairs, as anchors against model misspecification. Deterministic given the
+        shared log.
         """
-        _stats = {}
-        for _r in responses[:n]:
-            _k = _pair_key(_r["palette"], _r["base"], _r["odd_color"])
-            _c, _w = _stats.get(_k, (0, 0))
-            _stats[_k] = (_c + 1, _w) if _r["correct"] else (_c, _w + 1)
-
-        def _variance(k):
-            _c, _w = _stats.get(k, (0, 0))
-            _a, _b = _c + 1, _w + 1
-            return (_a * _b) / ((_a + _b) ** 2 * (_a + _b + 1))
-
         _rng = random.Random(n * 2654435761 % (2**31))
-        if _rng.random() < 0.2:
-            # Exploration keeps the sampler honest: without it, a pair judged easy in one
-            # sitting's light is never revisited, and the posterior can fixate on early luck.
-            _palette, _a, _b = _rng.choice(PAIRS)
+        _ground = ("day", "night")[n % 2]
+        _pal, _a, _b = _rng.choice(PAIRS)
+        if _rng.random() < 0.15:
+            if _rng.random() < 0.5:
+                _a, _b = _b, _a
+            _base, _odd, _kind = _a, _b, _pal
         else:
-            _best = max(_variance(_pair_key(*_p)) for _p in PAIRS)
-            _palette, _a, _b = _rng.choice([_p for _p in PAIRS if _variance(_pair_key(*_p)) >= _best - 1e-12])
-        if _rng.random() < 0.5:
-            _a, _b = _b, _a
-        _ground_name = ("day", "night")[n % 2]
+            _post = posterior_for(responses[:n])
+            _base_o = opp(_a)
+            _s2 = 1 / np.sqrt(2)
+            _dirs = [
+                np.array(_v)
+                for _v in [
+                    (0, 1, 0),
+                    (0, -1, 0),
+                    (0, 0, 1),
+                    (0, 0, -1),
+                    (1, 0, 0),
+                    (-1, 0, 0),
+                    (0, _s2, _s2),
+                    (0, -_s2, _s2),
+                ]
+            ]
+
+            def _entropy(q):
+                return -(q * np.log(q + 1e-12) + (1 - q) * np.log(1 - q + 1e-12))
+
+            _best, _best_hex = -1.0, None
+            for _dv in _dirs:
+                for _m in np.geomspace(_TAUS[0] * 0.5, _TAUS[-1] * 1.5, 6):
+                    _cand = _to_hex(_base_o + _dv * _m)
+                    if _cand == _a:
+                        continue
+                    _pth = p_correct(np.abs(_base_o - opp(_cand)), _ground)
+                    _pbar = float((_post * _pth).sum())
+                    _eig = _entropy(_pbar) - float((_post * _entropy(_pth)).sum())
+                    if _eig > _best:
+                        _best, _best_hex = _eig, _cand
+            _base, _odd, _kind = _a, _best_hex, "probe"
         return {
-            "palette": _palette,
-            "base": _a,
-            "odd_color": _b,
-            "ground": _ground_name,
-            "ground_hex": GROUNDS[_ground_name],
+            "palette": _kind,
+            "base": _base,
+            "odd_color": _odd,
+            "ground": _ground,
+            "ground_hex": GROUNDS[_ground],
             "odd_position": _rng.randrange(4),
         }
 
-    return (trial_for,)
+    return GRID, posterior_for, trial_for
 
 
 @app.cell(hide_code=True)
@@ -262,7 +330,7 @@ def _(LOG, answer_squares, datetime, get_responses, json, set_responses, timezon
 
 
 @app.cell(hide_code=True)
-def _(get_responses, mo, pd):
+def _(GRID, get_responses, mo, np, pd, posterior_for):
     _log = get_responses()
     if not _log:
         _out = mo.md("*No responses yet — the analysis fills in as you answer.*")
@@ -281,8 +349,24 @@ def _(get_responses, mo, pd):
             .sort_values("accuracy")
         )
         _by_ground = _frame.groupby("ground").correct.mean()
+        _post = posterior_for(_log)
+        _wrg, _wby, _td, _tn = (float((GRID[_i] * _post).sum()) for _i in range(4))
         _out = mo.vstack(
             [
+                mo.md(
+                    "**What the model has learned about your eyes** (lightness sensitivity = 1; "
+                    "a smaller weight means that axis needs a larger difference before you see it):"
+                ),
+                mo.hstack(
+                    [
+                        mo.stat(f"{_wrg:.2f}", label="red–green weight", bordered=True),
+                        mo.stat(f"{_wby:.2f}", label="blue–yellow weight", bordered=True),
+                        mo.stat(f"{_td:.3f}", label="threshold, day ground", bordered=True),
+                        mo.stat(f"{_tn:.3f}", label="threshold, night ground", bordered=True),
+                    ],
+                    justify="start",
+                    gap=1,
+                ),
                 mo.hstack(
                     [
                         mo.stat(f"{len(_frame):,}", label="responses", bordered=True),
