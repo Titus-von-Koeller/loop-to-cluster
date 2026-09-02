@@ -267,9 +267,9 @@ def _(LOG, datetime, get_responses, json, mo, set_responses, timezone, trial_for
         function render({ model, el }) {
           el.style.cssText = `display:block;width:100%`;
           const wrap = document.createElement("div");
-          wrap.style.cssText = `background:${model.get("ground")};padding:36px 22px;` +
-            `border-radius:10px;display:flex;justify-content:center;gap:28px;` +
-            `width:100%;box-sizing:border-box`;
+          wrap.style.cssText = `background:${model.get("ground")};padding:22px;` +
+            `border-radius:10px;display:flex;justify-content:center;align-items:center;` +
+            `gap:28px;width:100%;box-sizing:border-box;aspect-ratio:1.618/1`;
           model.get("colors").forEach((c, i) => {
             const sq = document.createElement("div");
             sq.style.cssText = `width:72px;height:72px;border-radius:8px;background:${c};` +
