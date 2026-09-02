@@ -121,7 +121,7 @@ def _(mo):
     return
 
 
-@app.cell
+@app.cell(hide_code=True)
 def _(datasets, mo, torch, v2):
     _raw_image, _raw_label = datasets.FashionMNIST(root="data", train=True, download=False)[7]
     _as_tensor = v2.ToImage()(_raw_image)
@@ -181,7 +181,7 @@ def _(mo):
     return
 
 
-@app.cell
+@app.cell(hide_code=True)
 def _(mo):
     label_sample = mo.ui.slider(0, 999, value=7, label="sample", show_value=True)
     label_sample
@@ -258,7 +258,7 @@ def _(mo):
     return
 
 
-@app.cell
+@app.cell(hide_code=True)
 def _(mo):
     sample = mo.ui.slider(0, 999, value=7, label="image", show_value=True)
     angle = mo.ui.slider(-90.0, 90.0, step=1.0, value=0.0, label="rotate °", show_value=True)

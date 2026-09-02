@@ -73,7 +73,8 @@ damage. A window reload (`ctrl+alt+shift+m`) resets that memory and refolds on t
 activation — but only the cells the editor has materialized, so on a long notebook some
 cells stay expanded and, the memory now marking them folded, are never retried. The
 reliable spot fix is per cell: the collapse chevron, or the "marimo: Hide cell code"
-command, which also persists. That is stock 0.17.2. On this machine the extension is
+command, which also persists. A polish pass ends with a fold audit: any cell whose code
+the narrative does not ask the reader to read carries `hide_code=True` in the file. That is stock 0.17.2. On this machine the extension is
 patched — `home/editors/marimo.nix` in the dotfiles repo, re-applied on every extension
 update — so every notebook activation re-folds every `hide_code` cell and the file is
 the authority on visibility; a manual expand lasts until the next tab switch. The stock
@@ -90,6 +91,9 @@ broken merge over the good file, and can silently drop `hide_code` from any cell
 `marimo.options` metadata was lost. The window reload named under Environment remains the
 fallback when the whole session is confused. After any editor save, `git diff` and look
 for decorator churn.
+
+A live session that reopens into spurious "this cell redefines variables" errors resyncs
+with Restart Kernel followed by Run All — cheaper than the window reload, measured working.
 
 `ctrl+alt+m` assumes the notebook's session is live and resyncs on reopen. A notebook that sat
 open but never ran when the rewrite landed can wedge the extension for the whole window session

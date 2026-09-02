@@ -167,7 +167,7 @@ def _(mo):
     return
 
 
-@app.cell
+@app.cell(hide_code=True)
 def _(labels_map, mo, training_data):
     wanted = mo.ui.multiselect(
         options=dict(sorted((name, index) for index, name in labels_map.items())),
@@ -179,7 +179,7 @@ def _(labels_map, mo, training_data):
     return page, wanted
 
 
-@app.cell
+@app.cell(hide_code=True)
 def _(labels_map, mo, page, torch, training_data, wanted):
     _targets = training_data.targets
     _keep = torch.isin(_targets, torch.tensor(wanted.value or list(labels_map)))
@@ -417,7 +417,7 @@ def _(mo):
     return
 
 
-@app.cell
+@app.cell(hide_code=True)
 def _(mo):
     batch_size_choice = mo.ui.slider(steps=[1, 8, 16, 32, 64, 128, 256], value=64, label="batch_size", show_value=True)
     shuffle_choice = mo.ui.switch(True, label="shuffle")
@@ -426,7 +426,7 @@ def _(mo):
     return batch_size_choice, drop_last_choice, shuffle_choice
 
 
-@app.cell
+@app.cell(hide_code=True)
 def _(
     DataLoader,
     batch_size_choice,
@@ -501,7 +501,7 @@ def _(mo):
     return
 
 
-@app.cell
+@app.cell(hide_code=True)
 def _(mo):
     time_it = mo.ui.run_button(label="time four loaders — a few seconds")
     time_it
