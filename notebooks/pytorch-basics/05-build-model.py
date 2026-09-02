@@ -25,23 +25,10 @@ def _():
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
-    [Learn the Basics](intro.html) \|\| [Quickstart](quickstart_tutorial.html) \|\|
-    [Tensors](tensorqs_tutorial.html) \|\| [Datasets & DataLoaders](data_tutorial.html) \|\|
-    [Transforms](transforms_tutorial.html) \|\| **Build Model** \|\|
-    [Autograd](autogradqs_tutorial.html) \|\| [Optimization](optimization_tutorial.html) \|\| [Save
-    & Load Model](saveloadrun_tutorial.html)
+    *PyTorch basics, 5 of 8 — before this: [Transforms](04-transforms.py) · after:
+    [Autograd](06-autograd.py)*
 
     # Build the Neural Network
-
-    Neural networks comprise of layers/modules that perform operations on data. The
-    [torch.nn](https://pytorch.org/docs/stable/nn.html) namespace provides all the building blocks
-    you need to build your own neural network. Every module in PyTorch subclasses the
-    [nn.Module](https://pytorch.org/docs/stable/generated/torch.nn.Module.html). A neural network
-    is a module itself that consists of other modules (layers). This nested structure allows for
-    building and managing complex architectures easily.
-
-    In the following sections, we'll build a neural network to classify images in the FashionMNIST
-    dataset.
     """)
     return
 
@@ -64,6 +51,22 @@ def _(mo):
     return
 
 
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    Every layer in PyTorch is a **module** — a subclass of
+    [nn.Module](https://pytorch.org/docs/stable/generated/torch.nn.Module.html) — and a neural
+    network is itself a module built from other modules. That one recursive idea is the whole
+    [torch.nn](https://pytorch.org/docs/stable/nn.html) namespace: it provides the building
+    blocks, and nesting them is how arbitrarily complex architectures stay one object that can
+    be printed, moved and saved whole.
+
+    This notebook builds such a module to classify FashionMNIST images, then follows one forward
+    pass through it, layer by layer, shape by shape.
+    """)
+    return
+
+
 @app.cell
 def _():
     import torch
@@ -75,11 +78,12 @@ def _():
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
-    # Get Device for Training
+    ## Get a device for training
 
-    We want to be able to train our model on an
-    [accelerator](https://pytorch.org/docs/stable/torch.html#accelerators) such as CUDA, MPS, MTIA,
-    or XPU. If the current accelerator is available, we will use it. Otherwise, we use the CPU.
+    We want to train on an
+    [accelerator](https://pytorch.org/docs/stable/torch.html#accelerators) when one is present —
+    CUDA here; the same API covers Apple's Metal Performance Shaders (MPS), Meta's Training and
+    Inference Accelerator (MTIA) and Intel's GPUs (XPU). Otherwise we fall back to the CPU.
     """)
     return
 
@@ -94,11 +98,10 @@ def _(torch):
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
-    # Define the Class
+    ## Define the class
 
-    We define our neural network by subclassing `nn.Module`, and initialize the neural network
-    layers in `__init__`. Every `nn.Module` subclass implements the operations on input data in the
-    `forward` method.
+    We define our neural network by subclassing `nn.Module`: the layers are initialized in
+    `__init__`, and what the module does to its input lives in the `forward` method.
     """)
     return
 
@@ -128,7 +131,7 @@ def _(nn):
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
-    We create an instance of `NeuralNetwork`, and move it to the `device`, and print its structure.
+    We create an instance of `NeuralNetwork`, move it to the `device`, and print its structure.
     """)
     return
 
@@ -143,7 +146,7 @@ def _(NeuralNetwork, device):
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
-    ## Two better pictures of the same model
+    ### Two better pictures of the same model
 
     `print(model)` gives the constructor arguments back. marimo formats an `nn.Module`
     itself, which adds what the constructor does not say: how many parameters each layer
@@ -170,7 +173,7 @@ def _(model):
     return
 
 
-@app.cell
+@app.cell(hide_code=True)
 def _(device, mo, model):
     from torchview import draw_graph
 
@@ -187,15 +190,15 @@ def _(device, mo, model):
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
-    To use the model, we pass it the input data. This executes the model's `forward`, along with
-    some [background
-    operations](https://github.com/pytorch/pytorch/blob/270111b7b611d174967ed204776985cefca9c144/torch/nn/modules/module.py#L866).
-    Do not call `model.forward()` directly!
+    To use the model, we pass it the input data. Calling the model executes its `forward` along
+    with some [background
+    operations](https://github.com/pytorch/pytorch/blob/270111b7b611d174967ed204776985cefca9c144/torch/nn/modules/module.py#L866)
+    — hooks, chiefly — which is why `model.forward()` is never called directly, even though it
+    would return the same tensor here.
 
-    Calling the model on the input returns a 2-dimensional tensor with dim=0 corresponding to each
-    output of 10 raw predicted values for each class, and dim=1 corresponding to the individual
-    values of each output. We get the prediction probabilities by passing it through an instance of
-    the `nn.Softmax` module.
+    The call returns a 2-dimensional tensor: dim=0 indexes the batch, one row per input image,
+    and dim=1 holds 10 raw scores, one per class — the **logits**. Passing them through an
+    instance of the `nn.Softmax` module turns them into prediction probabilities.
     """)
     return
 
@@ -221,10 +224,10 @@ def _(mo):
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
-    # Model Layers
+    ## Model layers
 
-    Let's break down the layers in the FashionMNIST model. To illustrate it, we will take a sample
-    minibatch of 3 images of size 28x28 and see what happens to it as we pass it through the
+    Let's break down the layers in the FashionMNIST model. To illustrate, we take a sample
+    minibatch of 3 images of size 28x28 and watch what happens to it as it passes through the
     network.
     """)
     return
@@ -240,11 +243,11 @@ def _(torch):
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
-    # nn.Flatten
+    ## nn.Flatten
 
     We initialize the [nn.Flatten](https://pytorch.org/docs/stable/generated/torch.nn.Flatten.html)
-    layer to convert each 2D 28x28 image into a contiguous array of 784 pixel values ( the
-    minibatch dimension (at dim=0) is maintained).
+    layer to convert each 2D 28x28 image into a contiguous array of 784 pixel values; the
+    minibatch dimension at dim=0 is maintained.
     """)
     return
 
@@ -260,7 +263,7 @@ def _(input_image, nn):
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
-    # nn.Linear
+    ## nn.Linear
 
     The [linear layer](https://pytorch.org/docs/stable/generated/torch.nn.Linear.html) is a module
     that applies a linear transformation on the input using its stored weights and biases.
@@ -279,31 +282,30 @@ def _(flat_image, nn):
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
-    # nn.ReLU
+    ## nn.ReLU
 
     Non-linear activations are what create the complex mappings between the model's inputs and
     outputs. They are applied after linear transformations to introduce *nonlinearity*, helping
     neural networks learn a wide variety of phenomena.
 
-    In this model, we use [nn.ReLU](https://pytorch.org/docs/stable/generated/torch.nn.ReLU.html)
-    between our linear layers, but there's other activations to introduce non-linearity in your
-    model.
+    This model uses [nn.ReLU](https://pytorch.org/docs/stable/generated/torch.nn.ReLU.html)
+    between its linear layers; other activations exist to introduce non-linearity the same way.
     """)
     return
 
 
 @app.cell
 def _(hidden1, nn):
+    hidden1_relu = nn.ReLU()(hidden1)
     print(f"Before ReLU: {hidden1}\n\n")
-    hidden1_1 = nn.ReLU()(hidden1)
-    print(f"After ReLU: {hidden1_1}")
-    return
+    print(f"After ReLU: {hidden1_relu}")
+    return (hidden1_relu,)
 
 
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
-    ## What ReLU did, as a picture
+    ### What ReLU did, as a picture
 
     Sixty numbers printed twice is accurate and unreadable. The same two tensors drawn on
     one shared color scale: three rows, one per image in the minibatch, twenty columns,
@@ -324,8 +326,8 @@ def _(mo):
     return
 
 
-@app.cell
-def _(hidden1, nn):
+@app.cell(hide_code=True)
+def _():
     import altair as alt
     import pandas as pd
     from _viz import ACCENT, BASE, DIVERGING_SCHEME
@@ -355,19 +357,18 @@ def _(hidden1, nn):
             .properties(width=20 * 26, height=3 * 26, title=title)
         )
 
-    after_relu = nn.ReLU()(hidden1)
-    return ACCENT, BASE, activation_map, after_relu, alt, pd
+    return ACCENT, BASE, activation_map, alt, pd
 
 
-@app.cell
-def _(activation_map, after_relu, hidden1, mo):
+@app.cell(hide_code=True)
+def _(activation_map, hidden1, hidden1_relu, mo):
     _limit = hidden1.abs().max().item()
-    _zeroed = (after_relu == 0).float().mean().item()
+    _zeroed = (hidden1_relu == 0).float().mean().item()
     mo.vstack(
         [
             activation_map(hidden1, "before ReLU", _limit),
-            activation_map(after_relu, "after ReLU", _limit),
-            mo.md(f"**{_zeroed:.0%}** of the {after_relu.numel()} activations are now exactly zero."),
+            activation_map(hidden1_relu, "after ReLU", _limit),
+            mo.md(f"**{_zeroed:.0%}** of the {hidden1_relu.numel()} activations are now exactly zero."),
         ],
         gap=0.6,
     )
@@ -377,55 +378,59 @@ def _(activation_map, after_relu, hidden1, mo):
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
-    # nn.Sequential
+    ## nn.Sequential
 
     [nn.Sequential](https://pytorch.org/docs/stable/generated/torch.nn.Sequential.html) is an
-    ordered container of modules. The data is passed through all the modules in the same order as
-    defined. You can use sequential containers to put together a quick network like `seq_modules`.
+    ordered container of modules: data passes through all of them in the order they were given.
+    Below, the `flatten` and `layer1` modules just walked through are chained with a fresh ReLU
+    and a final Linear into a quick network — the same shape of pipeline `NeuralNetwork` wraps in
+    a class.
     """)
     return
 
 
 @app.cell
-def _(flatten, layer1, nn, torch):
+def _(flatten, input_image, layer1, nn):
     seq_modules = nn.Sequential(flatten, layer1, nn.ReLU(), nn.Linear(20, 10))
-    input_image_1 = torch.rand(3, 28, 28)
-    logits_1 = seq_modules(input_image_1)
-    return (logits_1,)
+    seq_logits = seq_modules(input_image)
+    print(seq_logits.size())
+    return (seq_logits,)
 
 
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
-    # nn.Softmax
+    ## nn.Softmax
 
-    The last linear layer of the neural network returns <span class="title-ref">logits</span> - raw
-    values in \[-infty, infty\] - which are passed to the
-    [nn.Softmax](https://pytorch.org/docs/stable/generated/torch.nn.Softmax.html) module. The
-    logits are scaled to values \[0, 1\] representing the model's predicted probabilities for each
-    class. `dim` parameter indicates the dimension along which the values must sum to 1.
+    The last linear layer returns logits — raw values in (-∞, ∞), as met after the first forward
+    pass above. The [nn.Softmax](https://pytorch.org/docs/stable/generated/torch.nn.Softmax.html)
+    module rescales them to \[0, 1\], the model's predicted probability for each class. The `dim`
+    parameter names the dimension along which the values must sum to 1: `dim=1`, across the
+    classes of one image — not `dim=0`, across the batch.
     """)
     return
 
 
 @app.cell
-def _(logits_1, nn):
+def _(nn, seq_logits):
     softmax = nn.Softmax(dim=1)
-    _pred_probab = softmax(logits_1)
+    _pred_probab = softmax(seq_logits)
+    print(_pred_probab)
+    print(f"row sums: {_pred_probab.sum(dim=1)}")
     return
 
 
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
-    # Model Parameters
+    ## Model parameters
 
-    Many layers inside a neural network are *parameterized*, i.e. have associated weights and
-    biases that are optimized during training. Subclassing `nn.Module` automatically tracks all
-    fields defined inside your model object, and makes all parameters accessible using your model's
+    Many layers inside a neural network are *parameterized* — they hold weights and biases that
+    are optimized during training. Subclassing `nn.Module` automatically tracks all fields
+    defined inside your model object, and makes every parameter reachable through the model's
     `parameters()` or `named_parameters()` methods.
 
-    In this example, we iterate over each parameter, and print its size and a preview of its
+    Here we iterate over each parameter of `model` and print its name, size and a preview of its
     values.
     """)
     return
@@ -433,8 +438,6 @@ def _(mo):
 
 @app.cell
 def _(model):
-    print(f"Model structure: {model}\n\n")
-
     for name, param in model.named_parameters():
         print(f"Layer: {name} | Size: {param.size()} | Values : {param[:2]} \n")
     return
@@ -443,7 +446,7 @@ def _(model):
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
-    ## The parameters as a table, and where their values came from
+    ### The parameters as a table, and where their values came from
 
     The loop above prints six blocks of numbers. The same six as a table are easier to
     total, and the totals are the ones that decide whether a model fits on a card.
@@ -462,7 +465,7 @@ def _(mo):
     return
 
 
-@app.cell
+@app.cell(hide_code=True)
 def _(mo, model):
     _rows = [
         {
@@ -495,7 +498,7 @@ def _(mo, model):
     return
 
 
-@app.cell
+@app.cell(hide_code=True)
 def _(ACCENT, BASE, alt, mo, model, pd):
     import math
 
@@ -535,12 +538,23 @@ def _(mo):
     mo.md(r"""
     ### One number decides the size of this model
 
-    Drag the underlined number in the sentence below.
+    The count in the table is a function of one choice, the hidden width — the 512 in the
+    constructor. The arithmetic is short enough to write out. Then drag the underlined number
+    in the sentence below.
     """)
     return
 
 
 @app.cell
+def _():
+    def parameter_count(width):
+        # 784 -> width -> width -> 10, each Linear carrying one bias per output.
+        return 784 * width + width + width * width + width + width * 10 + 10
+
+    return (parameter_count,)
+
+
+@app.cell(hide_code=True)
 def _(mo):
     from wigglystuff import TangleSlider
 
@@ -548,23 +562,19 @@ def _(mo):
     return (hidden_width,)
 
 
-@app.cell
-def _(ACCENT, BASE, alt, hidden_width, mo, pd):
-    def _parameter_count(width):
-        # 784 -> width -> width -> 10, each Linear carrying one bias per output.
-        return 784 * width + width + width * width + width + width * 10 + 10
-
+@app.cell(hide_code=True)
+def _(ACCENT, BASE, alt, hidden_width, mo, parameter_count, pd):
     _width = int(hidden_width.amount)
     _sentence = mo.md(
         f"""
         With a hidden width of {hidden_width} units, this network holds
-        **{_parameter_count(_width):,}** parameters and occupies
-        **{_parameter_count(_width) * 4 / 1024**2:.1f} MB** in float32 — before the
+        **{parameter_count(_width):,}** parameters and occupies
+        **{parameter_count(_width) * 4 / 1024**2:.1f} MB** in float32 — before the
         optimizer, which will want a copy or two of its own.
         """
     )
     _curve = pd.DataFrame({"width": range(16, 2049, 16)})
-    _curve["parameters"] = [_parameter_count(w) for w in _curve["width"]]
+    _curve["parameters"] = [parameter_count(w) for w in _curve["width"]]
     _chart = (
         alt.Chart(_curve)
         .mark_line(color=BASE)
@@ -572,7 +582,7 @@ def _(ACCENT, BASE, alt, hidden_width, mo, pd):
         .properties(width=420, height=200)
     )
     _here = (
-        alt.Chart(pd.DataFrame({"width": [_width], "parameters": [_parameter_count(_width)]}))
+        alt.Chart(pd.DataFrame({"width": [_width], "parameters": [parameter_count(_width)]}))
         .mark_point(size=120, filled=True, color=ACCENT)
         .encode(x="width:Q", y="parameters:Q")
     )
@@ -604,9 +614,19 @@ def _(mo):
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
-    # Further Reading
+    ## Where to go next
 
-    - [torch.nn API](https://pytorch.org/docs/stable/nn.html)
+    - The [torch.nn API](https://pytorch.org/docs/stable/nn.html) is the shelf this notebook took
+      five modules from. Skipped: convolution and pooling layers (the reason image models
+      outperform this flattened one), `nn.Dropout` and the normalization layers, and the
+      containers beyond `Sequential` — `nn.ModuleList`, `nn.ModuleDict` — for a `forward` that is
+      not a straight line.
+    - Every module also carries a mode: `model.train()` and `model.eval()` flip the behavior of
+      layers like dropout and batch norm. Nothing in this model reacts to the switch yet; the
+      optimization notebook calls both, in their places in the loop.
+    - Next: [Autograd](06-autograd.py), where the `trainable` column in the table above stops
+      being a flag — every parameter with `requires_grad=True` collects a gradient there, and the
+      backward pass that computes it is the subject.
     """)
     return
 
