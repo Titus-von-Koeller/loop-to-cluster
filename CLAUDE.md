@@ -106,9 +106,17 @@ headless and let the first editor run wait for the reload. In the meantime,
 fully rendered, interactive stand-in for the wedged editor surface.
 
 **Checks.** `pixi run marimo check --strict` catches duplicate names and unparsable cells
-without running anything. The content check is executing the file itself —
-`CUDA_VISIBLE_DEVICES=0 pixi run python notebooks/pytorch-basics/<nb>.py` — where exit 0
-means every cell ran, and a failing cell exits nonzero (both directions measured).
+without running anything. The content check is executing the file itself — from inside
+`notebooks/pytorch-basics/`, `CUDA_VISIBLE_DEVICES=0 pixi run python <nb>.py` — where exit 0
+means every cell ran, and a failing cell exits nonzero (both directions measured). Run it from
+the notebooks directory, never the repo root: `root="data"` is cwd-relative, and a root-level
+run silently downloads a second 82 MB FashionMNIST copy where the hook once caught one.
+
+**Precedence.** The marimo extension ships a pairing skill whose contract is "never edit the
+notebook file; all changes through code mode." That contract governs working *inside* someone's
+live session; this repo's polish flow — edit on disk, verify headless, reopen — governs
+autonomous passes and wins here. The pairing contract still applies when driving a kernel Titus
+is actively using.
 
 **The upstream baseline is commit `891febb`** — the eight tutorials exactly as converted.
 `git diff 891febb -- <notebook>` shows everything ours against everything inherited; the
@@ -134,6 +142,23 @@ Prefer the forward-looking API to the one gathering dust — `set_float32_matmul
 **A script in `scripts/` imports nothing from this repo.** Duplication between scripts is
 correct: it lets one change without disturbing the baseline it is compared against.
 `tests/test_boundary.py` enforces it.
+
+## The rules improve
+
+Every session ends with a rules audit: what did the work teach about these documents
+themselves? Mechanics — sync hazards, recoveries, traps, checks — land in this file in the same
+session, in the commit that closes the work. Intent-level changes (SKILL.md entries,
+pedagogy.md) are proposed to Titus, never self-ratified — and a proposal he has not yet ruled
+on is parked below rather than left to die with the conversation. A friction met twice is a
+documentation bug.
+
+**Proposals awaiting Titus** (ratify by moving into the target file; reject by deleting):
+
+- pedagogy.md, Theme honesty: "the reading theme is plural where the OS flips it
+  (autoDetectColorScheme: Horizon Bright by day, Horizon Bold in dark); exhibits are checked in
+  both."
+- SKILL.md N6 expression: pass reports also state what the pass taught about the rules, so the
+  rules audit has raw material.
 
 ## Notion
 
