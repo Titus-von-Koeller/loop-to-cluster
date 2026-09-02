@@ -161,21 +161,42 @@ def _(GROUNDS, PAIRS, np, random):
     # set by the palette pairs' own distance distribution.
     _dref = np.array([np.linalg.norm(opp(_a) - opp(_b)) for _pal, _a, _b in PAIRS])
     _TAUS = np.geomspace(float(np.quantile(_dref, 0.05)) / 6, float(np.quantile(_dref, 0.9)), 8)
-    GRID = np.stack(np.meshgrid(np.geomspace(0.05, 3.0, 10), np.geomspace(0.1, 3.0, 8), _TAUS, _TAUS, indexing="ij"))
+    # Lapse is a fitted axis, not a constant: the model can attribute rare misses to the
+    # finger instead of the eyes, and stimulus placement marginalizes over that belief —
+    # an accidental miss or lucky guess costs a few misplaced trials, never a bad path,
+    # because the posterior is global and self-correcting.
+    GRID = np.stack(
+        np.meshgrid(
+            np.geomspace(0.05, 3.0, 10),
+            np.geomspace(0.1, 3.0, 8),
+            _TAUS,
+            _TAUS,
+            np.array([0.005, 0.02, 0.05, 0.1]),
+            indexing="ij",
+        )
+    )
 
     def p_correct(delta, ground):
         """P(correct) over the whole grid for one trial's opponent delta."""
         _d2 = delta[0] ** 2 + GRID[0] * delta[1] ** 2 + GRID[1] * delta[2] ** 2
         _tau = GRID[2] if ground == "day" else GRID[3]
-        return 0.25 + 0.73 * (1.0 - np.exp(-_d2 / _tau**2))
+        return 0.25 + (0.75 - GRID[4]) * (1.0 - np.exp(-_d2 / _tau**2))
 
     def posterior_for(responses):
-        _logp = np.zeros(GRID.shape[1:])
-        for _r in responses:
-            _p = p_correct(np.abs(opp(_r["base"]) - opp(_r["odd_color"])), _r["ground"])
-            _logp += np.log(_p if _r["correct"] else 1.0 - _p)
+        if not responses:
+            _post = np.ones(GRID.shape[1:])
+            return _post / _post.sum()
+        # Vectorized over trials: deltas (n,3), grounds (n,), one broadcast against the grid.
+        _da = np.array([np.abs(opp(_r["base"]) - opp(_r["odd_color"])) for _r in responses])
+        _night = np.array([_r["ground"] == "night" for _r in responses])
+        _ok = np.array([bool(_r["correct"]) for _r in responses])
+        _flat = GRID.reshape(5, -1)
+        _d2 = _da[:, 0:1] ** 2 + _flat[0] * _da[:, 1:2] ** 2 + _flat[1] * _da[:, 2:3] ** 2
+        _tau = np.where(_night[:, None], _flat[3], _flat[2])
+        _p = 0.25 + (0.75 - _flat[4]) * (1.0 - np.exp(-_d2 / _tau**2))
+        _logp = np.log(np.where(_ok[:, None], _p, 1.0 - _p)).sum(axis=0)
         _logp -= _logp.max()
-        _post = np.exp(_logp)
+        _post = np.exp(_logp).reshape(GRID.shape[1:])
         return _post / _post.sum()
 
     def trial_for(n, responses):
@@ -359,7 +380,7 @@ def _(GRID, get_responses, mo, np, pd, posterior_for):
         )
         _by_ground = _frame.groupby("ground").correct.mean()
         _post = posterior_for(_log)
-        _wrg, _wby, _td, _tn = (float((GRID[_i] * _post).sum()) for _i in range(4))
+        _wrg, _wby, _td, _tn, _lapse = (float((GRID[_i] * _post).sum()) for _i in range(5))
         _out = mo.vstack(
             [
                 mo.md(
@@ -372,6 +393,7 @@ def _(GRID, get_responses, mo, np, pd, posterior_for):
                         mo.stat(f"{_wby:.2f}", label="blue–yellow weight", bordered=True),
                         mo.stat(f"{_td:.3f}", label="threshold, day ground", bordered=True),
                         mo.stat(f"{_tn:.3f}", label="threshold, night ground", bordered=True),
+                        mo.stat(f"{100 * _lapse:.1f}%", label="your fitted slip rate", bordered=True),
                     ],
                     justify="start",
                     gap=1,
