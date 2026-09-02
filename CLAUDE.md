@@ -74,17 +74,18 @@ damage. A window reload (`ctrl+alt+shift+m`) resets that memory and refolds on t
 activation — but only the cells the editor has materialized, so on a long notebook some
 cells stay expanded and, the memory now marking them folded, are never retried. The
 reliable spot fix is per cell: the collapse chevron, or the "marimo: Hide cell code"
-command, which also persists. Every notebook edit ends with a fold audit — not only polish
-passes: any cell whose code the narrative does not ask the reader to read carries
-`hide_code=True` in the file, checked before the commit that carries the edit. Display
-logic and narrative code do not share a cell: where they are mixed, split — the content cell
-stays visible and may end by rendering the object it made, the display-assembly cell folds.
-Names flow between cells, so the split costs nothing. The standing exception remains the
-mutation demos, whose render timing is the demonstration. That is stock 0.17.2. On this machine the extension is
+command, which also persists. That is stock 0.17.2. On this machine the extension is
 patched — `home/editors/marimo.nix` in the dotfiles repo, re-applied on every extension
 update — so every notebook activation re-folds every `hide_code` cell and the file is
 the authority on visibility; a manual expand lasts until the next tab switch. The stock
 description stays because it is what any other machine, and any upstream report, sees.
+
+Every notebook edit ends with a fold audit — not only polish passes: any cell whose code the
+narrative does not ask the reader to read carries `hide_code=True` in the file, checked before
+the commit that carries the edit. Display logic and narrative code do not share a cell: where
+they are mixed, split — the content cell stays visible and may end by rendering the object it
+made, the display-assembly cell folds. Names flow between cells, so the split costs nothing.
+The standing exception remains the mutation demos, whose render timing is the demonstration.
 
 **Never rewrite a notebook on disk while it is open in the editor.** The extension syncs
 cells by id in transactions, and an external rewrite produces
