@@ -184,6 +184,19 @@ sessions keep moving through it and through the queue autonomously; the proposal
 *text ratification*, never work he has already directed. Parking directed work behind another
 confirmation is the failure this sentence records.
 
+- Resume the interrupted series pass (stopped 2026-09-02, credits): 01 and 05 have partial
+  commits pushed (through 55c45d6, d1614ea, 2e2e01d); 06 and 07 were mid-verification with
+  nothing staged (07 had found a falsified claim: "hundred and twenty printed loss values" is
+  100); 01's phase-3 and 08's mid-pass edits sit in `git stash` ("WIP from stopped polish
+  agents"). Re-dispatch one agent per notebook with the same instructions as before.
+- Apply the computed Horizon token overrides (the remaining syntax layer; workbench layer
+  already exists in VSCode settings.json with the same method at 6:1). Day, on #FDF0ED:
+  strings #F6661E → #A13A06 (6.04:1), functions #1D8991 → #15646A (6.16:1), comments
+  (drop the 50% alpha) → #605A59 (6.08:1); day variables override #BF0E37 already present
+  (5.66:1). Night, on #1C1E26: comments (drop the 30% alpha) → #82858F (4.51:1), variables
+  solid #E95678 (4.80:1, alpha was the whole problem). Same hue and saturation throughout —
+  walk lightness only. Target keys: editor.tokenColorCustomizations per theme.
+
 **Proposals awaiting Titus** (ratify by moving into the target file; reject by deleting):
 
 - none right now.
