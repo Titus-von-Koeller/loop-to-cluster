@@ -26,8 +26,10 @@ Resolved versions come from `pixi list <package>` rather than from memory or fro
 that would go stale. `pixi.toml` records why each dependency comes from PyPI rather than
 conda-forge; one reason is the torch ABI and it still holds.
 
-A *new* skill directory is discovered live, but an *edit* to an existing `SKILL.md` serves from a
-cached payload until the session restarts.
+Skill directories are watched live: adds, removals, and `SKILL.md` edits are picked up within
+the session (docs: live change detection; an older build cached edits until restart — the
+sentence that stood here). Only plugin-backed pieces of a skill folder — `hooks/`, `.mcp.json`,
+`agents/` — still need `/reload-plugins`.
 
 marimo finds `[tool.marimo]` with `find_nearest_pyproject_toml`, which walks *upward* from the
 working directory, so a kernel started in `notebooks/pytorch-basics/` still picks up this repo's
@@ -166,9 +168,16 @@ documentation bug.
   the calibration data as it accumulates. Named 2026-09-02.
 - Screen calibration (hardware/ICC) — named 2026-09-02 as "another day"; until then the
   vision-calibration data is relative-to-this-screen, which its prose says.
-- When calibration-responses.json has enough trials: fit Titus's personal confusion axis from
+- When calibration-responses.jsonl has enough trials: fit Titus's personal confusion axis from
   the misses and re-rank the theme gallery's dropdown with measured rather than simulated
   discriminability.
+- The theme program (named 2026-09-02): determine independently the best *editor* theme for
+  Titus (best-in-class as the starting field — Selenized, Modus, GitHub accessible, Horizon —
+  then self-evolved: token-color overrides tuned by his calibration data and the gallery's
+  contrast instruments) and the best *graphing* theme independently; then characterize how the
+  two interact (shared grounds, simultaneous contrast, accent-vs-data-hue collisions) and
+  determine the best combination. Builds on calibrate-vision data; the deliverable is a ranked,
+  measured recommendation plus the override files to apply it.
 
 **Proposals awaiting Titus** (ratify by moving into the target file; reject by deleting):
 
