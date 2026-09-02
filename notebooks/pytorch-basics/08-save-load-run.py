@@ -15,7 +15,7 @@ __generated_with = "0.24.0"
 app = marimo.App()
 
 
-@app.cell
+@app.cell(hide_code=True)
 def _():
     import marimo as mo
 
@@ -25,16 +25,13 @@ def _():
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
-    [Learn the Basics](intro.html) \|\| [Quickstart](quickstart_tutorial.html) \|\|
-    [Tensors](tensorqs_tutorial.html) \|\| [Datasets & DataLoaders](data_tutorial.html) \|\|
-    [Transforms](transforms_tutorial.html) \|\| [Build Model](buildmodel_tutorial.html) \|\|
-    [Autograd](autogradqs_tutorial.html) \|\| [Optimization](optimization_tutorial.html) \|\|
-    **Save & Load Model**
+    *PyTorch basics, 8 of 8 — before this: [Optimization](07-optimization-loop.py)*
 
     # Save and Load the Model
 
-    In this section we will look at how to persist model state with saving, loading and running
-    model predictions.
+    Training produces a model worth keeping. This last notebook is about persisting that
+    state: saving it to disk, loading it into a fresh model, and running a prediction from
+    the reload.
     """)
     return
 
@@ -67,10 +64,12 @@ def _():
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
-    # Saving and Loading Model Weights
+    ## Saving and Loading Model Weights
 
-    PyTorch models store the learned parameters in an internal state dictionary, called
-    `state_dict`. These can be persisted via the `torch.save` method:
+    A PyTorch model keeps its learned state in an internal state dictionary, its
+    `state_dict`: an ordered mapping from name to tensor, holding the parameters plus any
+    registered buffers (batch normalization's running statistics, for instance) — and
+    nothing else, no code and no structure. `torch.save` persists it:
     """)
     return
 
@@ -85,7 +84,7 @@ def _(models, torch):
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
-    ## What 528 megabytes is made of
+    ### What 528 megabytes is made of
 
     That cell downloaded a real trained model and wrote it to disk, and both facts pass
     without comment. VGG16 is a useful thing to look at precisely because it is old enough
@@ -109,7 +108,7 @@ def _(model):
     return
 
 
-@app.cell
+@app.cell(hide_code=True)
 def _(mo, model):
     _entries = model.state_dict()
     _total = sum(tensor.numel() for tensor in _entries.values())
@@ -146,44 +145,72 @@ def _(mo, model):
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
-    To load model weights, you need to create an instance of the same model first, and then load
-    the parameters using `load_state_dict()` method.
+    To load the weights back, first build an instance of the same architecture — the file
+    holds tensors, not the code that gives them meaning — then hand the loaded dictionary
+    to `load_state_dict()`.
 
-    In the code below, we set `weights_only=True` to limit the functions executed during unpickling
-    to only those necessary for loading weights. Using `weights_only=True` is considered a best
-    practice when loading weights.
+    `weights_only=True` restricts unpickling to plain tensor data, refusing anything that
+    would run code. It is already the default in the torch this repo pins — *The two
+    files, on disk* below shows the refusal — so writing it out is documentation: this
+    file is expected to hold nothing but weights.
     """)
     return
 
 
 @app.cell
 def _(models, torch):
-    model_1 = models.vgg16()  # we do not specify ``weights``, i.e. create untrained model
+    model_1 = models.vgg16()  # no weights= argument: the same architecture, untrained
     model_1.load_state_dict(torch.load("model_weights.pth", weights_only=True))
-    model_1.eval()
+    model_1.eval()  # switches to inference behavior -- demonstrated just below
     return (model_1,)
 
 
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
-    > [!NOTE]
-    > be sure to call `model.eval()` method before inferencing to set the dropout and batch
-    > normalization layers to evaluation mode. Failing to do this will yield inconsistent inference
-    > results.
+    ### A prediction from the reload
+
+    "Run" is the last third of save-load-run. The probe below is random noise, so which of
+    the 1,000 ImageNet classes wins means nothing — the question worth asking is whether
+    the reloaded model gives the same answer twice.
+
+    It does not have to. The module tree above shows `Dropout(p=0.5)` twice inside
+    `classifier`: in training mode, dropout zeroes a random half of that layer's inputs on
+    every call — regularization while learning, pure nondeterminism at inference.
+    `model_1.eval()` switches dropout (and batch normalization, which VGG16 predates) to
+    deterministic inference behavior; `.train()` is the way back, and the optimization
+    loop of the previous notebook toggled between the two on purpose. Predict what
+    distinguishes the two rows before running the cell.
     """)
+    return
+
+
+@app.cell
+def _(model_1, models, torch):
+    _probe = torch.randn(1, 3, 224, 224, generator=torch.Generator().manual_seed(0))
+    _labels = models.VGG16_Weights.IMAGENET1K_V1.meta["categories"]
+
+    def _top1(net):
+        with torch.no_grad():
+            scores = net(_probe)
+        return f"{_labels[scores.argmax()]} ({scores.max().item():.2f})"
+
+    model_1.train()  # dropout active again; restored to eval() below, so re-running is safe
+    _while_training = [_top1(model_1) for _ in range(3)]
+    model_1.eval()
+    _after_eval = [_top1(model_1) for _ in range(3)]
+    {"model_1.train()": _while_training, "model_1.eval()": _after_eval}
     return
 
 
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
-    # Saving and Loading Models with Shapes
+    ## Saving and Loading the Whole Model
 
-    When loading model weights, we needed to instantiate the model class first, because the class
-    defines the structure of a network. We might want to save the structure of this class together
-    with the model, in which case we can pass `model` (and not `model.state_dict()`) to the saving
-    function:
+    Loading weights required instantiating the model class first, because the file held no
+    structure. The second form `torch.save` accepts promises to skip that step: pass
+    `model` itself, rather than `model.state_dict()`, to the saving function:
     """)
     return
 
@@ -197,12 +224,13 @@ def _(model_1, torch):
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
-    We can then load the model as demonstrated below.
-
-    As described in [Saving and loading
-    torch.nn.Modules](https://pytorch.org/docs/main/notes/serialization.html#saving-and-loading-torch-nn-modules),
-    saving `state_dict` is considered the best practice. However, below we use `weights_only=False`
-    because this involves loading the model, which is a legacy use case for `torch.save`.
+    Loading it back needs two things. `weights_only=False`, because the file now holds a
+    pickled Python object rather than plain tensors. And `torchvision` importable at load
+    time, because pickle stores a *reference* to the class, not its code — the reliance
+    [Saving and loading
+    torch.nn.Modules](https://docs.pytorch.org/docs/stable/notes/serialization.html#saving-and-loading-torch-nn-modules)
+    names when it calls the `state_dict` route the best practice and this one a legacy use
+    of `torch.save`. The next section measures why.
     """)
     return
 
@@ -216,11 +244,10 @@ def _(torch):
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
-    ## The two files, on disk
+    ### The two files, on disk
 
-    The tutorial says saving a `state_dict` is best practice and that the other way
-    "relies on the actual class definition to be available". Both files now exist, so the
-    claim is checkable.
+    Best practice against legacy is the documentation's framing; both files now exist, so
+    it is checkable here.
 
     They are the same size to within a rounding error. Saving the model rather than its
     weights does not save the code — it pickles a *reference* to `torchvision.models.VGG`
@@ -234,13 +261,23 @@ def _(mo):
     if you let it be. In torch 2.13 the parameter defaults to `None`, which resolves to
     *true*: loading the pickled model above without passing `weights_only=False`
     explicitly raises `UnpicklingError` rather than quietly running it. The safe thing is
-    the default now, and the tutorial's `weights_only=False` is the opt-out.
+    the default now, and the `weights_only=False` written above is the opt-out.
     """)
     return
 
 
 @app.cell
-def _(mo, torch):
+def _(torch):
+    try:
+        torch.load("model.pth")  # no weights_only argument: the default decides
+        bare_load = "loaded without complaint"
+    except Exception as _refusal:
+        bare_load = f"`{type(_refusal).__name__}` — {str(_refusal).split('.')[0]}."
+    return (bare_load,)
+
+
+@app.cell(hide_code=True)
+def _(bare_load, mo):
     from pathlib import Path
 
     _files = [
@@ -253,17 +290,10 @@ def _(mo, torch):
         if Path(name).exists()
     ]
 
-    try:
-        torch.load("model.pth")
-    except Exception as _refusal:
-        _default_behavior = f"`{type(_refusal).__name__}` — {str(_refusal).splitlines()[0]}"
-    else:
-        _default_behavior = "loaded without complaint"
-
     mo.vstack(
         [
             mo.ui.table(_rows, selection=None),
-            mo.md(f"`torch.load('model.pth')` with no `weights_only` argument: {_default_behavior}"),
+            mo.md(f"`torch.load('model.pth')` with no `weights_only` argument: {bare_load}"),
             mo.callout(
                 mo.md(
                     "**A collision worth knowing about.** This notebook writes `model.pth` into "
@@ -284,23 +314,32 @@ def _(mo, torch):
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
-    > [!NOTE]
-    > This approach uses Python [pickle](https://docs.python.org/3/library/pickle.html) module when
-    > serializing the model, thus it relies on the actual class definition to be available when
-    > loading the model.
-    """)
-    return
+    ---
 
+    ## Where to go next
 
-@app.cell(hide_code=True)
-def _(mo):
-    mo.md(r"""
-    # Related Tutorials
+    This closes the series: tensors, data, a model, the loop that trains it, and now the
+    state that outlives the process. The `state_dict` idea keeps scaling up from here —
+    each of these is the same mapping-of-name-to-tensor wearing more machinery:
 
-    - [Saving and Loading a General Checkpoint in
-      PyTorch](https://pytorch.org/tutorials/recipes/recipes/saving_and_loading_a_general_checkpoint.html)
-    - [Tips for loading an nn.Module from a
-      checkpoint](https://pytorch.org/tutorials/recipes/recipes/module_load_state_dict_tips.html?highlight=loading%20nn%20module%20from%20checkpoint)
+    - **A resumable checkpoint is more than model weights.** Mid-run state also includes
+      the optimizer's `state_dict` (Adam keeps two running moments per parameter, so this
+      can outweigh the model itself), the epoch, and the last loss — [Saving and Loading a
+      General
+      Checkpoint](https://pytorch.org/tutorials/recipes/recipes/saving_and_loading_a_general_checkpoint.html)
+      is the recipe.
+    - **Loading has sharp edges at scale.** [Tips for loading an nn.Module from a
+      checkpoint](https://pytorch.org/tutorials/recipes/recipes/module_load_state_dict_tips.html)
+      covers `mmap=True` and `assign=True` — how to load a model without materializing it
+      in memory twice.
+    - **The ecosystem has moved past pickle.** The Hugging Face Hub serves
+      [safetensors](https://huggingface.co/docs/safetensors): tensors plus a JSON header,
+      nothing executable, so the `weights_only` question this notebook demonstrated is
+      designed away rather than defaulted away.
+    - **Distributed training splits the dictionary itself.** Once a model shards across
+      GPUs, no single rank holds a full `state_dict`, and
+      [torch.distributed.checkpoint](https://docs.pytorch.org/docs/stable/distributed.checkpoint.html)
+      saves and loads the pieces in parallel — where this repository is headed next.
     """)
     return
 
