@@ -153,10 +153,17 @@ def _(get_responses, mo, trial_for):
     _t = trial_for(_n)
     _colors = [_t["base"]] * 4
     _colors[_t["odd_position"]] = _t["odd_color"]
+
+    def _ink(c):
+        # Label ink by square brightness — the numeral is a label, not data.
+        r, g, b = (int(c.lstrip("#")[i : i + 2], 16) for i in (0, 2, 4))
+        return "#15181d" if (0.2126 * r + 0.7152 * g + 0.0722 * b) > 110 else "#ffffff"
+
     _squares = "".join(
-        f'<span style="display:inline-block;width:72px;height:72px;border-radius:8px;'
-        f'margin:0 14px;background:{c}"></span>'
-        for c in _colors
+        f'<span style="display:inline-flex;align-items:center;justify-content:center;'
+        f"width:72px;height:72px;border-radius:8px;margin:0 14px;background:{c};"
+        f'color:{_ink(c)};font:600 20px sans-serif">{i + 1}</span>'
+        for i, c in enumerate(_colors)
     )
     mo.vstack(
         [
@@ -205,6 +212,7 @@ def _(LOG, datetime, get_responses, json, mo, set_responses, timezone, trial_for
                 value=0,
                 on_click=lambda v: v + 1,
                 on_change=lambda _, i=i: _record(i),
+                keyboard_shortcut=f"Ctrl-{i + 1}",
             )
             for i in range(4)
         ]
