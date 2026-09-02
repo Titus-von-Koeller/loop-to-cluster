@@ -265,6 +265,7 @@ def _(LOG, datetime, get_responses, json, mo, set_responses, timezone, trial_for
     class _OddOneOut(anywidget.AnyWidget):
         _esm = """
         function render({ model, el }) {
+          el.style.cssText = `display:block;width:100%`;
           const wrap = document.createElement("div");
           wrap.style.cssText = `background:${model.get("ground")};padding:36px 22px;` +
             `border-radius:10px;display:flex;justify-content:center;gap:28px;` +
@@ -290,7 +291,7 @@ def _(LOG, datetime, get_responses, json, mo, set_responses, timezone, trial_for
         clicks = traitlets.Int(0).tag(sync=True)
 
     answer_squares = mo.ui.anywidget(_OddOneOut(colors=_colors, ground=_t["ground_hex"]))
-    mo.hstack([answer_squares], justify="center")
+    answer_squares
     return (answer_squares,)
 
 
