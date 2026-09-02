@@ -65,8 +65,9 @@ def _():
     import pandas as pd
     import torch
     from _viz import INK_DARK, INK_LIGHT, OKABE_ITO, POLARITY, RAMP, show
+    from cmcrameri import cm as cmc
 
-    return INK_DARK, INK_LIGHT, OKABE_ITO, POLARITY, RAMP, alt, mpl, np, pd, show, torch
+    return INK_DARK, INK_LIGHT, OKABE_ITO, POLARITY, RAMP, alt, cmc, mpl, np, pd, show, torch
 
 
 @app.cell(hide_code=True)
@@ -137,8 +138,8 @@ def _(INK_DARK, INK_LIGHT, alt, mpl, np, pd):
         return _rgb_to_hex(np.array([gray, gray, gray]))
 
     def sample_cmap(name, n=7):
-        """n hexes from one of matplotlib's colormaps -- the palette's own definition."""
-        cmap = mpl.colormaps[name]
+        """n hexes from a colormap (matplotlib name or Colormap object) — its definition."""
+        cmap = mpl.colormaps[name] if isinstance(name, str) else name
         if hasattr(cmap, "colors") and len(cmap.colors) < 30:
             return [_rgb_to_hex(np.asarray(c)[:3]) for c in cmap.colors[:n]]
         return [_rgb_to_hex(np.asarray(cmap(t))[:3]) for t in np.linspace(0, 1, n)]
@@ -195,8 +196,8 @@ def _(mo):
     non-monotonic in luminance — and `jet` itself, MATLAB's default until 2014 and matplotlib's
     until 2017, is kept here as the specimen: watch its luminance numbers rise *and fall*,
     which is the mechanism by which it paints ridges into smooth data. Fabio Crameri's
-    `batlow` — the current geoscience reference — is not shipped with matplotlib, so it lives
-    in the prose and links; `cividis` demonstrates its design goals.
+    `batlow` — the current geoscience reference — comes from his own `cmcrameri` package, so
+    its row below is sampled from the map's actual definition, not a transcription.
 
     The uniform maps differ mostly in *local contrast* — multi-hue maps spend more perceptual
     distance per step than a single-hue ramp — and in temperament. Compare rows in the first
@@ -206,12 +207,13 @@ def _(mo):
 
 
 @app.cell(hide_code=True)
-def _(RAMP, gallery, mo, sample_cmap):
+def _(RAMP, cmc, gallery, mo, sample_cmap):
     mo.ui.altair_chart(
         gallery(
             {
                 "RAMP (house)": RAMP,
                 "cividis": sample_cmap("cividis"),
+                "batlow (Crameri)": sample_cmap(cmc.batlow),
                 "viridis": sample_cmap("viridis"),
                 "plasma": sample_cmap("plasma"),
                 "inferno": sample_cmap("inferno"),
@@ -442,6 +444,12 @@ def _(mo):
 
     The gallery shows swatches; this shows a tensor. Same data, your choice of ramp — the
     digits stay, so what changes is exactly the reinforcement layer the verdict above weighs.
+
+    The dropdown is ordered as a ranking for *this* use — digit-bearing grids, read on both
+    Horizon pages, by an author with mild red-green deficiency: CVD-safe uniformity first
+    (cividis, batlow, viridis), then the integrated incumbent, then the remaining uniform and
+    single-hue maps by local contrast, with the two luminance-non-monotonic rainbows last —
+    present for comparison, not candidacy.
     """)
     return
 
@@ -450,37 +458,39 @@ def _(mo):
 def _(mo):
     ramp_choice = mo.ui.dropdown(
         options=[
-            "RAMP (house)",
             "cividis",
+            "batlow (Crameri)",
             "viridis",
+            "RAMP (house)",
+            "YlGnBu (Brewer)",
+            "magma",
             "plasma",
             "inferno",
-            "magma",
-            "cubehelix",
             "Blues (Brewer)",
-            "YlGnBu (Brewer)",
+            "cubehelix",
             "turbo",
             "jet",
         ],
         value="RAMP (house)",
-        label="sequential ramp",
+        label="sequential ramp, ranked",
     )
     ramp_choice
     return (ramp_choice,)
 
 
 @app.cell(hide_code=True)
-def _(INK_DARK, INK_LIGHT, RAMP, alt, luminance, mo, pd, ramp_choice, sample_cmap, torch):
+def _(INK_DARK, INK_LIGHT, RAMP, alt, cmc, luminance, mo, pd, ramp_choice, sample_cmap, torch):
     _ramps = {
-        "RAMP (house)": RAMP,
         "cividis": sample_cmap("cividis", 5),
+        "batlow (Crameri)": sample_cmap(cmc.batlow, 5),
         "viridis": sample_cmap("viridis", 5),
+        "RAMP (house)": RAMP,
+        "YlGnBu (Brewer)": sample_cmap("YlGnBu", 5),
+        "magma": sample_cmap("magma", 5),
         "plasma": sample_cmap("plasma", 5),
         "inferno": sample_cmap("inferno", 5),
-        "magma": sample_cmap("magma", 5),
-        "cubehelix": sample_cmap("cubehelix", 5),
         "Blues (Brewer)": sample_cmap("Blues", 5),
-        "YlGnBu (Brewer)": sample_cmap("YlGnBu", 5),
+        "cubehelix": sample_cmap("cubehelix", 5),
         "turbo": sample_cmap("turbo", 5),
         "jet": sample_cmap("jet", 5),
     }
