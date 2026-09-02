@@ -245,7 +245,7 @@ def _(get_responses, mo, trial_for):
     # The trial number doubles as a staleness indicator: if it ever disagrees with the
     # squares below, the surface lagged and clicks are being dropped by the guard.
     _n = len(get_responses())
-    mo.md(f"**Trial {_n + 1}** — click the odd square.")
+    mo.hstack([mo.md(f"**Trial {_n + 1}** — click the odd square.")], justify="center")
     return
 
 
@@ -289,7 +289,7 @@ def _(LOG, datetime, get_responses, json, mo, set_responses, timezone, trial_for
         clicks = traitlets.Int(0).tag(sync=True)
 
     answer_squares = mo.ui.anywidget(_OddOneOut(colors=_colors, ground=_t["ground_hex"]))
-    answer_squares
+    mo.hstack([answer_squares], justify="center")
     return (answer_squares,)
 
 
