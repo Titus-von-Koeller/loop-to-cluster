@@ -149,7 +149,7 @@ def _(get_responses, mo, trial_for):
     # The trial number doubles as a staleness indicator: if it ever disagrees with the
     # squares below, the surface lagged and clicks are being dropped by the guard.
     _n = len(get_responses())
-    mo.md(f"**Trial {_n + 1}** — click the odd square (Ctrl-1 … Ctrl-4 also answer).")
+    mo.md(f"**Trial {_n + 1}** — click the odd square.")
     return
 
 
@@ -183,26 +183,27 @@ def _(LOG, datetime, get_responses, json, mo, set_responses, timezone, trial_for
             _f.write(json.dumps(_entry) + "\n")
         set_responses([*get_responses(), _entry])
 
-    # Each button carries its own patch of ground so the color is judged against the theme
-    # page it will live on; the page gaps between buttons are the compromise this buys.
+    # The squares share one patch of theme ground, as the display cell used to draw it:
+    # UI elements interpolate into mo.md, so the buttons live inside the ground div.
     answer_squares = mo.ui.array(
         [
             mo.ui.button(
                 label=(
-                    f'<span style="display:inline-block;padding:16px 12px;'
-                    f'background:{_t["ground_hex"]};border-radius:10px">'
                     f'<span style="display:inline-block;width:64px;height:64px;'
-                    f'border-radius:8px;background:{_c}"></span></span>'
+                    f'border-radius:8px;background:{_c}"></span>'
                 ),
                 value=0,
                 on_click=lambda v: v + 1,
                 on_change=lambda _, i=_i: _record(i),
-                keyboard_shortcut=f"Ctrl-{_i + 1}",
             )
             for _i, _c in enumerate(_colors)
         ]
     )
-    mo.hstack([answer_squares[_j] for _j in range(4)], justify="start", gap=1)
+    mo.md(
+        f'<div style="background:{_t["ground_hex"]};padding:30px 20px;border-radius:10px;'
+        f'display:inline-block">'
+        f"{answer_squares[0]} {answer_squares[1]} {answer_squares[2]} {answer_squares[3]}</div>"
+    )
     return (answer_squares,)
 
 
