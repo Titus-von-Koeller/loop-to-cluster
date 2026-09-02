@@ -36,10 +36,10 @@ def _(mo):
 
     Tensors are similar to [NumPy’s](https://numpy.org/) ndarrays, except that tensors can run on
     GPUs or other hardware accelerators. In fact, tensors and NumPy arrays can often share the same
-    underlying memory, eliminating the need to copy data (see `bridge-to-np-label`). Tensors are
-    also optimized for automatic differentiation (we'll see more about that later in the
-    [Autograd](autogradqs_tutorial.html) section). If you’re familiar with ndarrays, you’ll be
-    right at home with the Tensor API. If not, follow along!
+    underlying memory, eliminating the need to copy data (see the Bridge with NumPy section at the
+    end of this notebook). Tensors are also optimized for automatic differentiation (we'll see more
+    about that later in the [Autograd](06-autograd.py) notebook). If you’re familiar with ndarrays,
+    you’ll be right at home with the Tensor API. If not, follow along!
     """)
     return
 
@@ -107,7 +107,7 @@ def _(mo):
     mo.md(r"""
     **From a NumPy array**
 
-    Tensors can be created from NumPy arrays (and vice versa - see `bridge-to-np-label`).
+    Tensors can be created from NumPy arrays (and vice versa — see Bridge with NumPy below).
     """)
     return
 
@@ -1331,7 +1331,7 @@ def _(mo):
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
-    # Bridge with NumPy
+    ## Bridge with NumPy
 
     Tensors on the CPU and NumPy arrays can share their underlying memory locations, and changing
     one will change the other.
@@ -1342,7 +1342,7 @@ def _(mo):
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
-    # Tensor to NumPy array
+    ### Tensor to NumPy array
     """)
     return
 
@@ -1384,7 +1384,7 @@ def _(mo, show, torch):
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
-    # NumPy array to Tensor
+    ### NumPy array to tensor
     """)
     return
 
