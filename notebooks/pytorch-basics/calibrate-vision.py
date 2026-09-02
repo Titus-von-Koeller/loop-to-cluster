@@ -266,8 +266,9 @@ def _(LOG, datetime, get_responses, json, mo, set_responses, timezone, trial_for
         _esm = """
         function render({ model, el }) {
           const wrap = document.createElement("div");
-          wrap.style.cssText = `background:${model.get("ground")};padding:30px 22px;` +
-            `border-radius:10px;display:inline-flex;gap:28px`;
+          wrap.style.cssText = `background:${model.get("ground")};padding:36px 22px;` +
+            `border-radius:10px;display:flex;justify-content:center;gap:28px;` +
+            `width:100%;box-sizing:border-box`;
           model.get("colors").forEach((c, i) => {
             const sq = document.createElement("div");
             sq.style.cssText = `width:72px;height:72px;border-radius:8px;background:${c};` +
