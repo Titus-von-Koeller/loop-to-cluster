@@ -28,26 +28,23 @@ def _():
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
-    [Learn the Basics](intro.html) \|\| [Quickstart](quickstart_tutorial.html) \|\|
-    [Tensors](tensorqs_tutorial.html) \|\| [Datasets & DataLoaders](data_tutorial.html) \|\|
-    [Transforms](transforms_tutorial.html) \|\| [Build Model](buildmodel_tutorial.html) \|\|
-    [Autograd](autogradqs_tutorial.html) \|\| **Optimization** \|\| [Save & Load
-    Model](saveloadrun_tutorial.html)
+    *PyTorch basics, 7 of 8 — before this: [Autograd](06-autograd.py)
+    · after: [Save & Load Model](08-save-load-run.py)*
 
     # Optimizing Model Parameters
 
     Now that we have a model and data it's time to train, validate and test our model by optimizing
     its parameters on our data. Training a model is an iterative process; in each iteration the
     model makes a guess about the output, calculates the error in its guess (*loss*), collects the
-    derivatives of the error with respect to its parameters (as we saw in the [previous
-    section](autogradqs_tutorial.html)), and **optimizes** these parameters using gradient descent.
+    derivatives of the error with respect to its parameters (as [the previous
+    notebook](06-autograd.py) showed), and **optimizes** these parameters using gradient descent.
     For a more detailed walkthrough of this process, check out this video on [backpropagation from
     3Blue1Brown](https://www.youtube.com/watch?v=tIeHLnjs5U8).
 
     ## Prerequisite Code
 
-    We load the code from the previous sections on [Datasets & DataLoaders](data_tutorial.html) and
-    [Build Model](buildmodel_tutorial.html).
+    We load the code from the previous notebooks on [Datasets &
+    DataLoaders](03-datasets-and-dataloaders.py) and [Build Model](05-build-model.py).
     """)
     return
 
@@ -133,8 +130,8 @@ def _(mo):
     The prerequisite cell builds it silently. Returning it draws marimo's tree, which is
     worth one look here for the line the other notebooks do not have cause to point at:
     **device `cpu`**. Nothing in this tutorial moves the model to an accelerator, so the
-    ten epochs above run on the processor. That is also the one substantive difference in
-    the training cell further down, which does move it, and finishes in seconds.
+    ten epochs below run on the processor. The interactive training cell further down
+    does move it, which is why that one finishes in seconds.
     """)
     return
 
@@ -148,11 +145,11 @@ def _(model):
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
-    # Hyperparameters
+    ## Hyperparameters
 
     Hyperparameters are adjustable parameters that let you control the model optimization process.
     Different hyperparameter values can impact model training and convergence rates ([read
-    more](https://pytorch.org/tutorials/beginner/hyperparameter_tuning_tutorial.html) about
+    more](https://docs.pytorch.org/tutorials/beginner/hyperparameter_tuning_tutorial) about
     hyperparameter tuning)
 
     We define the following hyperparameters for training:
@@ -160,7 +157,7 @@ def _(mo):
     - **Number of Epochs** - the number of times to iterate over the dataset
     - **Batch Size** - the number of data samples propagated through the network before the
       parameters are updated
-    - **Learning Rate** - how much to update models parameters at each batch/epoch. Smaller values
+    - **Learning Rate** - how much to update model parameters at each batch/epoch. Smaller values
       yield slow learning speed, while large values may result in unpredictable behavior during
       training.
     """)
@@ -171,14 +168,14 @@ def _(mo):
 def _():
     learning_rate = 0.001
     batch_size = 64
-    _epochs = 5
+    _epochs = 10
     return batch_size, learning_rate
 
 
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
-    # Optimization Loop
+    ## Optimization Loop
 
     Once we set our hyperparameters, we can then train and optimize our model with an optimization
     loop. Each iteration of the optimization loop is called an **epoch**.
@@ -190,10 +187,10 @@ def _(mo):
     - **The Validation/Test Loop** - iterate over the test dataset to check if model performance is
       improving.
 
-    Let's briefly familiarize ourselves with some of the concepts used in the training loop. Jump
-    ahead to see the `full-impl-label` of the optimization loop.
+    Let's briefly familiarize ourselves with the two concepts the loop is built from — the loss
+    function and the optimizer; the full implementation follows right after.
 
-    ## Loss Function
+    ### Loss Function
 
     When presented with some training data, our untrained network is likely not to give the correct
     answer. **Loss function** measures the degree of dissimilarity of obtained result to the target
@@ -225,13 +222,13 @@ def _(nn):
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
-    # Optimizer
+    ### Optimizer
 
     Optimization is the process of adjusting model parameters to reduce model error in each
     training step. **Optimization algorithms** define how this process is performed (in this
     example we use Stochastic Gradient Descent). All optimization logic is encapsulated in the
     `optimizer` object. Here, we use the SGD optimizer; additionally, there are many [different
-    optimizers](https://pytorch.org/docs/stable/optim.html) available in PyTorch such as ADAM and
+    optimizers](https://pytorch.org/docs/stable/optim.html) available in PyTorch such as Adam and
     RMSProp, that work better for different kinds of models and data.
 
     We initialize the optimizer by registering the model's parameters that need to be trained, and
@@ -264,7 +261,7 @@ def _(mo):
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
-    # Full Implementation
+    ## Full Implementation
 
     We define `train_loop` that loops over our optimization code, and `test_loop` that evaluates
     the model's performance against our test data.
@@ -276,37 +273,41 @@ def _(mo):
 def _(batch_size, torch):
     def train_loop(dataloader, model, loss_fn, optimizer):
         size = len(dataloader.dataset)
-        model.train()  # Set the model to training mode - important for batch normalization and dropout layers
-        for batch, (X, y) in enumerate(dataloader):  # Unnecessary in this situation but added for best practices
+        # Set the model to training mode - important for batch normalization and dropout
+        # layers. Unnecessary in this situation but added for best practices.
+        model.train()
+        for batch, (X, y) in enumerate(dataloader):
+            # Compute prediction and loss
             pred = model(X)
             loss = loss_fn(pred, y)
-            loss.backward()  # Compute prediction and loss
+
+            # Backpropagation
+            loss.backward()
             optimizer.step()
             optimizer.zero_grad()
+
             if batch % 100 == 0:
-                loss, current = (loss.item(), batch * batch_size + len(X))  # Backpropagation
+                loss, current = (loss.item(), batch * batch_size + len(X))
                 print(f"loss: {loss:>7f}  [{current:>5d}/{size:>5d}]")
 
     def test_loop(dataloader, model, loss_fn):
+        # Set the model to evaluation mode - important for batch normalization and dropout
+        # layers. Unnecessary in this situation but added for best practices.
         model.eval()
         size = len(dataloader.dataset)
         num_batches = len(dataloader)
         test_loss, correct = (0, 0)
+        # Evaluating the model with torch.no_grad() ensures that no gradients are computed
+        # during test mode; also serves to reduce unnecessary gradient computations and
+        # memory usage for tensors with requires_grad=True.
         with torch.no_grad():
             for X, y in dataloader:
                 pred = model(X)
-                test_loss += loss_fn(
-                    pred, y
-                ).item()  # Set the model to evaluation mode - important for batch normalization and dropout layers
-                correct += (
-                    (pred.argmax(1) == y).type(torch.float).sum().item()
-                )  # Unnecessary in this situation but added for best practices
+                test_loss += loss_fn(pred, y).item()
+                correct += (pred.argmax(1) == y).type(torch.float).sum().item()
         test_loss /= num_batches
         correct /= size
         print(f"Test Error: \n Accuracy: {100 * correct:>0.1f}%, Avg loss: {test_loss:>8f} \n")
-        # Evaluating the model with torch.no_grad() ensures that no gradients are
-        # computed during test mode; also serves to reduce unnecessary gradient
-        # computations and memory usage for tensors with requires_grad=True
 
     return test_loop, train_loop
 
@@ -347,34 +348,34 @@ def _(mo):
     mo.md(r"""
     ## The same loop, with the curve drawn as it runs
 
-    A hundred and twenty printed loss values are a time series rendered as text. The cell
-    below runs the identical loop and draws it instead: training loss every twenty
-    batches, test loss and accuracy once per epoch, redrawn in place while the run
-    proceeds.
+    The hundred loss values the loop above printed — one every hundred batches, ten per
+    epoch — are a time series rendered as text. The cell below runs the same loop and
+    draws it instead: training loss (blue) every twenty batches, test loss and accuracy
+    (vermillion points) once per epoch, redrawn in place while the run proceeds. Three
+    deliberate differences from the loop above: the model moves to the accelerator, which
+    is why this finishes in seconds; the loader shuffles, as training loaders should
+    (notebook 03; the tutorial's reads file order); and every run reseeds and rebuilds the
+    model, so two runs differ only by what you changed.
 
-    Every run starts from the same seed and a fresh model, so two runs differ only by
-    what you changed. Worth trying, in this order:
+    Worth trying, in this order:
 
     - **learning rate 0.001**, the tutorial's value, for two epochs. The curve falls and
       is still falling when it stops. That is what an undertrained model looks like, and
       the 10 epochs above are still on the same slope.
-    - **learning rate 0.1.** Roughly a hundred times fewer steps to reach the same loss.
-      The tutorial's value is not a default worth keeping; it is a value chosen to be
-      safe without a schedule.
-    - **learning rate 1.0.** The loss stops falling and starts wandering, or leaves. The
-      failure is not gradual — there is a threshold, and past it the step overshoots the
-      curvature it is descending.
+    - **learning rate 0.1.** The first thirty batches reach the loss that two epochs —
+      1,876 steps — end at above: roughly sixty times fewer steps. The tutorial's value is
+      not a default worth keeping; it is a value chosen to be safe without a schedule.
+    - **learning rate 1.0.** The loss climbs instead of falling and is NaN before the
+      first epoch ends — the curve simply leaves. The failure is not gradual — there is a
+      threshold, and past it the step overshoots the curvature it is descending.
     - **Adam at 0.001** against **SGD at 0.001.** Same number, different distance
       travelled, because Adam divides each parameter's step by a running estimate of that
       parameter's own gradient scale. A learning rate means something different for each.
-
-    The model here is moved to the accelerator, unlike the tutorial's, which is why this
-    finishes in seconds.
     """)
     return
 
 
-@app.cell
+@app.cell(hide_code=True)
 def _(mo):
     optimizer_pick = mo.ui.dropdown(
         {"SGD": "sgd", "SGD, momentum 0.9": "momentum", "Adam": "adam"},
@@ -404,11 +405,11 @@ def _(mo):
     return batch_pick, epochs_pick, optimizer_pick, rate_pick, start_training
 
 
-@app.cell
+@app.cell(hide_code=True)
 def _():
     import altair as alt
     import pandas as pd
-    from _viz import ACCENT, BASE, OKABE_ITO
+    from _viz import ACCENT, BASE, OKABE_ITO, RAMP
 
     def loss_curves(history, checkpoints):
         """Train loss against test loss, on one pair of axes."""
@@ -429,7 +430,7 @@ def _():
             )
         return alt.layer(*layers).properties(width=560, height=260)
 
-    return OKABE_ITO, alt, loss_curves, pd
+    return OKABE_ITO, RAMP, alt, loss_curves, pd
 
 
 @app.cell
@@ -453,9 +454,9 @@ def _(
         mo.md("Set the controls above, then press **Train**. Nothing runs until you do."),
     )
 
-    _device = torch.accelerator.current_accelerator().type if torch.accelerator.is_available() else "cpu"
+    run_device = torch.accelerator.current_accelerator().type if torch.accelerator.is_available() else "cpu"
     torch.manual_seed(0)
-    _model = NeuralNetwork().to(_device)
+    _model = NeuralNetwork().to(run_device)
     _loader = DataLoader(training_data, batch_size=int(batch_pick.value), shuffle=True)
     _loss_fn = nn.CrossEntropyLoss()
     _optimizer = {
@@ -474,7 +475,7 @@ def _(
         for _epoch in range(epochs_pick.value):
             _model.train()
             for _images, _labels in _loader:
-                _images, _labels = _images.to(_device), _labels.to(_device)
+                _images, _labels = _images.to(run_device), _labels.to(run_device)
                 _batch_loss = _loss_fn(_model(_images), _labels)
                 _batch_loss.backward()
                 _optimizer.step()
@@ -489,7 +490,7 @@ def _(
             _total_loss, _hits, _count = 0.0, 0, 0
             with torch.no_grad():
                 for _images, _labels in test_dataloader:
-                    _images, _labels = _images.to(_device), _labels.to(_device)
+                    _images, _labels = _images.to(run_device), _labels.to(run_device)
                     _logits = _model(_images)
                     _total_loss += _loss_fn(_logits, _labels).item() * len(_labels)
                     _hits += (_logits.argmax(1) == _labels).sum().item()
@@ -503,18 +504,20 @@ def _(
                 }
             )
             mo.output.replace_at_index(loss_curves(history, checkpoints), 1)
+    return checkpoints, run_device, seen
 
-    mo.output.append(
-        mo.hstack(
-            [
-                mo.stat(f"{checkpoints[-1]['accuracy']:.1f}%", label="test accuracy", bordered=True),
-                mo.stat(f"{checkpoints[-1]['loss']:.3f}", label="test loss", bordered=True),
-                mo.stat(f"{seen:,}", label="optimizer steps", bordered=True),
-                mo.stat(_device, label="device", bordered=True),
-            ],
-            justify="start",
-            gap=1,
-        )
+
+@app.cell(hide_code=True)
+def _(checkpoints, mo, run_device, seen):
+    mo.hstack(
+        [
+            mo.stat(f"{checkpoints[-1]['accuracy']:.1f}%", label="test accuracy", bordered=True),
+            mo.stat(f"{checkpoints[-1]['loss']:.3f}", label="test loss", bordered=True),
+            mo.stat(f"{seen:,}", label="optimizer steps", bordered=True),
+            mo.stat(run_device, label="device", bordered=True),
+        ],
+        justify="start",
+        gap=1,
     )
     return
 
@@ -534,10 +537,12 @@ def _(mo):
 
     Start at **0.06** and walk the rate up. Plain SGD tells the whole story on its own:
 
-    - At 0.06 it does not bounce at all. It kills the steep direction in a few steps and
-      then crawls along the floor, ending 1.98 from the minimum having started at 4.9.
-    - At 0.3 it arrives. At 0.6 and 0.9 it oscillates violently across the valley — the
-      curve visibly zig-zags — and *still* converges, in fact fastest of all at 0.9.
+    - At 0.06 it does not bounce at all. It kills the steep direction within the first
+      couple dozen steps and then crawls along the floor, ending 1.98 from the minimum
+      having started at 4.9.
+    - At 0.3 it arrives. At 0.6 and 0.9 it overshoots the floor and zig-zags across the
+      valley — briefly at 0.6, ringing all the way down at 0.9 — and *still* converges,
+      in fact fastest of all at 0.9.
     - At exactly 1.0 the oscillation stops decaying: `y` flips sign every step at constant
       size, forever. At 1.02 it explodes. That edge is not luck, it is `2/λ`, where λ = 2
       is the curvature of the steep direction, and it does not depend on the shallow one.
@@ -549,7 +554,7 @@ def _(mo):
 
     The other two buy their way out differently. **Momentum** integrates the gradient, so
     the shallow direction accumulates speed; it rings in the steep direction more than SGD
-    does, not less, and still lands about a thousand times closer at 0.06. **Adam**
+    does, not less, and still lands nearly two thousand times closer at 0.06. **Adam**
     divides each coordinate's step by a running estimate of that coordinate's own gradient
     size, which removes the anisotropy rather than tolerating it — that per-parameter
     rescaling is also why an Adam learning rate does not transfer to SGD.
@@ -557,7 +562,7 @@ def _(mo):
     return
 
 
-@app.cell
+@app.cell(hide_code=True)
 def _(mo):
     valley_rate = mo.ui.slider(
         steps=[0.001, 0.01, 0.03, 0.06, 0.1, 0.3, 0.6, 0.9, 1.0, 1.02],
@@ -573,10 +578,7 @@ def _(mo):
 
 
 @app.cell
-def _(OKABE_ITO, mo, torch, valley_rate, valley_steps):
-    import numpy as np
-    import plotly.graph_objects as plot
-
+def _(torch, valley_rate, valley_steps):
     def valley(x, y):
         """Twenty times steeper across than along. Any anisotropy would do."""
         return 0.05 * x**2 + y**2
@@ -593,14 +595,23 @@ def _(OKABE_ITO, mo, torch, valley_rate, valley_steps):
         return torch.stack(path)
 
     runs = {
-        "SGD": (OKABE_ITO["vermillion"], descend(lambda p: torch.optim.SGD(p, lr=valley_rate.value))),
-        "momentum 0.9": (
-            OKABE_ITO["orange"],
-            descend(lambda p: torch.optim.SGD(p, lr=valley_rate.value, momentum=0.9)),
-        ),
-        "Adam": (OKABE_ITO["green"], descend(lambda p: torch.optim.Adam(p, lr=valley_rate.value))),
+        "SGD": descend(lambda p: torch.optim.SGD(p, lr=valley_rate.value)),
+        "momentum 0.9": descend(lambda p: torch.optim.SGD(p, lr=valley_rate.value, momentum=0.9)),
+        "Adam": descend(lambda p: torch.optim.Adam(p, lr=valley_rate.value)),
     }
+    return runs, valley
 
+
+@app.cell(hide_code=True)
+def _(OKABE_ITO, RAMP, mo, runs, valley):
+    import numpy as np
+    import plotly.graph_objects as plot
+
+    _colors = {
+        "SGD": OKABE_ITO["vermillion"],
+        "momentum 0.9": OKABE_ITO["orange"],
+        "Adam": OKABE_ITO["green"],
+    }
     _grid_x, _grid_y = np.meshgrid(np.linspace(-5, 5, 90), np.linspace(-2, 2, 60))
     _figure = plot.Figure(
         data=[
@@ -608,14 +619,16 @@ def _(OKABE_ITO, mo, torch, valley_rate, valley_steps):
                 x=_grid_x,
                 y=_grid_y,
                 z=valley(_grid_x, _grid_y),
-                colorscale="Blues",
+                # The house sequential ramp (cividis, _palette.py): dark end is low, so
+                # the valley floor is dark and the Okabe-Ito paths read against it.
+                colorscale=[[i / (len(RAMP) - 1), c] for i, c in enumerate(RAMP)],
                 opacity=0.75,
                 showscale=False,
                 contours={"z": {"show": True, "usecolormap": True, "width": 1}},
             )
         ]
     )
-    for _name, (_color, _path) in runs.items():
+    for _name, _path in runs.items():
         _xs, _ys = _path[:, 0].numpy(), _path[:, 1].numpy()
         _figure.add_trace(
             plot.Scatter3d(
@@ -624,8 +637,8 @@ def _(OKABE_ITO, mo, torch, valley_rate, valley_steps):
                 # Lifted a little so the line reads against the surface rather than through it.
                 z=valley(_xs, _ys) + 0.15,
                 mode="lines+markers",
-                line={"color": _color, "width": 5},
-                marker={"size": 2, "color": _color},
+                line={"color": _colors[_name], "width": 5},
+                marker={"size": 2, "color": _colors[_name]},
                 name=_name,
             )
         )
@@ -647,7 +660,7 @@ def _(OKABE_ITO, mo, torch, valley_rate, valley_steps):
             mo.hstack(
                 [
                     mo.stat(f"{_path[-1].norm():.3f}", label=_name, caption="distance left to (0, 0)", bordered=True)
-                    for _name, (_, _path) in runs.items()
+                    for _name, _path in runs.items()
                 ],
                 justify="start",
                 gap=1,
@@ -660,12 +673,16 @@ def _(OKABE_ITO, mo, torch, valley_rate, valley_steps):
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
-    # Further Reading
+    ## Where to go next
 
-    - [Loss Functions](https://pytorch.org/docs/stable/nn.html#loss-functions)
-    - [torch.optim](https://pytorch.org/docs/stable/optim.html)
-    - [Warmstart Training a
+    - [Loss Functions](https://pytorch.org/docs/stable/nn.html#loss-functions) and
+      [torch.optim](https://pytorch.org/docs/stable/optim.html) list what this notebook picked
+      one of each from; [Warmstart Training a
       Model](https://pytorch.org/tutorials/recipes/recipes/warmstarting_model_using_parameters_from_a_different_model.html)
+      shows a partially trained model's parameters seeding another.
+    - Every run in this notebook ended with a trained model that dies with the process. Next:
+      [Save & Load Model](08-save-load-run.py), where the parameters leave the process and come
+      back.
     """)
     return
 
