@@ -104,8 +104,9 @@ def _(mo):
 @app.cell
 def _(DataLoader, test_data, training_data):
     batch_size = 64
-    train_dataloader = DataLoader(training_data, batch_size=batch_size)
+
     # Create data loaders.
+    train_dataloader = DataLoader(training_data, batch_size=batch_size)
     test_dataloader = DataLoader(test_data, batch_size=batch_size)
     for X, _y in test_dataloader:
         print(f"Shape of X [N, C, H, W]: {X.shape}")
@@ -241,12 +242,17 @@ def _(device):
         model.train()
         for batch, (X, _y) in enumerate(dataloader):
             X, _y = (X.to(device), _y.to(device))
+
+            # Compute prediction error
             pred = model(X)
-            loss = loss_fn(pred, _y)  # Compute prediction error
+            loss = loss_fn(pred, _y)
+
+            # Backpropagation
             loss.backward()
             optimizer.step()
             optimizer.zero_grad()
-            if batch % 100 == 0:  # Backpropagation
+
+            if batch % 100 == 0:
                 loss, current = (loss.item(), (batch + 1) * len(X))
                 print(f"loss: {loss:>7f}  [{current:>5d}/{size:>5d}]")
 
@@ -471,8 +477,9 @@ def _(mo):
 
     A single accuracy number hides *which* classes the model confuses, and the answer is
     never uniform. Click a square: the images behind it appear below. The color scale is
-    symlog, because the diagonal is two orders of magnitude larger than everything else
-    and a linear scale would render the interesting cells as white.
+    symlog: one picture holds counts from single digits to nearly a thousand (each row is
+    1,000 test images), and on a linear scale most of the mistake cells — the interesting
+    ones — would be indistinguishable from an empty cell.
     """)
     return
 
