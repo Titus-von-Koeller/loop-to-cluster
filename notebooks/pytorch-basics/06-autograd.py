@@ -25,23 +25,10 @@ def _():
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
-    [Learn the Basics](intro.html) \|\| [Quickstart](quickstart_tutorial.html) \|\|
-    [Tensors](tensorqs_tutorial.html) \|\| [Datasets & DataLoaders](data_tutorial.html) \|\|
-    [Transforms](transforms_tutorial.html) \|\| [Build Model](buildmodel_tutorial.html) \|\|
-    **Autograd** \|\| [Optimization](optimization_tutorial.html) \|\| [Save & Load
-    Model](saveloadrun_tutorial.html)
+    *PyTorch basics, 6 of 8 — before this: [Build Model](05-build-model.py) · after:
+    [Optimization](07-optimization-loop.py)*
 
     # Automatic Differentiation with `torch.autograd`
-
-    When training neural networks, the most frequently used algorithm is **back propagation**. In
-    this algorithm, parameters (model weights) are adjusted according to the **gradient** of the
-    loss function with respect to the given parameter.
-
-    To compute those gradients, PyTorch has a built-in differentiation engine called
-    `torch.autograd`. It supports automatic computation of gradient for any computational graph.
-
-    Consider the simplest one-layer neural network, with input `x`, parameters `w` and `b`, and
-    some loss function. It can be defined in PyTorch in the following manner:
     """)
     return
 
@@ -64,6 +51,22 @@ def _(mo):
     return
 
 
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    The last notebook ended on a flag: every parameter in its table carried `trainable = True` —
+    the `requires_grad` property — and nothing had happened because of it yet. This notebook is
+    where the flag does its work. Training adjusts parameters by **back propagation**: each weight
+    moves according to the **gradient** of the loss with respect to that weight, and PyTorch
+    computes those gradients with a built-in differentiation engine, `torch.autograd`, which can
+    differentiate through any computational graph.
+
+    The whole mechanism fits in a one-layer network — input `x`, parameters `w` and `b`, and a
+    loss to differentiate:
+    """)
+    return
+
+
 @app.cell
 def _():
     import torch
@@ -80,17 +83,13 @@ def _():
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
-    # Tensors, Functions and Computational graph
+    ## Tensors, Functions and Computational graph
 
-    This code defines the following **computational graph**:
-
-    <figure>
-    <img src="/_static/img/basics/comp-graph.png" alt="/_static/img/basics/comp-graph.png" />
-    </figure>
-
-    In this network, `w` and `b` are **parameters**, which we need to optimize. Thus, we need to be
-    able to compute the gradients of loss function with respect to those variables. In order to do
-    that, we set the `requires_grad` property of those tensors.
+    Running that code did more than produce a number. `w` and `b` are **parameters** — the tensors
+    training will adjust, so the gradients of the loss with respect to them are what we are after,
+    and setting their `requires_grad` property is how we ask for them. While the forward pass ran,
+    autograd recorded every operation that touched a tracked tensor into a **computational
+    graph** — the record it will differentiate, drawn from the live objects a few cells down.
     """)
     return
 
@@ -108,11 +107,11 @@ def _(mo):
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
-    A function that we apply to tensors to construct computational graph is in fact an object of
-    class `Function`. This object knows how to compute the function in the *forward* direction, and
-    also how to compute its derivative during the *backward propagation* step. A reference to the
-    backward propagation function is stored in `grad_fn` property of a tensor. You can find more
-    information of `Function` [in the
+    A function that we apply to tensors to construct the computational graph is in fact an object
+    of class `Function`. This object knows how to compute the function in the *forward* direction,
+    and also how to compute its derivative during the *backward propagation* step. A reference to
+    the backward propagation function is stored in the `grad_fn` property of a tensor. You can
+    find more information on `Function` [in the
     documentation](https://pytorch.org/docs/stable/autograd.html#function).
     """)
     return
@@ -128,100 +127,114 @@ def _(loss, z):
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
-    ## The graph itself, walked and drawn
+    ### The graph itself, walked and drawn
 
-    The section above says a graph exists and prints two of its nodes. It is reachable:
-    every tensor that required grad carries `.grad_fn`, and every `grad_fn` carries
-    `.next_functions`, the edges to whatever produced its inputs. Walking that from `loss`
-    to the leaves is a dozen lines, and it draws the picture the text describes.
+    The two printed nodes are the tip of something reachable: every tensor autograd produced
+    carries `.grad_fn`, and every `grad_fn` carries `.next_functions` — the edges to whatever
+    produced its inputs. Walking that from `loss` back to the leaves is a dozen lines; drawing
+    what the walk finds is plumbing, folded below it.
 
-    Read it bottom-up, which is the direction `backward()` travels. The ovals are
-    `AccumulateGrad`: the ends of the road, one per leaf tensor with `requires_grad=True`,
-    and the only places a `.grad` is ever written. The double-outlined box at the top is
-    the root you called `backward()` on; the plain boxes between them are operations.
+    The double-outlined box at the top is the root, the tensor `backward()` gets called on. The
+    ovals at the bottom are `AccumulateGrad`: the ends of the road, one per leaf tensor with
+    `requires_grad=True`, and the only places a `.grad` is ever written. The plain boxes between
+    them are the recorded operations. The forward pass built the picture bottom-up; `backward()`
+    will run it top-down, root to leaves.
 
-    One node is not in the code you wrote. `torch.matmul(x, w)` with a 1-D `x` becomes
-    unsqueeze, matrix multiply, squeeze — so a `SqueezeBackward` sits in the graph
-    recording a reshape you never asked for. The graph is a record of what *ran*, and it
-    is built during the forward pass, which is why it can follow an `if` statement and why
-    it has to be rebuilt every iteration.
+    One node is not in the code you wrote. `torch.matmul(x, w)` with a 1-D `x` becomes unsqueeze,
+    matrix multiply, squeeze — so a `SqueezeBackward4` sits in the graph recording a reshape you
+    never asked for. Its matching unsqueeze is absent: it touched only `x`, which tracks nothing,
+    so it was never recorded — a rule the switches further down make vivid. The graph is a record
+    of what *ran*, built during the forward pass, which is why it can follow an `if` statement and
+    why it has to be rebuilt every iteration.
     """)
     return
 
 
 @app.cell
-def _(b, mo, w, x):
+def _():
+    def graph_of(root):
+        """Walk .grad_fn to the leaves: a node reaches its producers via .next_functions."""
+        nodes, edges, frontier = {}, [], [root.grad_fn]
+        while frontier:
+            node = frontier.pop()
+            if id(node) in nodes:
+                continue
+            nodes[id(node)] = node
+            for producer, _ in node.next_functions:
+                if producer is not None:
+                    edges.append((producer, node))
+                    frontier.append(producer)
+        return nodes, edges
+
+    return (graph_of,)
+
+
+@app.cell(hide_code=True)
+def _(graph_of, mo):
+    # The viewing vocabulary is shared with the sibling notebooks and lives in _viz.py.
+    # Graphviz takes literal colors, so the node fills are computed from the palette
+    # constants -- each hue mixed toward the card's white -- rather than typed in by hand.
     import graphviz
+    from _viz import ACCENT, BASE, INK_DARK, OKABE_ITO, show
 
-    def backward_graph(root, named):
-        """Walk .grad_fn back to the leaves and draw it.
+    def tint(color, toward_white):
+        channels = (int(color[i : i + 2], 16) for i in (1, 3, 5))
+        return "#" + "".join(f"{round(c + (255 - c) * toward_white):02x}" for c in channels)
 
-        The three node kinds are told apart by shape first and color second. Hue is a
-        selective variable, not an ordered one, and roughly one man in twelve cannot
-        separate a red node from a green one; a rectangle, an oval and a doubled outline
-        survive that, and survive printing in gray as well.
+    def draw(root, named):
+        """Hand graph_of's findings to graphviz.
+
+        The three node kinds are told apart by shape first and color second: a rectangle,
+        an oval and a doubled outline survive color-vision deficiency, and survive printing
+        in gray as well. Labels are the exact class names, so the picture matches what
+        `type(node).__name__` prints.
         """
         dot = graphviz.Digraph()
         dot.attr(bgcolor="transparent", rankdir="BT", margin="8")
-        dot.attr("node", style="rounded,filled", fontname="Helvetica", fontsize="11", fontcolor="#15181d")
-        dot.attr("edge", color="#8a8f98")
-        seen = set()
-
-        def walk(node):
-            if node is None or id(node) in seen:
-                return
-            seen.add(id(node))
+        dot.attr("node", style="rounded,filled", fontname="Helvetica", fontsize="11", fontcolor=INK_DARK)
+        dot.attr("edge", color=tint(INK_DARK, 0.45))
+        nodes, edges = graph_of(root)
+        for node in nodes.values():
             kind = type(node).__name__
             if kind == "AccumulateGrad":
-                tensor = node.variable
-                label = f"{named.get(id(tensor), 'leaf')}\\n{tuple(tensor.shape)}"
-                dot.node(str(id(node)), label, shape="oval", fillcolor="#d5eee4", color="#199e70")
+                label = f"{named.get(id(node.variable), 'leaf')}\\n{tuple(node.variable.shape)}"
+                green = OKABE_ITO["green"]
+                dot.node(str(id(node)), label, shape="oval", fillcolor=tint(green, 0.82), color=green)
             elif node is root.grad_fn:
-                dot.node(
-                    str(id(node)),
-                    kind.removesuffix("0"),
-                    shape="box",
-                    peripheries="2",
-                    fillcolor="#f7e0d5",
-                    color="#d95926",
-                )
+                dot.node(str(id(node)), kind, shape="box", peripheries="2", fillcolor=tint(ACCENT, 0.82), color=ACCENT)
             else:
-                dot.node(str(id(node)), kind.removesuffix("0"), shape="box", fillcolor="#dbe7f7", color="#2a78d6")
-            for child, _ in node.next_functions:
-                if child is not None:
-                    walk(child)
-                    dot.edge(str(id(child)), str(id(node)))
-
-        walk(root.grad_fn)
+                dot.node(str(id(node)), kind, shape="box", fillcolor=tint(BASE, 0.82), color=BASE)
+        for producer, consumer in edges:
+            dot.edge(str(id(producer)), str(id(consumer)))
         return dot
 
     def as_svg(dot):
+        # On its own white card: a graph drawn in dark ink should not inherit whatever
+        # page color the reader's theme paints.
         svg = dot.pipe(format="svg").decode()
         return mo.Html(
             '<div style="background:white;border-radius:8px;padding:12px;display:inline-block">'
             f"{svg[svg.index('<svg') :]}</div>"
         )
 
-    leaf_names = {id(w): "w", id(b): "b", id(x): "x"}
-    return as_svg, backward_graph, leaf_names
+    return as_svg, draw, show
 
 
-@app.cell
-def _(as_svg, backward_graph, leaf_names, loss):
-    as_svg(backward_graph(loss, leaf_names))
+@app.cell(hide_code=True)
+def _(as_svg, b, draw, loss, w):
+    as_svg(draw(loss, {id(w): "w", id(b): "b"}))
     return
 
 
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
-    # Computing Gradients
+    ## Computing Gradients
 
-    To optimize weights of parameters in the neural network, we need to compute the derivatives of
-    our loss function with respect to parameters, namely, we need
-    $`\frac{\partial loss}{\partial w}`$ and $`\frac{\partial loss}{\partial b}`$ under some fixed
-    values of `x` and `y`. To compute those derivatives, we call `loss.backward()`, and then
-    retrieve the values from `w.grad` and `b.grad`:
+    To optimize the parameters, we need the derivatives of the loss function with respect to
+    them: $\frac{\partial loss}{\partial w}$ and $\frac{\partial loss}{\partial b}$ under the
+    fixed values of `x` and `y`. To compute those derivatives, we call `loss.backward()`, and
+    then retrieve the values from `w.grad` and `b.grad`:
     """)
     return
 
@@ -237,64 +250,34 @@ def _(b, loss, w):
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
-    ## Check that gradient by hand
+    ### Check that gradient by hand
 
-    `backward()` filled in fifteen numbers and there is no reason yet to believe them.
-    This model is small enough to differentiate on paper, so the cell below computes the
-    same gradient from the closed form and compares.
+    `backward()` filled in fifteen numbers and there is no reason yet to believe them. This model
+    is small enough to differentiate on paper, so the cell below computes the same gradient from
+    the closed form and compares.
 
-    With $`z = xW + b`$ and $`L`$ the mean binary cross entropy over the three outputs, the
-    logistic loss collapses to something short:
+    With $z = xW + b$ and $L$ the mean binary cross entropy over the three outputs, the logistic
+    loss collapses to something short:
 
     $$\frac{\partial L}{\partial z_j} = \frac{\sigma(z_j) - y_j}{3}, \qquad
     \frac{\partial L}{\partial W_{ij}} = x_i \cdot \frac{\partial L}{\partial z_j}, \qquad
     \frac{\partial L}{\partial b_j} = \frac{\partial L}{\partial z_j}$$
 
-    The sigmoid never appears in the code — `binary_cross_entropy_with_logits` fuses it
-    into the loss for numerical stability — and it reappears here in the derivative.
-
-    Look at the picture rather than the numbers: every row of `dL/dW` is identical.
-    Nothing forced that, except `x = torch.ones(5)`. The gradient with respect to a weight
-    is its input times the error arriving at its output, so an input of zero produces a
-    gradient of zero no matter how wrong the prediction was — and five identical inputs
-    produce five identical rows.
+    The sigmoid never appears in the code — `binary_cross_entropy_with_logits` fuses it into the
+    loss for numerical stability — and it reappears here in the derivative.
     """)
     return
 
 
 @app.cell
-def _(b, mo, torch, w, x, y, z):
-    import altair as alt
-    import pandas as pd
+def _(torch, x, y, z):
+    error = (torch.sigmoid(z.detach()) - y) / y.numel()  # dL/dz, one entry per output
+    analytic_w = torch.outer(x, error)  # each weight's gradient: its input times the error at its output
+    return analytic_w, error
 
-    def gradient_map(values, title):
-        cells = pd.DataFrame(
-            [
-                {"column": j, "row": i, "value": float(v)}
-                for i, line in enumerate(values.tolist())
-                for j, v in enumerate(line)
-            ]
-        )
-        limit = cells["value"].abs().max()
-        position = {"x": alt.X("column:O", axis=None), "y": alt.Y("row:O", axis=None)}
-        return (
-            alt.Chart(cells)
-            .mark_rect(stroke="white", strokeWidth=2)
-            .encode(
-                **position,
-                color=alt.Color(
-                    "value:Q", scale=alt.Scale(scheme="redblue", domain=[-limit, limit], reverse=True), legend=None
-                ),
-            )
-            + alt.Chart(cells)
-            .mark_text(fontSize=11)
-            .encode(
-                **position,
-                text=alt.Text("value:Q", format=".3f"),
-                color=alt.condition(f"abs(datum.value) > {0.6 * limit}", alt.value("white"), alt.value("#111111")),
-            )
-        ).properties(width=3 * 76, height=values.shape[0] * 40, title=title)
 
+@app.cell(hide_code=True)
+def _(analytic_w, b, error, mo, show, torch, w):
     if w.grad is None:
         _panel = mo.callout(
             mo.md(
@@ -305,39 +288,35 @@ def _(b, mo, torch, w, x, y, z):
             kind="warn",
         )
     else:
-        _error = (torch.sigmoid(z.detach()) - y) / y.numel()
-        _analytic_w = torch.outer(x, _error)
         _panel = mo.vstack(
             [
                 mo.hstack(
                     [
-                        gradient_map(w.grad, "w.grad, from backward()"),
-                        gradient_map(_analytic_w, "x ⊗ (σ(z) − y)/3, by hand"),
+                        show(w.grad, "w.grad, from backward()"),
+                        show(analytic_w, "x ⊗ (σ(z) − y)/3, by hand"),
                     ],
                     justify="start",
                     gap=1.5,
                     wrap=True,
                 ),
                 mo.md(
-                    f"identical to floating-point tolerance: **{torch.allclose(w.grad, _analytic_w)}** for `w`, "
-                    f"**{torch.allclose(b.grad, _error)}** for `b`; "
-                    f"largest disagreement {(w.grad - _analytic_w).abs().max():.2e}"
+                    f"identical to floating-point tolerance: **{torch.allclose(w.grad, analytic_w)}** for `w`, "
+                    f"**{torch.allclose(b.grad, error)}** for `b`; "
+                    f"largest disagreement {(w.grad - analytic_w).abs().max():.2e}"
                 ),
             ]
         )
     _panel
-    return alt, gradient_map, pd
+    return
 
 
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
-    > [!NOTE]
-    > - We can only obtain the `grad` properties for the leaf nodes of the computational graph,
-    > which have `requires_grad` property set to `True`. For all other nodes in our graph,
-    > gradients will not be available. - We can only perform gradient calculations using `backward`
-    > once on a given graph, for performance reasons. If we need to do several `backward` calls on
-    > the same graph, we need to pass `retain_graph=True` to the `backward` call.
+    Look at the picture rather than the numbers: every row of `dL/dW` is identical. Nothing forced
+    that, except `x = torch.ones(5)`. The gradient with respect to a weight is its input times the
+    error arriving at its output, so an input of zero produces a gradient of zero no matter how
+    wrong the prediction was — and five identical inputs produce five identical rows.
     """)
     return
 
@@ -345,7 +324,23 @@ def _(mo):
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
-    # Disabling Gradient Tracking
+    > [!NOTE]
+    > - We can only obtain the `grad` properties for the leaf nodes of the computational graph,
+    >   which have the `requires_grad` property set to `True`. For all other nodes in our graph,
+    >   gradients will not be available.
+    > - We can only perform gradient calculations using `backward` once on a given graph, for
+    >   performance reasons: the backward pass frees the graph's saved tensors as it consumes
+    >   them, and a second call raises. If we do need several `backward` calls on the same graph,
+    >   we pass `retain_graph=True` to the `backward` call — the optional-reading section at the
+    >   bottom does exactly that.
+    """)
+    return
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    ## Disabling Gradient Tracking
 
     By default, all tensors with `requires_grad=True` are tracking their computational history and
     support gradient computation. However, there are some cases when we do not need to do that, for
@@ -369,31 +364,30 @@ def _(b, torch, w, x):
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
-    ## The same three switches, drawn
+    ### The same three switches, drawn
 
-    `True` then `False` is the whole result above, which understates it. The switches
-    rebuild the identical forward pass and redraw the graph.
+    `True` then `False` is the whole result above, which understates it. The switches below
+    rebuild the identical forward pass and redraw the graph — predict what each flip removes
+    before flipping it.
 
-    Freeze `w` and more disappears than its own green node: the matrix multiply and the
-    squeeze go with it, and the graph drops from six nodes to three. Autograd records an
-    operation only when something it consumed needs a gradient, so with `x` and `w` both
-    untracked there is nothing to record — the multiply still *runs*, it is simply not
-    written down.
+    Freeze `w` and more disappears than its own oval: the matrix multiply and the squeeze go with
+    it, and the graph drops from six nodes to three. Autograd records an operation only when
+    something it consumed needs a gradient, so with `x` and `w` both untracked there is nothing to
+    record — the multiply still *runs*, it is simply not written down.
 
-    That is what freezing a backbone actually buys. The saving is not one skipped
-    accumulation; it is every backward operation below the highest frozen layer, and the
-    activations they would have needed kept alive to do it.
+    That is what freezing a backbone actually buys. The saving is not one skipped accumulation; it
+    is every backward operation below the highest frozen layer, and the activations they would
+    have needed kept alive to do it.
 
-    Freeze both and there is no graph at all. `no_grad()` gets to the same place by a
-    different route: the tensors still require grad, but nothing is recorded while the
-    block is open. The first is a property of the parameters and survives the function
-    call; the second is a property of the moment. Inference wants the second, and a frozen
-    layer wants the first.
+    Freeze both and there is no graph at all. `no_grad()` gets to the same place by a different
+    route: the tensors still require grad, but nothing is recorded while the block is open. The
+    first is a property of the parameters and survives the function call; the second is a property
+    of the moment. Inference wants the second, and a frozen layer wants the first.
     """)
     return
 
 
-@app.cell
+@app.cell(hide_code=True)
 def _(mo):
     track_w = mo.ui.switch(True, label="`w.requires_grad`")
     track_b = mo.ui.switch(True, label="`b.requires_grad`")
@@ -403,24 +397,27 @@ def _(mo):
 
 
 @app.cell
-def _(as_svg, backward_graph, mo, torch, track_b, track_w, under_no_grad, x, y):
-    _w = torch.randn(5, 3, requires_grad=track_w.value)
-    _b = torch.randn(3, requires_grad=track_b.value)
+def _(torch, track_b, track_w, under_no_grad, x, y):
+    w_live = torch.randn(5, 3, requires_grad=track_w.value)
+    b_live = torch.randn(3, requires_grad=track_b.value)
     with torch.set_grad_enabled(not under_no_grad.value):
-        _z = torch.matmul(x, _w) + _b
-        _loss = torch.nn.functional.binary_cross_entropy_with_logits(_z, y)
+        loss_live = torch.nn.functional.binary_cross_entropy_with_logits(torch.matmul(x, w_live) + b_live, y)
+    return b_live, loss_live, w_live
 
-    if _loss.grad_fn is None:
+
+@app.cell(hide_code=True)
+def _(as_svg, b_live, draw, loss_live, mo, w_live):
+    if loss_live.grad_fn is None:
         _drawing = mo.callout(
             mo.md(
                 f"`loss.grad_fn` is `None`: nothing was recorded, so `loss.backward()` would "
-                f"raise. `loss` is still a perfectly good number — {_loss.item():.4f} — it "
+                f"raise. `loss` is still a perfectly good number — {loss_live.item():.4f} — it "
                 "simply has no history."
             ),
             kind="neutral",
         )
     else:
-        _drawing = as_svg(backward_graph(_loss, {id(_w): "w", id(_b): "b", id(x): "x"}))
+        _drawing = as_svg(draw(loss_live, {id(w_live): "w", id(b_live): "b"}))
     _drawing
     return
 
@@ -455,7 +452,7 @@ def _(mo):
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
-    # More on Computational Graphs
+    ## More on Computational Graphs
 
     Conceptually, autograd keeps a record of data (tensors) and all executed operations (along with
     the resulting new tensors) in a directed acyclic graph (DAG) consisting of
@@ -486,31 +483,30 @@ def _(mo):
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
-    # Optional Reading: Tensor Gradients and Jacobian Products
+    ## Optional Reading: Tensor Gradients and Jacobian Products
 
     In many cases, we have a scalar loss function, and we need to compute the gradient with respect
     to some parameters. However, there are cases when the output function is an arbitrary tensor.
-    In this case, PyTorch allows you to compute so-called **Jacobian product**, and not the actual
-    gradient.
+    In this case, PyTorch allows you to compute a so-called **Jacobian product**, and not the
+    actual gradient.
 
-    For a vector function $`\vec{y}=f(\vec{x})`$, where $`\vec{x}=\langle x_1,\dots,x_n\rangle`$
-    and $`\vec{y}=\langle y_1,\dots,y_m\rangle`$, a gradient of $`\vec{y}`$ with respect to
-    $`\vec{x}`$ is given by **Jacobian matrix**:
+    For a vector function $\vec{y}=f(\vec{x})$, where $\vec{x}=\langle x_1,\dots,x_n\rangle$ and
+    $\vec{y}=\langle y_1,\dots,y_m\rangle$, a gradient of $\vec{y}$ with respect to $\vec{x}$ is
+    given by the **Jacobian matrix**:
 
-    ``` math
-    \begin{aligned}
-    J=\left(\begin{array}{ccc}
-       \frac{\partial y_{1}}{\partial x_{1}} & \cdots & \frac{\partial y_{1}}{\partial x_{n}}\\
-       \vdots & \ddots & \vdots\\
-       \frac{\partial y_{m}}{\partial x_{1}} & \cdots & \frac{\partial y_{m}}{\partial x_{n}}
-       \end{array}\right)
-    \end{aligned}
-    ```
+    $$J=\left(\begin{array}{ccc}
+    \frac{\partial y_{1}}{\partial x_{1}} & \cdots & \frac{\partial y_{1}}{\partial x_{n}}\\
+    \vdots & \ddots & \vdots\\
+    \frac{\partial y_{m}}{\partial x_{1}} & \cdots & \frac{\partial y_{m}}{\partial x_{n}}
+    \end{array}\right)$$
 
-    Instead of computing the Jacobian matrix itself, PyTorch allows you to compute **Jacobian
-    Product** $`v^T\cdot J`$ for a given input vector $`v=(v_1 \dots v_m)`$. This is achieved by
-    calling `backward` with $`v`$ as an argument. The size of $`v`$ should be the same as the size
-    of the original tensor, with respect to which we want to compute the product:
+    Instead of computing the Jacobian matrix itself, PyTorch allows you to compute the **Jacobian
+    product** $v^T\cdot J$ for a given input vector $v=(v_1 \dots v_m)$. This is achieved by
+    calling `backward` with $v$ as an argument. The size of $v$ should be the same as the size of
+    the original tensor, with respect to which we want to compute the product.
+
+    The cell calls `backward` three times on one retained graph — guess what the second print
+    shows before reading past it:
     """)
     return
 
@@ -534,10 +530,11 @@ def _(mo):
     mo.md(r"""
     Notice that when we call `backward` for the second time with the same argument, the value of
     the gradient is different. This happens because when doing `backward` propagation, PyTorch
-    **accumulates the gradients**, i.e. the value of computed gradients is added to the `grad`
-    property of all leaf nodes of computational graph. If you want to compute the proper gradients,
-    you need to zero out the `grad` property before. In real-life training an *optimizer* helps us
-    to do this.
+    **accumulates the gradients**: the value of computed gradients is added to the `grad` property
+    of all leaf nodes of the computational graph. If you want to compute the proper gradients, you
+    need to zero out the `grad` property before. This is Marc's second check, passed by exactly
+    doubled numbers — and it is not a demo quirk: in real training an *optimizer* zeroes the
+    gradients every iteration, and the next notebook's loop shows where that call sits.
     """)
     return
 
@@ -546,7 +543,7 @@ def _(mo):
 def _(mo):
     mo.md(r"""
     > [!NOTE]
-    > Previously we were calling `backward()` function without parameters. This is essentially
+    > Previously we were calling the `backward()` function without parameters. This is essentially
     > equivalent to calling `backward(torch.tensor(1.0))`, which is a useful way to compute the
     > gradients in case of a scalar-valued function, such as loss during neural network training.
     """)
@@ -564,9 +561,18 @@ def _(mo):
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
-    # Further Reading
+    ## Where to go next
 
-    - [Autograd Mechanics](https://pytorch.org/docs/stable/notes/autograd.html)
+    - [Autograd mechanics](https://pytorch.org/docs/stable/notes/autograd.html) documents what
+      this notebook skipped: how in-place writes on saved tensors are caught (a version counter
+      the backward pass checks), what participates in the graph under mixed `requires_grad`, and
+      hooks for watching gradients flow through any node.
+    - `torch.autograd.grad(loss, [w, b])` returns the same gradients as values instead of
+      accumulating them into `.grad` — the functional door to everything here, and the one
+      higher-order derivatives go through.
+    - Next: [Optimization](07-optimization-loop.py), where these pieces start running in a loop —
+      forward, `backward()`, a step downhill — and `optimizer.zero_grad()` runs every iteration,
+      because gradients accumulate and nothing else resets them.
     """)
     return
 
