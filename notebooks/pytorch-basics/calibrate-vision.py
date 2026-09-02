@@ -188,6 +188,50 @@ def _(LOG, datetime, get_responses, json, mo, set_responses, timezone, trial_for
     _colors = [_t["base"]] * 4
     _colors[_t["odd_position"]] = _t["odd_color"]
 
+    # A real widget instead of styled buttons: the squares are plain clickable divs on one
+    # ground, so nothing of a button's chrome shows. anywidget syncs the click back as the
+    # chosen index; a fresh widget renders per trial and the guard drops stale clicks.
+    import anywidget
+    import traitlets
+
+    class _OddOneOut(anywidget.AnyWidget):
+        _esm = """
+        function render({ model, el }) {
+          const wrap = document.createElement("div");
+          wrap.style.cssText = `background:${model.get("ground")};padding:30px 22px;` +
+            `border-radius:10px;display:inline-flex;gap:28px`;
+          model.get("colors").forEach((c, i) => {
+            const sq = document.createElement("div");
+            sq.style.cssText = `width:72px;height:72px;border-radius:8px;background:${c};` +
+              `cursor:pointer`;
+            sq.onclick = () => {
+              model.set("clicks", model.get("clicks") + 1);
+              model.set("choice", i);
+              model.save_changes();
+            };
+            wrap.appendChild(sq);
+          });
+          el.replaceChildren(wrap);
+        }
+        export default { render };
+        """
+        colors = traitlets.List([]).tag(sync=True)
+        ground = traitlets.Unicode("#ffffff").tag(sync=True)
+        choice = traitlets.Int(-1).tag(sync=True)
+        clicks = traitlets.Int(0).tag(sync=True)
+
+    answer_squares = mo.ui.anywidget(_OddOneOut(colors=_colors, ground=_t["ground_hex"]))
+    answer_squares
+    return (answer_squares,)
+
+
+@app.cell(hide_code=True)
+def _(LOG, answer_squares, datetime, get_responses, json, set_responses, timezone, trial_for):
+    # Recording watches the widget's synced traits. Only the FIRST click of a fresh widget
+    # counts (clicks == 1): later clicks on the same trial, and clicks on an orphaned stale
+    # widget, record nothing — the guard below double-checks against the response count.
+    _n = len(get_responses())
+
     def _record(choice, n=_n):
         # The squares are the buttons, so they re-render per trial — which reintroduces the
         # stale-surface risk. The guard converts it from data corruption into a dropped
@@ -211,28 +255,10 @@ def _(LOG, datetime, get_responses, json, mo, set_responses, timezone, trial_for
             _f.write(json.dumps(_entry) + "\n")
         set_responses([*get_responses(), _entry])
 
-    # The squares share one patch of theme ground, as the display cell used to draw it:
-    # UI elements interpolate into mo.md, so the buttons live inside the ground div.
-    answer_squares = mo.ui.array(
-        [
-            mo.ui.button(
-                label=(
-                    f'<span style="display:inline-block;width:64px;height:64px;'
-                    f'border-radius:8px;background:{_c}"></span>'
-                ),
-                value=0,
-                on_click=lambda v: v + 1,
-                on_change=lambda _, i=_i: _record(i),
-            )
-            for _i, _c in enumerate(_colors)
-        ]
-    )
-    mo.md(
-        f'<div style="background:{_t["ground_hex"]};padding:30px 20px;border-radius:10px;'
-        f'display:inline-block">'
-        f"{answer_squares[0]} {answer_squares[1]} {answer_squares[2]} {answer_squares[3]}</div>"
-    )
-    return (answer_squares,)
+    _v = answer_squares.value
+    if _v.get("clicks") == 1 and _v.get("choice", -1) >= 0:
+        _record(_v["choice"])
+    return
 
 
 @app.cell(hide_code=True)
