@@ -210,7 +210,10 @@ def _(GROUNDS, PAIRS, np, random):
         shared log.
         """
         _rng = random.Random(n * 2654435761 % (2**31))
-        _ground = ("day", "night")[n % 2]
+        # Blocked, not alternating: flipping the page every click churns light/dark
+        # adaptation and adds measurement noise. Sixteen-trial blocks keep the eye in one
+        # adapted state while still balancing the two grounds over a sitting.
+        _ground = ("day", "night")[(n // 16) % 2]
         _pal, _a, _b = _rng.choice(PAIRS)
         if _rng.random() < 0.15:
             if _rng.random() < 0.5:
