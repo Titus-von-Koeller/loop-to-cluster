@@ -47,6 +47,12 @@ DIVERGING_SCHEME = "blueorange"
 RAMP = ["#dbe7f7", "#a8c6ec", "#6b9ede", "#2a78d6", "#17457c"]
 POLARITY = ["#8f3413", "#d95926", "#eaa886", "#e8e8e6", "#93bae9", "#2a78d6", "#173f6e"]
 
+# Ink for text set on a known square fill — never on the page, whose color belongs to the
+# reader's theme. The pair show()'s contrast crossovers are calibrated against; exhibits
+# that color their own squares use the same pair rather than re-tuning it locally.
+INK_LIGHT = "#ffffff"
+INK_DARK = "#15181d"
+
 
 def show(tensor, title=None, cell=54, facts=True):
     """Render a small tensor as its own numbers, colored by magnitude."""
@@ -88,7 +94,7 @@ def show(tensor, title=None, cell=54, facts=True):
         .encode(
             **at,
             text=alt.Text("v:Q", format=digits),
-            color=alt.condition(on_dark, alt.value("#ffffff"), alt.value("#15181d")),
+            color=alt.condition(on_dark, alt.value(INK_LIGHT), alt.value(INK_DARK)),
         )
     ).properties(width=cell * len(numbers[0]), height=cell * len(numbers))
 

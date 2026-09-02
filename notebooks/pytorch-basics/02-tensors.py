@@ -25,10 +25,8 @@ def _():
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
-    [Learn the Basics](intro.html) \|\| [Quickstart](quickstart_tutorial.html) \|\| **Tensors**
-    \|\| [Datasets & DataLoaders](data_tutorial.html) \|\| [Transforms](transforms_tutorial.html)
-    \|\| [Build Model](buildmodel_tutorial.html) \|\| [Autograd](autogradqs_tutorial.html) \|\|
-    [Optimization](optimization_tutorial.html) \|\| [Save & Load Model](saveloadrun_tutorial.html)
+    *PyTorch basics, 2 of 8 — before this: [Quickstart](01-quickstart.py) · after:
+    [Datasets & DataLoaders](03-datasets-and-dataloaders.py)*
 
     # Tensors
 
@@ -72,15 +70,15 @@ def _():
     # notebook inherits, live in _viz.py.
     import altair as alt
     import pandas as pd
-    from _viz import show
+    from _viz import INK_DARK, INK_LIGHT, RAMP, show
 
-    return alt, pd, show
+    return INK_DARK, INK_LIGHT, RAMP, alt, pd, show
 
 
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
-    # Initializing a Tensor
+    ## Initializing a tensor
 
     Tensors can be initialized in various ways. Take a look at the following examples:
 
@@ -255,7 +253,7 @@ def _(mo):
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
-    # Attributes of a Tensor
+    ## Attributes of a tensor
 
     Tensor attributes describe their shape, datatype, and the device on which they are stored.
     """)
@@ -321,7 +319,7 @@ def _(mo):
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
-    # Operations on Tensors
+    ## Operations on tensors
 
     Over 1200 tensor operations, including arithmetic, linear algebra, matrix manipulation
     (transposing, indexing, slicing), sampling and more are comprehensively described
@@ -552,7 +550,7 @@ def _(mo):
 
 
 @app.cell(hide_code=True)
-def _(alt, mo, pd, show, slicing, torch):
+def _(INK_DARK, INK_LIGHT, RAMP, alt, mo, pd, show, slicing, torch):
     t2_sliced = torch.arange(48).reshape(6, 8)
     try:
         _result = slicing.value(t2_sliced)
@@ -589,28 +587,47 @@ def _(alt, mo, pd, show, slicing, torch):
             for j, v in enumerate(_row)
         ]
     )
-    _position = {"x": alt.X("col:O", axis=None), "y": alt.Y("row:O", axis=None)}
+    # The gaps between squares stay transparent (band padding, not strokes) and the fills
+    # come from the shared ramp, so the picture obeys the reader's theme like show() does.
+    _position = {
+        "x": alt.X("col:O", axis=None, scale=alt.Scale(paddingInner=0.06)),
+        "y": alt.Y("row:O", axis=None, scale=alt.Scale(paddingInner=0.06)),
+    }
     _grid = (
         alt.Chart(_cells)
-        .mark_rect(stroke="white", strokeWidth=2)
+        .mark_rect()
         .encode(
             **_position,
             color=alt.Color(
                 "picked:N",
-                scale=alt.Scale(domain=[False, True], range=["#e9e9ee", "#4c78a8"]),
+                scale=alt.Scale(domain=[False, True], range=[RAMP[0], RAMP[3]]),
                 legend=None,
             ),
+            tooltip=[alt.Tooltip("value:Q", title="value"), "row:O", "col:O"],
         )
         + alt.Chart(_cells)
-        .mark_text(fontSize=11)
+        .mark_text(fontSize=13, fontWeight=500)
         .encode(
             **_position,
             text=alt.Text("value:Q"),
-            color=alt.condition("datum.picked", alt.value("white"), alt.value("#5a5a66")),
+            color=alt.condition("datum.picked", alt.value(INK_LIGHT), alt.value(INK_DARK)),
         )
-    ).properties(width=8 * 46, height=6 * 46, title="t, with the selected elements filled in")
+    ).properties(width=8 * 46, height=6 * 46)
 
-    mo.hstack([_grid, _panel], justify="start", align="center", gap=2, wrap=True)
+    mo.hstack(
+        [
+            mo.vstack(
+                [_grid, mo.md("<small>`t`, with the selected elements filled in</small>")],
+                align="center",
+                gap=0.2,
+            ),
+            _panel,
+        ],
+        justify="start",
+        align="center",
+        gap=2,
+        wrap=True,
+    )
     return
 
 
@@ -775,7 +792,7 @@ def _(mo):
 
 
 @app.cell(hide_code=True)
-def _(alt, mo, operation, pd, show, torch):
+def _(INK_DARK, INK_LIGHT, RAMP, alt, mo, operation, pd, show, torch):
     import itertools
 
     def storage_strip(result, base, shares):
@@ -812,7 +829,7 @@ def _(alt, mo, operation, pd, show, torch):
                 # text on a dark fill.
                 color=alt.Color(
                     "order:Q",
-                    scale=alt.Scale(range=["#dbe7f7", "#17457c"], domain=[0, base.numel() - 1]),
+                    scale=alt.Scale(range=[RAMP[0], RAMP[-1]], domain=[0, base.numel() - 1]),
                     legend=None,
                 ),
                 tooltip=[alt.Tooltip("slot:O", title="storage slot"), alt.Tooltip("order:Q", title="read position")],
@@ -825,7 +842,7 @@ def _(alt, mo, operation, pd, show, torch):
                 **at,
                 text=alt.Text("value:Q", format=".0f"),
                 color=alt.condition(
-                    f"datum.order > {0.73 * (base.numel() - 1):.2f}", alt.value("#ffffff"), alt.value("#15181d")
+                    f"datum.order > {0.73 * (base.numel() - 1):.2f}", alt.value(INK_LIGHT), alt.value(INK_DARK)
                 ),
             )
         )
