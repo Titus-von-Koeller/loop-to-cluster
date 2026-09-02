@@ -371,14 +371,16 @@ def _(mo):
     accent, on that theme's own ground, as designed and under deuteranopia. AA for body-size
     text is 4.5:1; ratios below it are flagged.
 
-    As measured on `horizon-theme-vscode 1.0.1`: the **night variant clears AA for every role**
-    (strings 9.7:1, functions 6.4:1, links 4.7:1), but the **day variant fails it on three of
-    five accents** — strings at 2.8:1, links at 3.3:1, functions at 3.7:1 against the warm
-    page. And the palette's two pink-family roles, links (345°) and variables (346°), are one
-    degree of hue apart — a distinction that rides the weakest axis of red-green vision even
-    before any simulation. The warm paper ground and the day/night pairing are genuine
-    strengths; the day theme's accent contrast is where a replacement or an override would
-    earn its keep.
+    As measured on `horizon-theme-vscode 1.0.1`, alpha included: the **day variant fails AA on
+    four of six roles** — comments and strings at 2.8:1, links at 3.3:1, functions at 3.7:1
+    against the warm page — and the **night variant on two**: comments at 2.0:1 (they carry 30%
+    alpha) and variables at 4.1:1. An earlier draft of this paragraph, written from a probe
+    that skipped alpha compositing, claimed the night variant cleared AA everywhere; the
+    exhibit below corrected its own caption. The palette's two pink-family roles, links (345°)
+    and variables (346°), sit one hue degree apart — a distinction riding the weakest axis of
+    red-green vision even before simulation; watch them converge in the deuteranopia rows. The
+    warm paper ground and the day/night pairing are genuine strengths; accent contrast, on both
+    pages once alpha is honest, is where an override would earn its keep.
     """)
     return
 
