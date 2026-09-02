@@ -53,7 +53,7 @@ def _():
 
     import matplotlib as mpl
     import pandas as pd
-    from _viz import OKABE_ITO, POLARITY, RAMP
+    from _palette import OKABE_ITO, POLARITY, RAMP
     from cmcrameri import cm as cmc
 
     def _hexes(cmap, n=7):

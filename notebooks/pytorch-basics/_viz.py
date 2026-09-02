@@ -16,42 +16,19 @@ import marimo as mo
 import pandas as pd
 import torch
 
-# Okabe & Ito (2008): the categorical palette designed for color-vision deficiency.
-OKABE_ITO = {
-    "orange": "#E69F00",
-    "sky": "#56B4E9",
-    "green": "#009E73",
-    "yellow": "#F0E442",
-    "blue": "#0072B2",
-    "vermillion": "#D55E00",
-    "purple": "#CC79A7",
-    "black": "#000000",
-}
-
-# The two-role pair most charts need: the thing itself, and the thing pointed at.
-BASE = OKABE_ITO["blue"]
-ACCENT = OKABE_ITO["vermillion"]
-
-# Vega scheme names for continuous data, same constraint.
-SEQUENTIAL_SCHEME = "cividis"
-DIVERGING_SCHEME = "blueorange"
-
-# show()'s own ramps predate the policy and satisfy it: both carry magnitude as lightness,
-# the diverging one adds hue only for sign, and the text-contrast crossovers inside show()
-# are measured against exactly these values -- change them together or not at all.
-#
-# Magnitude is carried by lightness and only by lightness, so the picture survives being
-# read by someone who cannot separate red from green, and survives being printed gray.
-# Hue carries sign and nothing else. There are no axes and no chart title: the numbers
-# are in the squares and the caption says what the object is.
-RAMP = ["#dbe7f7", "#a8c6ec", "#6b9ede", "#2a78d6", "#17457c"]
-POLARITY = ["#8f3413", "#d95926", "#eaa886", "#e8e8e6", "#93bae9", "#2a78d6", "#173f6e"]
-
-# Ink for text set on a known square fill — never on the page, whose color belongs to the
-# reader's theme. The pair show()'s contrast crossovers are calibrated against; exhibits
-# that color their own squares use the same pair rather than re-tuning it locally.
-INK_LIGHT = "#ffffff"
-INK_DARK = "#15181d"
+# The constants live in _palette.py (importable without torch — see its docstring);
+# re-exported here so every existing importer keeps its single entry point.
+from _palette import (  # noqa: F401
+    ACCENT,
+    BASE,
+    DIVERGING_SCHEME,
+    INK_DARK,
+    INK_LIGHT,
+    OKABE_ITO,
+    POLARITY,
+    RAMP,
+    SEQUENTIAL_SCHEME,
+)
 
 
 def show(tensor, title=None, cell=54, facts=True):
