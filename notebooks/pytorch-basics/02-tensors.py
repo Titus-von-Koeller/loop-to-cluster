@@ -260,10 +260,14 @@ def _(mo):
     return
 
 
-@app.cell(hide_code=True)
-def _(mo, show, torch):
+@app.cell
+def _(torch):
     tensor = torch.rand(3, 4)
+    return (tensor,)
 
+
+@app.cell(hide_code=True)
+def _(mo, show, tensor):
     mo.vstack(
         [
             mo.hstack(
@@ -288,7 +292,7 @@ def _(mo, show, torch):
         ],
         gap=1,
     )
-    return (tensor,)
+    return
 
 
 @app.cell(hide_code=True)
