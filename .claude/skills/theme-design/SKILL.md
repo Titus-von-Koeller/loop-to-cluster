@@ -47,6 +47,53 @@ interact, and choose the best combination — every step from measurement.
   a two-stage coarse-then-fine sweep per direction recovers it.
 - A surface's beauty is allowed to vote and never to overrule the instruments; Titus's eyes
   outrank both — his comparison across a gallery row is the final measurement.
+- Verify a theme change by **pixel-sampling a screenshot against the expected hexes**, never by
+  impression: an eyeballed screenshot once confirmed a completely dormant override layer as
+  "applied" — the reader saw what they expected. The VSCode application gotchas that made it
+  dormant (autoDetectColorScheme makes the preferred* theme keys operative; bracket-pair
+  colorization is its own layer above textMate rules; notebook.cellEditorBackground does not
+  inherit editor.background) live as comments in dotfiles settings.jsonc — read them before
+  editing the override layer.
+
+## Debugging an applied theme (earned 2026-09-02, when the whole layer was dormant)
+
+1. **Pixel-sample first**: CDP screenshot of the real surface → PIL crop → Counter of hexes.
+   The measured hex tells you *which layer is rendering* — theme default, override, or a third
+   party — where an eyeball only confirms expectations.
+2. **If overrides are dormant, check the active theme name**: with autoDetectColorScheme on,
+   `workbench.preferredLightColorTheme` / `preferredDarkColorTheme` pick the theme and
+   `workbench.colorTheme` is inert; a `"[Theme Name]"` block whose name doesn't match the
+   *active* variant exactly applies to nothing, silently.
+3. **Know the layers**: textMate token rules do not reach bracket-pair colorization (own
+   `editorBracketHighlight.*` keys) or semantic tokens; each surface has its own background
+   key with its own default chain (`editor.background`, `notebook.editorBackground`,
+   `notebook.cellEditorBackground` — which does NOT inherit from editor — `terminal.background`;
+   the chat webview follows panel chrome, not the editor).
+4. **Apply and verify per surface**: `nh home switch .` lands the symlink in seconds and VSCode
+   picks it up live, no reload; then re-sample every surface kind touched — plain editor,
+   native notebook, terminal, chat — because each can dissent independently.
+
+## What "pretty" means here — the aesthetics the program applies
+
+Measured legibility is the floor, not the goal; these four theories shape choices above it,
+each with its operational form:
+
+- **Processing fluency** (Reber, Schwarz, Winkielman): what is easy to encode feels good.
+  Operationally: the fewest simultaneous signals that still carry the information — hue count
+  per line down; structure (punctuation, operators, brackets, indent guides, line boxes) at
+  near-ink so identifiers, literals, and data marks are the figure. The editor's quiet-structure
+  layer and the exhibits' one-base-one-accent rule are the same principle at two scales.
+- **Berlyne's inverted U**: pleasure peaks at intermediate complexity. Mute toward calm, never
+  toward flat — one expressive accent family stays alive (Horizon's warm corals) so the page
+  keeps its character. If a quieting pass makes a surface feel dead, it overshot the ridge.
+- **Ecological valence** (Palmer, Schloss): color preference is accumulated personal
+  association, so the optimal accents are colors Titus names as loved — an input only he can
+  give (asked 2026-09-02, pending). Until then the theme's own hues stand in.
+- **Peak shift** (Ramachandran): mild exaggeration of a signature reads as more beautiful than
+  the original. Licensed only on rare surfaces (links, errors, selection) and never on body
+  tokens; wants glyph-scale data first.
+
+Beauty votes through these; the instruments still veto, and Titus's eyes outrank both.
 - Results live with their instrument or in Titus's Notion (his hands only); CLAUDE.md carries
   rules, routing, and resume points.
 
