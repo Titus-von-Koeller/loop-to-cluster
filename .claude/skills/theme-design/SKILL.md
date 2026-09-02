@@ -93,6 +93,17 @@ each with its operational form:
   the original. Licensed only on rare surfaces (links, errors, selection) and never on body
   tokens; wants glyph-scale data first.
 
+Two operational corollaries, both applied and liked:
+
+- **Luminance hierarchy**: chrome > page > code well in light themes, direction inverted (page
+  > well, i.e. wells deepest) in dark ones. One ground step (~3 L*) is a surface's only role
+  marker — a single figure-ground cue instead of borders, and dense mono text takes the lowest
+  luminance. Every text surface joins the hierarchy: a webview page reading chrome keys
+  (sideBar/panel) will otherwise show a second paper on the same screen.
+- **Content over commentary**: comments sit a deliberate contrast step below body tokens
+  (context, not figure), with the italic carrying the rest of the distinction — but never below
+  4.5:1 on the deepest surface they appear on.
+
 Beauty votes through these; the instruments still veto, and Titus's eyes outrank both.
 - Results live with their instrument or in Titus's Notion (his hands only); CLAUDE.md carries
   rules, routing, and resume points.
