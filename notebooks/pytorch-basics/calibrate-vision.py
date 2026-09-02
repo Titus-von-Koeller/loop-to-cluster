@@ -430,7 +430,16 @@ def _(mo):
     ## Reading the numbers, and what happens to them
 
     A pair at 25% is invisible to you; at 100% it is trivially yours; sequential ramps live or
-    die by their *adjacent* pairs, categorical palettes by their worst pair anywhere. Grounds
+    die by their *adjacent* pairs, categorical palettes by their worst pair anywhere. Two notes
+    on reading the tiles above: the raw axis *weights* are not comparable across axes (their
+    units are arbitrary, so a weight will happily chase the grid's edge) — the identified
+    quantity is each axis's *threshold*, τ/√w; and everything measured here is at the trial
+    patch size. Findings at 440 trials: slip rate ~0.6%, and every candidate palette's worst
+    pair sits at the lapse-limited ceiling on both grounds — at exhibit scale, palette choice is
+    freed from color-vision constraints and belongs to aesthetics, ground contrast, and
+    luminance monotonicity. What that does **not** settle is glyph scale: color discrimination
+    collapses for small fields, editor tokens are ~10px, and text-sized stimuli are this
+    instrument's queued next stage — the measurement that actually decides the editor theme. Grounds
     are logged because simultaneous contrast shifts discrimination — the same pair can pass on
     one page and fail on the other. Trials accumulate in `calibration-responses.jsonl`, which is
     committed like any measurement: future sessions (and future exhibits) read it to weight

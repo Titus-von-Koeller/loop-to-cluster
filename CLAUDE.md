@@ -203,18 +203,9 @@ confirmation is the failure this sentence records.
   solid #E95678 (4.80:1, alpha was the whole problem). Same hue and saturation throughout —
   walk lightness only. Target keys: editor.tokenColorCustomizations per theme.
 
-**Calibration findings as of 440 trials (2026-09-02)** — the working state for the theme
-program: fitted slip rate 0.6% (his inputs are clean); per-axis thresholds are the identified
-quantity (report tau/sqrt(w), never raw weights — those chase the grid ceiling because axis
-units are arbitrary); and the headline: **every candidate palette's worst pair sits at the
-lapse-limited ceiling (~0.99 P(seen)) on both grounds at 104px patches** — his deficiency is
-mild enough that exhibit-scale palette choice is FREED from CVD constraints and should be
-decided on aesthetics, ground contrast, and luminance monotonicity instead. The decisive
-remaining unknown is **glyph scale**: color discrimination collapses for small fields
-(small-field tritanopia), and editor tokens are ~10px — the calibrator's next stage is
-text-sized stimuli (colored glyphs on theme grounds), which is what actually settles the
-editor-theme question. Also queued: report per-axis thresholds in the analysis panel instead
-of weights; re-zoom the grid when a CI touches an edge.
+**Results live with their instrument** (notebook prose) or in Titus's Notion — this file
+carries rules, routing, and resume points only. The calibration program's current findings
+and their interpretation are in calibrate-vision.py's closing section.
 
 **Proposals awaiting Titus** (ratify by moving into the target file; reject by deleting):
 
