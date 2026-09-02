@@ -125,10 +125,38 @@ def _(LOG, json, mo):
 
 @app.cell(hide_code=True)
 def _(GROUNDS, PAIRS, random):
-    def trial_for(n):
-        """The nth trial, deterministically: same n, same trial, on every surface."""
+    def _pair_key(palette, a, b):
+        return (palette, *sorted((a, b)))
+
+    def trial_for(n, responses):
+        """The nth trial: Bayesian uncertainty sampling over per-pair Beta posteriors.
+
+        Each pair's accuracy carries a Beta(1+correct, 1+wrong) posterior; the next trial
+        goes to the pair whose posterior variance is largest — untested pairs first, then
+        the ones the responses keep failing, so measurement concentrates where your eyes
+        are least readable. Deterministic given n and the first n responses, so every
+        surface poses the same trial. (For continuous just-noticeable-difference
+        staircases between two colors, the right tool is QUEST+ — parked in the queue.)
+        """
+        _stats = {}
+        for _r in responses[:n]:
+            _k = _pair_key(_r["palette"], _r["base"], _r["odd_color"])
+            _c, _w = _stats.get(_k, (0, 0))
+            _stats[_k] = (_c + 1, _w) if _r["correct"] else (_c, _w + 1)
+
+        def _variance(k):
+            _c, _w = _stats.get(k, (0, 0))
+            _a, _b = _c + 1, _w + 1
+            return (_a * _b) / ((_a + _b) ** 2 * (_a + _b + 1))
+
         _rng = random.Random(n * 2654435761 % (2**31))
-        _palette, _a, _b = _rng.choice(PAIRS)
+        if _rng.random() < 0.2:
+            # Exploration keeps the sampler honest: without it, a pair judged easy in one
+            # sitting's light is never revisited, and the posterior can fixate on early luck.
+            _palette, _a, _b = _rng.choice(PAIRS)
+        else:
+            _best = max(_variance(_pair_key(*_p)) for _p in PAIRS)
+            _palette, _a, _b = _rng.choice([_p for _p in PAIRS if _variance(_pair_key(*_p)) >= _best - 1e-12])
         if _rng.random() < 0.5:
             _a, _b = _b, _a
         _ground_name = ("day", "night")[n % 2]
@@ -156,7 +184,7 @@ def _(get_responses, mo, trial_for):
 @app.cell(hide_code=True)
 def _(LOG, datetime, get_responses, json, mo, set_responses, timezone, trial_for):
     _n = len(get_responses())
-    _t = trial_for(_n)
+    _t = trial_for(_n, get_responses())
     _colors = [_t["base"]] * 4
     _colors[_t["odd_position"]] = _t["odd_color"]
 
@@ -166,7 +194,7 @@ def _(LOG, datetime, get_responses, json, mo, set_responses, timezone, trial_for
         # click: a rendering whose trial is no longer current records nothing.
         if n != len(get_responses()):
             return
-        _now = trial_for(n)
+        _now = trial_for(n, get_responses())
         _entry = {
             "ts": datetime.now(timezone.utc).isoformat(timespec="seconds"),
             "palette": _now["palette"],
