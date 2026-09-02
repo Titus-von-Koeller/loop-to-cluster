@@ -85,7 +85,9 @@ narrative does not ask the reader to read carries `hide_code=True` in the file, 
 the commit that carries the edit. Display logic and narrative code do not share a cell: where
 they are mixed, split — the content cell stays visible and may end by rendering the object it
 made, the display-assembly cell folds. Names flow between cells, so the split costs nothing.
-The standing exception remains the mutation demos, whose render timing is the demonstration.
+The standing exceptions: the mutation demos, whose render timing is the demonstration, and
+cells whose in-loop `mo.output` redraw *is* the exhibit (07's trainer) — those can't split the
+display out, but their trailing displays (a stat row after the loop) still can and do.
 
 **Interactive cells.** Mechanics that cost a day to learn: a UI element is inert unless bound
 to a global name (`mo.ui.array` for groups); a button's `on_change` fires only if its value
@@ -142,6 +144,19 @@ is actively using.
 `git diff 891febb -- <notebook>` shows everything ours against everything inherited; the
 original's text is provenance to consult, not a boundary to respect.
 
+**Converted-tutorial traps** (each cost a polish agent a debugging loop): the converter emits
+GitLab math (``$`…`$``, ```` ```math ```` fences) which marimo renders literally — the
+supported syntax is `$…$`/`$$…$$`. It also re-attaches standalone comments as trailing
+comments on the *wrong* lines — diff comment placement against the upstream commit
+(`891febb`) when a cell reads oddly. Exception messages interpolated into `mo.md` need
+sanitizing (PyTorch embeds ANSI escapes in them). Vega scheme names can invert orientation
+against the house constants — `blueorange` is the reverse of `POLARITY`; diverging exhibits
+use `POLARITY`/`RAMP` explicit ranges, and non-Vega renderers (graphviz) compute their hexes
+from `_palette` (there's a `tint()` there for mixing toward a card's white). Ruff's isort
+config keeps first-party `_viz`/`_palette` imports in the same block as third-party ones —
+no blank line. Cells chained through the filesystem (save→load) have no DAG edge: file-order
+keeps them correct headless, but a lone re-run of the save cell won't re-trigger its loads.
+
 ## Claims
 
 Version-dependent behaviour, defaults and API semantics are where confident wrongness happens.
@@ -156,6 +171,15 @@ this conversation.
 
 Prefer the forward-looking API to the one gathering dust — `set_float32_matmul_precision` over
 `allow_tf32`, `dtype=` over `torch_dtype=`. It usually also names the thing that actually matters.
+
+Three claim species the 01–08 pass caught repeatedly: a sentence about an *unseeded random
+quantity* must attach certainty to the prediction, never to rounded equality ("exactly what a
+uniform distribution gives" was false ~2% of draws — loop the draw to check); a *layout* claim
+about a drawn exhibit ("read it bottom-up") survives every value check, so assert the layout
+fact itself (rank direction vs traversal direction); and a *forward link* is a claim about its
+target — read the target's headings before promising it answers a question. Exhibits gated
+behind `mo.stop` are invisible to a headless run: their claims need a standalone replication
+script.
 
 ## The one enforced rule
 
@@ -174,21 +198,13 @@ documentation bug.
 
 **Queue** (work Titus has named but not yet aimed a session at; take an item only on his go):
 
-- The full polish pass over 01 and 05–08 (breadcrumbs, hierarchy, theming, split/fold,
-  executed claims, open endings) — **GO given 2026-09-02, run to completion, do not stop
-  until all five are done** (Titus: "start pimping the remaining notebooks and don't stop
-  until you're done"). Protocol: one subagent per notebook (01, 05, 06, 07, 08), each reads
-  "Editing notebooks" here plus the marimo-notebooks skill and pedagogy.md, verifies
-  headlessly (never by driving VSCode windows Titus may be using), commits and pushes per
-  notebook with `git pull --rebase` before push. State: 01 (fcbbed4), 05 (108479e) and
-  08 (ee20cb2) are DONE and pushed; 06 (full redo) and 07 (mid-verification finding: prose
-  says "120 printed loss values", actual is 100) have agents in flight. The salvage stash
-  is dropped — both its halves landed. After compaction or interruption: check
-  `git log --oneline` for which notebooks have landed, relaunch agents for the rest, same
-  instructions. When all five land: fold the agents' reported rule-learnings into the
-  skills in one batch (ANSI in exception strings, stash-salvage mechanics, forward links
-  are claims about their targets, unseeded-RNG "exactly" claims, Vega scheme orientation
-  vs POLARITY).
+- The full polish pass over 01 and 05–08: **COMPLETE 2026-09-02** — 01 fcbbed4, 05 108479e,
+  06 fcfb57b, 07 baad8e5, 08 ee20cb2, all pushed; salvage stash dropped after both halves
+  landed; the agents' rule-learnings are folded into "Editing notebooks", "Claims", and
+  "Stopping agents" here, `tint()` promoted to _palette.py, and the invariants hook now
+  flags only relative dead links. Residuals for Titus's eyes (headless runs can't see
+  rendering): 06's KaTeX math cells and its graphviz card on both themes; and any notebook
+  open in a tab was rewritten on disk — ctrl+alt+m reloads it before running there.
 - Code-reading efficiency in the editor across languages: research + measure (semantic
   highlighting, token-color overrides per the Horizon findings, font/ligature choices), using
   the calibration data as it accumulates. Named 2026-09-02.
@@ -228,7 +244,10 @@ documentation bug.
 agents "commit what is verified, then stop" instead of killing them: a kill converts in-flight
 verified work back into future spend. Kill only when spend must stop this instant, then stash
 uncommitted edits and park a resume point in the queue (measured: one killed agent's full
-re-read, versus two whose partial commits survived).
+re-read, versus two whose partial commits survived). Salvaging a stash later: finish the
+*intent*, not the diff — an imported-but-unused name in stashed WIP is the fingerprint of the
+interrupted edit it was for. Reading one file out of a multi-file stash:
+`git diff 'stash@{0}^' 'stash@{0}' -- <path>` (the `stash show -p -- <path>` form errors).
 
 **A go is standing.** Once Titus has aimed work — "go", or "go on the things you proposed" —
 sessions keep moving through it and through the queue autonomously; the proposals block gates

@@ -39,3 +39,13 @@ POLARITY = ["#8f3413", "#d95926", "#eaa886", "#e8e8e6", "#93bae9", "#2a78d6", "#
 # reader's theme. The pair show()'s contrast crossovers are calibrated against.
 INK_LIGHT = "#ffffff"
 INK_DARK = "#15181d"
+
+
+def tint(color, toward_white):
+    """The palette hue mixed toward a card's white, as a literal hex.
+
+    For renderers that cannot take scheme names (graphviz, raw CSS): fills stay derived
+    from the constants above instead of hand-tuned hexes appearing per notebook.
+    """
+    channels = (int(color[i : i + 2], 16) for i in (1, 3, 5))
+    return "#" + "".join(f"{round(c + (255 - c) * toward_white):02x}" for c in channels)

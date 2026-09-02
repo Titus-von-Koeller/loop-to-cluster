@@ -15,7 +15,10 @@ failures = []
 for path in sys.argv[1:]:
     with open(path) as f:
         source = f.read()
-    if "_tutorial.html" in source or "(intro.html)" in source:
+    # Only RELATIVE .html links are the converted tutorials' dead breadcrumbs; a legitimate
+    # absolute URL that happens to end in _tutorial.html must not trip this (it did, and
+    # cost 07's agent a workaround link).
+    if re.search(r"\]\((?!https?://)[^)]*(?:_tutorial\.html|intro\.html)", source):
         failures.append(f"{path}: dead pytorch.org nav link")
     h1 = sum(
         1

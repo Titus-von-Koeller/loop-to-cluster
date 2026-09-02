@@ -175,11 +175,8 @@ def _(graph_of, mo):
     # Graphviz takes literal colors, so the node fills are computed from the palette
     # constants -- each hue mixed toward the card's white -- rather than typed in by hand.
     import graphviz
+    from _palette import tint
     from _viz import ACCENT, BASE, INK_DARK, OKABE_ITO, show
-
-    def tint(color, toward_white):
-        channels = (int(color[i : i + 2], 16) for i in (1, 3, 5))
-        return "#" + "".join(f"{round(c + (255 - c) * toward_white):02x}" for c in channels)
 
     def draw(root, named):
         """Hand graph_of's findings to graphviz.
