@@ -117,6 +117,8 @@ then looks — structured reads for facts, screenshots for layout and aesthetics
 the vscode-keyhole skill against his real editor, under a standing license to watch
 over his shoulder at any time; use a headless render when his editor is closed, and ask
 him to open the notebook when the native surface is needed. Each pass states what it
-changed and what it learned; a learning that generalizes moves to pedagogy.md. Stop
+changed and what it learned; a learning that generalizes moves to pedagogy.md, and what the
+pass taught about the rules themselves is stated too, so the session-closing rules audit has
+raw material. Stop
 when a pass yields only preference-grade changes — report then, rather than polishing
 the polish.

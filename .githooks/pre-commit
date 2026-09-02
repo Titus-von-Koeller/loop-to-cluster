@@ -31,12 +31,26 @@ fi
 # app._unparsable_cell, which is itself valid Python and commits without complaint. Both
 # have happened here. --strict because the notebooks are clean of warnings today and the
 # cheapest time to keep them that way is now. Takes about a second.
-# The numbered files are the notebooks; _viz.py beside them is a plain module, and
-# marimo check rejects any .py it is handed that lacks a marimo.App. A new notebook
-# must match the 0*.py pattern to stay under this check.
-if ! pixi run marimo check --strict "$snapshot"/notebooks/pytorch-basics/0*.py; then
+# Underscore-prefixed files beside the notebooks (_viz.py, _palette.py) are plain
+# modules, and marimo check rejects any .py it is handed that lacks a marimo.App. A new
+# notebook must avoid the underscore prefix to stay under this check.
+if ! pixi run marimo check --strict "$snapshot"/notebooks/pytorch-basics/[!_]*.py; then
     echo "pre-commit: marimo check failed on staged content" >&2
     exit 1
+fi
+
+# Series invariants, enforced rather than remembered: no dead pytorch.org nav links, and
+# exactly one h1 per notebook (the title; sections are h2 and below). Checked only on
+# notebooks this commit touches, so a not-yet-polished notebook blocks nobody else.
+staged_notebooks=$(git diff --cached --name-only --diff-filter=ACM -- 'notebooks/pytorch-basics/*.py' |
+    rg -v '/_' || true)
+if [ -n "$staged_notebooks" ]; then
+    checks=()
+    while IFS= read -r f; do checks+=("$snapshot/$f"); done <<<"$staged_notebooks"
+    if ! pixi run python .githooks/check-notebook-invariants.py "${checks[@]}"; then
+        echo "pre-commit: notebook series invariants failed on staged content" >&2
+        exit 1
+    fi
 fi
 
 # Datasets land beside the notebooks that download them, and a directory staged whole

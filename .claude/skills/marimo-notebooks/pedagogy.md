@@ -77,5 +77,7 @@ surfacing that gap, cheapening its testing, or holding attention on it.
   The primary reader's deficiency is mild: hue pairs must stay *reliably* separable,
   which established palettes guarantee; lightness carries magnitude so pictures also
   survive grayscale. Hand-tuned hex values in a notebook are a bug.
-- **Theme honesty**: exhibits are checked in the theme actually used for reading; a
+- **Theme honesty**: exhibits are checked in the theme actually used for reading — which is
+  plural where the OS flips it (autoDetectColorScheme: Horizon Bright by day, Horizon Bold in
+  dark), so exhibits are checked in both; a
   graphic that assumes a white page carries its own background.

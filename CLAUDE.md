@@ -179,13 +179,14 @@ documentation bug.
   determine the best combination. Builds on calibrate-vision data; the deliverable is a ranked,
   measured recommendation plus the override files to apply it.
 
+**A go is standing.** Once Titus has aimed work — "go", or "go on the things you proposed" —
+sessions keep moving through it and through the queue autonomously; the proposals block gates
+*text ratification*, never work he has already directed. Parking directed work behind another
+confirmation is the failure this sentence records.
+
 **Proposals awaiting Titus** (ratify by moving into the target file; reject by deleting):
 
-- pedagogy.md, Theme honesty: "the reading theme is plural where the OS flips it
-  (autoDetectColorScheme: Horizon Bright by day, Horizon Bold in dark); exhibits are checked in
-  both."
-- SKILL.md N6 expression: pass reports also state what the pass taught about the rules, so the
-  rules audit has raw material.
+- none right now.
 
 ## Notion
 
