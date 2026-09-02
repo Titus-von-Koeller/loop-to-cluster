@@ -124,49 +124,80 @@ def _(LOG, json, mo):
 
 
 @app.cell(hide_code=True)
-def _(GROUNDS, LOG, PAIRS, datetime, get_responses, json, mo, random, set_responses, timezone):
-    _n = len(get_responses())
-    _rng = random.Random(_n * 2654435761 % (2**31))
-    _palette, _a, _b = _rng.choice(PAIRS)
-    if _rng.random() < 0.5:
-        _a, _b = _b, _a
-    _ground_name = ("day", "night")[_n % 2]
-    _ground = GROUNDS[_ground_name]
-    _odd = _rng.randrange(4)
-    _colors = [_a] * 4
-    _colors[_odd] = _b
-
-    def _record(choice, n=_n, odd=_odd, palette=_palette, a=_a, b=_b, ground=_ground_name):
-        # VSCode's native renderer repaints state-driven reruns unreliably: a stale trial can
-        # stay on screen and its old buttons keep firing. A click only counts if it belongs to
-        # the trial the backend currently poses — measured live when four stale duplicates of
-        # one trial reached the log.
-        if n != len(get_responses()):
-            return
-        _entry = {
-            "ts": datetime.now(timezone.utc).isoformat(timespec="seconds"),
-            "palette": palette,
-            "base": a,
-            "odd_color": b,
-            "ground": ground,
-            "odd_position": odd,
-            "choice": choice,
-            "correct": choice == odd,
+def _(GROUNDS, PAIRS, random):
+    def trial_for(n):
+        """The nth trial, deterministically: same n, same trial, on every surface."""
+        _rng = random.Random(n * 2654435761 % (2**31))
+        _palette, _a, _b = _rng.choice(PAIRS)
+        if _rng.random() < 0.5:
+            _a, _b = _b, _a
+        _ground_name = ("day", "night")[n % 2]
+        return {
+            "palette": _palette,
+            "base": _a,
+            "odd_color": _b,
+            "ground": _ground_name,
+            "ground_hex": GROUNDS[_ground_name],
+            "odd_position": _rng.randrange(4),
         }
-        # Append-only, one record per line: concurrent sessions (a browser tab beside the
-        # native editor) interleave instead of overwriting each other's history.
-        with LOG.open("a") as _f:
-            _f.write(json.dumps(_entry) + "\n")
-        set_responses([*get_responses(), _entry])
 
+    return (trial_for,)
+
+
+@app.cell(hide_code=True)
+def _(get_responses, mo, trial_for):
+    # Display only, no UI elements: marimo does not reliably repaint the cell a user just
+    # interacted with (measured on the native renderer, the Simple Browser, and Chrome), so
+    # the picture that must change lives apart from the buttons that change it.
+    _n = len(get_responses())
+    _t = trial_for(_n)
+    _colors = [_t["base"]] * 4
+    _colors[_t["odd_position"]] = _t["odd_color"]
     _squares = "".join(
         f'<span style="display:inline-block;width:72px;height:72px;border-radius:8px;'
         f'margin:0 14px;background:{c}"></span>'
         for c in _colors
     )
+    mo.vstack(
+        [
+            mo.md(f"**Trial {_n + 1}** — which square is the odd one out?"),
+            mo.Html(
+                f'<div style="background:{_t["ground_hex"]};padding:36px 22px;border-radius:10px;'
+                f'display:inline-block">{_squares}</div>'
+            ),
+        ],
+        gap=0.8,
+    )
+    return
+
+
+@app.cell(hide_code=True)
+def _(LOG, datetime, get_responses, json, mo, set_responses, timezone, trial_for):
+    def _record(choice):
+        # The trial is derived from the response count at click time, never from a closure:
+        # the buttons are static and trial-agnostic, so a stale rendering cannot mis-record —
+        # what gets scored is always the trial the display cell currently poses.
+        _n = len(get_responses())
+        _t = trial_for(_n)
+        _entry = {
+            "ts": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+            "palette": _t["palette"],
+            "base": _t["base"],
+            "odd_color": _t["odd_color"],
+            "ground": _t["ground"],
+            "odd_position": _t["odd_position"],
+            "choice": choice,
+            "correct": choice == _t["odd_position"],
+        }
+        # Append-only, one record per line: concurrent sessions interleave instead of
+        # overwriting each other's history.
+        with LOG.open("a") as _f:
+            _f.write(json.dumps(_entry) + "\n")
+        set_responses([*get_responses(), _entry])
+
     # UI elements must live in a global binding to be interactive; a cell-local list renders
-    # but never registers. mo.ui.array is that binding for a homogeneous group, and each
-    # button needs a value that changes (on_click) for its on_change to fire.
+    # but never registers. These buttons are created once and never re-render — each carries a
+    # click-incremented value so its on_change fires on every press.
     answer_buttons = mo.ui.array(
         [
             mo.ui.button(
@@ -178,17 +209,7 @@ def _(GROUNDS, LOG, PAIRS, datetime, get_responses, json, mo, random, set_respon
             for i in range(4)
         ]
     )
-    mo.vstack(
-        [
-            mo.md(f"**Trial {_n + 1}** — which square is the odd one out?"),
-            mo.Html(
-                f'<div style="background:{_ground};padding:36px 22px;border-radius:10px;'
-                f'display:inline-block">{_squares}</div>'
-            ),
-            mo.hstack([answer_buttons[_i] for _i in range(4)], justify="start", gap=3.4),
-        ],
-        gap=0.8,
-    )
+    mo.hstack([answer_buttons[_i] for _i in range(4)], justify="start", gap=3.4)
     return (answer_buttons,)
 
 
