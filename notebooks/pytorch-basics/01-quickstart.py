@@ -56,16 +56,16 @@ def _():
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
-    PyTorch offers domain-specific libraries such as
-    [TorchText](https://pytorch.org/text/stable/index.html),
-    [TorchVision](https://pytorch.org/vision/stable/index.html), and
-    [TorchAudio](https://pytorch.org/audio/stable/index.html), all of which include datasets. For
-    this tutorial, we will be using a TorchVision dataset.
+    PyTorch's domain libraries — [TorchVision](https://pytorch.org/vision/stable/index.html) for
+    images, [TorchAudio](https://pytorch.org/audio/stable/index.html) for sound — ship `Dataset`
+    objects for many real-world benchmarks like CIFAR and COCO
+    ([full list](https://pytorch.org/vision/stable/datasets.html)). This tutorial uses
+    FashionMNIST: 70,000 grayscale 28×28 images of clothing, in ten classes.
 
-    The `torchvision.datasets` module contains `Dataset` objects for many real-world vision data
-    like CIFAR, COCO ([full list here](https://pytorch.org/vision/stable/datasets.html)). In this
-    tutorial, we use the FashionMNIST dataset. Every TorchVision `Dataset` includes two arguments:
-    `transform` and `target_transform` to modify the samples and labels respectively.
+    Every TorchVision `Dataset` takes two optional arguments, `transform` and
+    `target_transform`, to modify the samples and labels. The pipeline below converts each
+    image to a `float32` tensor scaled to `[0, 1]`; what those two `v2` steps do, and what
+    else belongs in such a pipeline, is [Transforms](04-transforms.py)' whole subject.
     """)
     return
 
@@ -96,7 +96,8 @@ def _(mo):
     We pass the `Dataset` as an argument to `DataLoader`. This wraps an iterable over our dataset,
     and supports automatic batching, sampling, shuffling and multiprocess data loading. Here we
     define a batch size of 64, i.e. each element in the dataloader iterable will return a batch of
-    64 features and labels.
+    64 features and labels. The shape printed below reads `N, C, H, W` — batch, channels, height,
+    width: 64 single-channel 28×28 images at a time.
     """)
     return
 
@@ -143,6 +144,9 @@ def _(mo):
     to the [accelerator](https://pytorch.org/docs/stable/torch.html#accelerators) such as CUDA,
     MPS, MTIA, or XPU. If the current accelerator is available, we will use it. Otherwise, we use
     the CPU.
+
+    The network's `forward` returns **logits** — one raw, unnormalized score per class. Nothing
+    here turns them into probabilities; the loss function in the next section expects them raw.
     """)
     return
 
@@ -214,7 +218,9 @@ def _(mo):
 
     To train a model, we need a [loss
     function](https://pytorch.org/docs/stable/nn.html#loss-functions) and an
-    [optimizer](https://pytorch.org/docs/stable/optim.html).
+    [optimizer](https://pytorch.org/docs/stable/optim.html). `CrossEntropyLoss` consumes the
+    model's logits directly — it applies the log-softmax itself, which is why the network above
+    ends at a bare `Linear`.
     """)
     return
 
@@ -423,12 +429,15 @@ def _(mo):
     return
 
 
-@app.cell
+@app.cell(hide_code=True)
 def _():
+    # The viewing vocabulary is shared with the sibling notebooks: one module, evolved
+    # in place, never forked into a file. The color policy lives in _viz.py.
     import altair as alt
     import pandas as pd
+    from _viz import SEQUENTIAL_SCHEME
 
-    return alt, pd
+    return SEQUENTIAL_SCHEME, alt, pd
 
 
 @app.cell
@@ -446,7 +455,7 @@ def _(DataLoader, device, model_1, test_data, torch):
     return test_actual, test_hits, test_predicted, test_probabilities
 
 
-@app.cell
+@app.cell(hide_code=True)
 def _(mo, test_hits, test_probabilities):
     mo.hstack(
         [
@@ -484,8 +493,8 @@ def _(mo):
     return
 
 
-@app.cell
-def _(alt, classes, mo, pd, test_actual, test_predicted):
+@app.cell(hide_code=True)
+def _(SEQUENTIAL_SCHEME, alt, classes, mo, pd, test_actual, test_predicted):
     _pairs = pd.DataFrame(
         {
             "actual": [classes[i] for i in test_actual.tolist()],
@@ -498,7 +507,7 @@ def _(alt, classes, mo, pd, test_actual, test_predicted):
         .encode(
             x=alt.X("predicted:N", sort=classes, title="predicted"),
             y=alt.Y("actual:N", sort=classes, title="actual"),
-            color=alt.Color("size:Q", scale=alt.Scale(scheme="blues", type="symlog"), title="images"),
+            color=alt.Color("size:Q", scale=alt.Scale(scheme=SEQUENTIAL_SCHEME, type="symlog"), title="images"),
             tooltip=["actual", "predicted", "size"],
         )
         .properties(width=420, height=420)
@@ -508,7 +517,7 @@ def _(alt, classes, mo, pd, test_actual, test_predicted):
     return (confusion,)
 
 
-@app.cell
+@app.cell(hide_code=True)
 def _(classes, confusion, mo, test_actual, test_hits, test_predicted, torch):
     if len(confusion.value):
         _selected = {(row.actual, row.predicted) for row in confusion.value.itertuples()}
@@ -527,7 +536,7 @@ def _(classes, confusion, mo, test_actual, test_hits, test_predicted, torch):
     return (picked,)
 
 
-@app.cell
+@app.cell(hide_code=True)
 def _(mo, picked):
     offset = mo.ui.slider(
         0, max(len(picked) - 10, 0), step=10, value=0, label="browse", full_width=True, show_value=True
@@ -536,7 +545,7 @@ def _(mo, picked):
     return (offset,)
 
 
-@app.cell
+@app.cell(hide_code=True)
 def _(classes, mo, offset, picked, test_actual, test_data, test_predicted, test_probabilities):
     _cards = [
         mo.vstack(
@@ -567,7 +576,7 @@ def _(mo):
     return
 
 
-@app.cell
+@app.cell(hide_code=True)
 def _(classes, mo, pd, test_actual, test_hits, test_predicted):
     _misses = pd.DataFrame(
         {
@@ -581,7 +590,7 @@ def _(classes, mo, pd, test_actual, test_hits, test_predicted):
     return
 
 
-@app.cell
+@app.cell(hide_code=True)
 def _(classes, mo, test_actual, test_hits, torch):
     _recall = torch.stack([test_hits[test_actual == i].float().mean() for i in range(len(classes))])
     _worst = _recall.argmin().item()
@@ -595,6 +604,32 @@ def _(classes, mo, test_actual, test_hits, torch):
         evaluation that decides whether a training change helped.
         """
     )
+    return
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    -----------------------------------------------------------------------------------------------
+    """)
+    return
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    ## Where to go next
+
+    Two questions are left deliberately open. Nothing here argues that five epochs of
+    stochastic gradient descent at learning rate `1e-3` was a good choice —
+    [Optimization](07-optimization-loop.py) is where those numbers stop being defaults.
+    And the mistakes cluster into garment groups nobody told the model about; every
+    mechanism that structure could come from — the [layers](05-build-model.py), the
+    [gradients](06-autograd.py), the loop — gets its own notebook. The series takes this
+    one apart in order, starting from the bottom:
+    [Tensors](02-tensors.py) is next, on what every `X` above actually was — a shape, a
+    dtype and a stride over one run of memory.
+    """)
     return
 
 
