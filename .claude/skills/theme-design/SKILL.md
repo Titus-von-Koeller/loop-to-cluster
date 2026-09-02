@@ -20,6 +20,9 @@ interact, and choose the best combination — every step from measurement.
   live numbers; do not restate them elsewhere.
 - `~/dotfiles/home/editors/vscode/settings.jsonc` — the applied override layer; its block
   comments are the precedent for method and bar (workbench ~6:1 by day, AA by night).
+- `~/.claude/skills/titus-preferences/SKILL.md` — his standing functionality and aesthetics
+  preferences across all programs; theme choices must respect it, and new preferences he
+  states go there.
 - `notebooks/pytorch-basics/calibration-responses.jsonl` — every response, append-only;
   size_px and gap_px ride along because they are stimulus parameters.
 
@@ -95,11 +98,15 @@ each with its operational form:
 
 Two operational corollaries, both applied and liked:
 
-- **Luminance hierarchy**: chrome > page > code well in light themes, direction inverted (page
-  > well, i.e. wells deepest) in dark ones. One ground step (~3 L*) is a surface's only role
-  marker — a single figure-ground cue instead of borders, and dense mono text takes the lowest
-  luminance. Every text surface joins the hierarchy: a webview page reading chrome keys
-  (sideBar/panel) will otherwise show a second paper on the same screen.
+- **Elevation, not inset** (Titus's correction of the first attempt, which sank code into
+  wells): code sits on the SAME paper everywhere — plain editor, notebook cell, terminal —
+  and the notebook page drops one step (~3 L*) below it, so content cells read as raised
+  cards behind a quiet border. Consistency of the code ground is itself the fluency cue.
+  Collapsed cells render on the page tone (no VSCode key reaches the folded strip), which
+  completes the metaphor: folding flattens the card into the page. VSCode notebooks have no
+  shadow key; border + ground step is the supported depth cue. Every text surface joins the
+  same system: a webview page reads chrome keys (sideBar/panel) and will otherwise show a
+  second paper on the same screen.
 - **Content over commentary**: comments sit a deliberate contrast step below body tokens
   (context, not figure), with the italic carrying the rest of the distinction — but never below
   4.5:1 on the deepest surface they appear on.

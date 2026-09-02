@@ -175,7 +175,18 @@ documentation bug.
 **Queue** (work Titus has named but not yet aimed a session at; take an item only on his go):
 
 - The full polish pass over 01 and 05–08 (breadcrumbs, hierarchy, theming, split/fold,
-  executed claims, open endings) — offered, awaiting go.
+  executed claims, open endings) — **GO given 2026-09-02, run to completion, do not stop
+  until all five are done** (Titus: "start pimping the remaining notebooks and don't stop
+  until you're done"). Protocol: one subagent per notebook (01, 05, 06, 07, 08), each reads
+  "Editing notebooks" here plus the marimo-notebooks skill and pedagogy.md, verifies
+  headlessly (never by driving VSCode windows Titus may be using), commits and pushes per
+  notebook with `git pull --rebase` before push. State: 01 and 05 partially committed and
+  pushed (01 magnitude claim and 05 histogram binning already corrected); 06 needs a full
+  redo; 07 was mid-verification (known: prose says "120 printed loss values", actual is
+  100); the git stash "WIP from stopped polish agents" holds salvage material for
+  01-phase-3 and 08 — read it with `git stash show -p`, never pop it, drop it only after
+  both notebooks land. After compaction or interruption: check `git log --oneline` for
+  which notebooks have landed, relaunch agents for the rest, same instructions.
 - Code-reading efficiency in the editor across languages: research + measure (semantic
   highlighting, token-color overrides per the Horizon findings, font/ligature choices), using
   the calibration data as it accumulates. Named 2026-09-02.
