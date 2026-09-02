@@ -168,6 +168,15 @@ documentation bug.
   the calibration data as it accumulates. Named 2026-09-02.
 - Screen calibration (hardware/ICC) — named 2026-09-02 as "another day"; until then the
   vision-calibration data is relative-to-this-screen, which its prose says.
+- Ground optimization (named 2026-09-02): the background is currently a fixed condition,
+  not a searched variable. Promote it: a family of candidate page colors (the two Horizon
+  pages plus the best-in-class candidates' grounds — Selenized, Modus, GitHub — spanning
+  lightness and warmth), with threshold parametrized as a smooth function of ground
+  luminance/warmth (2-3 params, not per-ground axes) so the fit generalizes to unseen
+  grounds. Answers "which page maximizes his discrimination" and feeds the theme program's
+  ground choice directly. Note: discrimination is one criterion; reading comfort (halation,
+  fatigue) is separate and needs its own probe. Early signal from fixed grounds: night is
+  ~20% finer than day (tau 0.041 vs 0.050) at 440 trials.
 - Calibration observer-model refinements (v1 shipped: Weibull over weighted LMS-opponent
   distance, exact grid posterior, info-gain-generated stimuli): move the space to CAM16-UCS,
   fit slope and lapse instead of fixing them, allow red-green asymmetry, and go GPU
