@@ -156,6 +156,19 @@ pedagogy.md) are proposed to Titus, never self-ratified — and a proposal he ha
 on is parked below rather than left to die with the conversation. A friction met twice is a
 documentation bug.
 
+**Queue** (work Titus has named but not yet aimed a session at; take an item only on his go):
+
+- The full polish pass over 01 and 05–08 (breadcrumbs, hierarchy, theming, split/fold,
+  executed claims, open endings) — offered, awaiting go.
+- Code-reading efficiency in the editor across languages: research + measure (semantic
+  highlighting, token-color overrides per the Horizon findings, font/ligature choices), using
+  the calibration data as it accumulates. Named 2026-09-02.
+- Screen calibration (hardware/ICC) — named 2026-09-02 as "another day"; until then the
+  vision-calibration data is relative-to-this-screen, which its prose says.
+- When calibration-responses.json has enough trials: fit Titus's personal confusion axis from
+  the misses and re-rank the theme gallery's dropdown with measured rather than simulated
+  discriminability.
+
 **Proposals awaiting Titus** (ratify by moving into the target file; reject by deleting):
 
 - pedagogy.md, Theme honesty: "the reading theme is plural where the OS flips it
