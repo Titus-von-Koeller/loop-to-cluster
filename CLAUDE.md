@@ -273,23 +273,48 @@ one-line spark. When a queue item is opened, closed, or founded, mirror the one-
   decouples it; fold his loved colors into the aesthetics prior (still unanswered); GPU
   posterior only if the grid must grow (sanctioned, not yet needed); the cividis-prose
   queue item remains untaken.
-- The aesthetics-preference instrument: **BUILT 2026-09-03** —
-  `notebooks/pytorch-basics/calibrate-aesthetics.py` (torch-free, serves under `marimo run`),
-  exactly the kicked-off design: preferential Bayesian optimization (Bradley–Terry duels
-  with reaction-time-scaled slopes, Laplace-approximated GP posterior, Thompson-plus-EIG
-  acquisition, 7% uniform probes, 5% champion-vs-worst anchors) over a 9-axis CAM16-UCS
-  theme space plus a binary polarity block coordinate; comprehension micro-tasks and
-  find-highlight time-to-find hunts share the loop; floors (WCAG 4.5 + APCA 60/45 + 2× the
-  measured CAM16-UCS thresholds refit live from calibration-responses.jsonl) are hard
-  constraints realized by walking lightness to the bar; Ou–Luo/Berlyne/warm-tilt prior
-  mean. Verified: strict check, headless exit 0, 160-trial synthetic sitting recovers a
-  planted optimum (100% day / 47% night at ~35 duels each), deterministic replay from the
-  log across fresh kernels; browser-verified 2026-09-03 (12 duels + both task modes clicked
-  over CDP against a served copy: rows carry both timestamps, double-click dedupes, grounds
-  pixel-match the log, and the loop resumed correctly across a server restart). Data:
-  `aesthetics-responses.jsonl`. **Serving on port 2919** (zellij pane `calibrate-aesthetics`,
-  lock `port-2919`) — Titus clicks next. Ecological-valence prior is a stand-in
-  until he names loved colors (asked in the intro prose).
+- The aesthetics-preference instrument — `notebooks/pytorch-basics/calibrate-aesthetics.py`,
+  **built and in use**, Titus clicking daily. Torch-free so it serves under `marimo run`;
+  **port 2919**, lock `port-2919`. Data in `aesthetics-responses.jsonl` (committed like any
+  measurement). Recovery tests in `_model_tests.py`; stimulus corpus in `_codegen.py`.
+
+  *Intention.* Find the theme(s) he most wants to read in, measured rather than guessed, and
+  say honestly whether one theme wins or a set of equally good ones exists. Preference is the
+  objective; legibility and contrast are constraints. His preferences are DISCOVERED, never
+  asked for.
+
+  *How it works now* (2026-09-03, after a day of iteration with him at the screen):
+  preferential Bayesian optimization — Bradley–Terry duels with reaction-time-scaled slopes
+  and a fitted side-advantage term, Laplace GP posterior with ARD length-scales shrunk toward
+  isotropy while relevance is unidentifiable, candidates bred every trial (standing pool as
+  codebook + 64-point Sobol trickle + ARD-scaled mutation + crossover) with a *declared*
+  explore/exploit split via stratified Thompson. A second GP over log time-to-click turns the
+  comprehension and find arms into a legibility surface that CONSTRAINS the verdict. The
+  verdict groups near-identical themes before counting P(best) and reports one of three
+  states: a winner, a plateau, or not-yet-decided. Every trial takes the screen; duels split
+  the viewport with each half in its own ground; stimuli are fresh generated pages every
+  trial, never repeated.
+
+  *State on 178 responses (121 duels):* day is a plateau of ~12 distinct themes, leader 8% and
+  falling while the set narrows — a real plateau resolving. Night is converging: leader 4→10%,
+  set 44→24, naive line ~167 duels to a majority. Night data is the thinner half.
+
+  *Remaining work, ranked by value:*
+  1. Recovery tests for the NEW machinery — the RT/legibility surface, the grouping in
+     best_set, and progress_report have no synthetic-truth tests, while the preference model
+     does. Same standard: plant a truth, check it comes back.
+  2. The duel RT→slope map (`lam`) is a hand-rolled `sqrt(median/rt)` clipped to [0.6, 1.8].
+     It should be fitted: the relationship between decision time and utility gap is estimable
+     from the log now that there are 121 duels.
+  3. Confirm the find-highlight axes (7, 8) are identified — hunts sweep them, but nothing
+     checks whether the data pins them or the prior is still doing the work.
+  4. Surface (editor / panel / notebook) is logged but never tested for interaction with
+     theme. If the optimum differs by surface, one theme is the wrong answer shape.
+  5. Untested assumption worth a probe: duels are judged at 12–13px and probes read at
+     15–16px, so preference measured at one size is being applied to reading at another.
+  6. More night sittings; and applying the winner (the override snippet is emitted in the
+     analysis, pasting it is still manual).
+
 - The theme program (named 2026-09-02): determine independently the best *editor* theme for
   Titus (best-in-class as the starting field — Selenized, Modus, GitHub accessible, Horizon —
   then self-evolved: token-color overrides tuned by his calibration data and the gallery's
