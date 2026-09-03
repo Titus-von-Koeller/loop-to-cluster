@@ -243,17 +243,20 @@ one-line spark. When a queue item is opened, closed, or founded, mirror the one-
 - When calibration-responses.jsonl has enough trials: fit Titus's personal confusion axis from
   the misses and re-rank the theme gallery's dropdown with measured rather than simulated
   discriminability.
-- The aesthetics-preference instrument (Titus is kicking this off in its own session,
-  2026-09-02): `notebooks/pytorch-basics/calibrate-aesthetics.py`, torch-free, modeled on
-  calibrate-vision — preferential Bayesian optimization (Bradley–Terry duels, GP posterior,
-  expected-information-gain acquisition, epsilon uniform probes) over a CAM16-UCS theme
-  space (page lightness/warmth, token roles, accents, and VSCode's find-highlight keys
-  `editor.findMatchBackground`/`editor.findMatchHighlightBackground` as a salience-vs-beauty
-  axis measured by time-to-find trials); reaction time logged per response and used both
-  DDM-style in the likelihood and directly on comprehension micro-tasks; legibility floors
-  (APCA + his measured thresholds in CAM16 units) are constraints, harmony models the prior
-  mean. If its session dies, the kickoff prompt lives in this queue entry's commit and the
-  design in theme-design's method section.
+- The aesthetics-preference instrument: **BUILT 2026-09-03** —
+  `notebooks/pytorch-basics/calibrate-aesthetics.py` (torch-free, serves under `marimo run`),
+  exactly the kicked-off design: preferential Bayesian optimization (Bradley–Terry duels
+  with reaction-time-scaled slopes, Laplace-approximated GP posterior, Thompson-plus-EIG
+  acquisition, 7% uniform probes, 5% champion-vs-worst anchors) over a 9-axis CAM16-UCS
+  theme space plus a binary polarity block coordinate; comprehension micro-tasks and
+  find-highlight time-to-find hunts share the loop; floors (WCAG 4.5 + APCA 60/45 + 2× the
+  measured CAM16-UCS thresholds refit live from calibration-responses.jsonl) are hard
+  constraints realized by walking lightness to the bar; Ou–Luo/Berlyne/warm-tilt prior
+  mean. Verified: strict check, headless exit 0, 160-trial synthetic sitting recovers a
+  planted optimum (100% day / 47% night at ~35 duels each), deterministic replay from the
+  log across fresh kernels. Data: `aesthetics-responses.jsonl`. Remaining: real-browser
+  interactive verification, then Titus clicks. Ecological-valence prior is a stand-in
+  until he names loved colors (asked in the intro prose).
 - The theme program (named 2026-09-02): determine independently the best *editor* theme for
   Titus (best-in-class as the starting field — Selenized, Modus, GitHub accessible, Horizon —
   then self-evolved: token-color overrides tuned by his calibration data and the gallery's

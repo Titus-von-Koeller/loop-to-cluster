@@ -23,6 +23,11 @@ interact, and choose the best combination — every step from measurement.
 - `~/.claude/skills/titus-preferences/SKILL.md` — his standing functionality and aesthetics
   preferences across all programs; theme choices must respect it, and new preferences he
   states go there.
+- `notebooks/pytorch-basics/calibrate-aesthetics.py` — the preference side of the
+  interlock: preferential Bayesian optimization over a CAM16-UCS theme space (duels,
+  comprehension micro-tasks, find-highlight hunts), with the vision fit's thresholds as
+  hard constraints refit live from the shared jsonl. Findings in its closing prose; data
+  in `aesthetics-responses.jsonl`.
 - `notebooks/pytorch-basics/calibration-responses.jsonl` — every response, append-only;
   size_px and gap_px ride along because they are stimulus parameters.
 
@@ -48,6 +53,15 @@ interact, and choose the best combination — every step from measurement.
 - Greedy one-step EIG needs a dense candidate set to deliver: a coarse magnitude grid (~2.8x
   steps) lost ~28% of achievable information per trial when the threshold fell between steps;
   a two-stage coarse-then-fine sweep per direction recovers it.
+- APCA is the stricter master on dark grounds: WCAG 4.5:1 on the Horizon night page is only
+  Lc ~54, under the Lc 60 body bar — a floor checked in WCAG units alone silently under-
+  delivers by night (measured 2026-09-03: 131 of 256 sampled dark themes passed 4.5:1 and
+  failed Lc 60). Check both, and solve to whichever bar is farther.
+- Distinguishability floors can falsify a theme's own role split: Horizon's day string
+  (#F6661E) and number (#F77D26) sit ~3 dE apart in CAM16-UCS — inside 2× the measured day
+  threshold — so string and number are one literal family in anything built on these
+  measurements, and any per-role color plan is checked pairwise against the thresholds
+  before it is searched or shipped.
 - A surface's beauty is allowed to vote and never to overrule the instruments; Titus's eyes
   outrank both — his comparison across a gallery row is the final measurement.
 - Verify a theme change by **pixel-sampling a screenshot against the expected hexes**, never by
