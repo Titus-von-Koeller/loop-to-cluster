@@ -93,7 +93,10 @@ def _():
 
     LOG = Path(__file__).parent / "aesthetics-responses.jsonl"
     VISION_LOG = Path(__file__).parent / "calibration-responses.jsonl"
-    return LOG, VISION_LOG, colour, datetime, json, math, np, pd, qmc, random, timezone
+    # Where the instrument publishes its current answer for the applier to read. A result
+    # that only exists as text on a page is a result someone has to retype.
+    CHAMPION = Path(__file__).parent / "measured-theme.json"
+    return CHAMPION, LOG, VISION_LOG, colour, datetime, json, math, np, pd, qmc, random, timezone
 
 
 @app.cell(hide_code=True)
@@ -2467,6 +2470,7 @@ def _(LOG, datetime, get_responses, json, random, set_responses, snippet_for, ti
 @app.cell(hide_code=True)
 def _(
     AXES,
+    CHAMPION,
     DE_MIN,
     axis_consensus,
     factor_effect,
@@ -2477,6 +2481,7 @@ def _(
     candidates,
     fitted,
     get_responses,
+    json,
     mo,
     mu_at,
     np,
@@ -2785,6 +2790,31 @@ def _(
                             "high (0.85)": round(float(_mm[1] - _mu[_ci]), 2),
                         }
                     )
+                # Publish rather than print. The applier reads this file, so the palette
+                # crosses from instrument to editor without a human copying hex codes -- the
+                # step where a digit gets dropped and nobody notices for a week. Written on
+                # every analysis pass, so it always reflects the current log; the applier is
+                # what decides when his editor changes, and it is never this notebook.
+                _pub = {}
+                if CHAMPION.exists():
+                    try:
+                        _pub = json.loads(CHAMPION.read_text())
+                    except Exception:
+                        _pub = {}
+                _pub[_pol] = {
+                    "ground": _champ["ground"],
+                    "find_fill": _champ["find_fill"],
+                    "keyword": _champ["keyword"],
+                    "function": _champ["function"],
+                    "string": _champ["string"],
+                    "comment": _champ["comment"],
+                    "ink": _champ["ink"],
+                    "punct": _champ["punct"],
+                    "p_best": round(float(_bs["lead"]), 4),
+                    "verdict": _bs["verdict"],
+                    "n_duels": int(_frame[(_frame["mode"] == "duel") & (_frame["polarity"] == _pol)].shape[0]),
+                }
+                CHAMPION.write_text(json.dumps(_pub, indent=2, sort_keys=True) + "\n")
                 _blocks += [
                     mo.md(
                         f"**Current best {_pol} page** — beats a random feasible theme with "
@@ -2804,8 +2834,10 @@ def _(
                     ),
                     mo.ui.table(pd.DataFrame(_sweep), selection=None),
                     mo.md(
-                        "Champion override snippet (paste into settings.jsonc under the matching "
-                        "theme block; find keys carry their alpha):"
+                        f"Champion published to `{CHAMPION.name}` — apply it with "
+                        f"`dotfiles/home/editors/vscode/apply-measured-theme.py`, which rewrites the "
+                        f"marked block in settings.jsonc rather than asking you to paste. The same "
+                        f"palette, for reading:"
                     ),
                     mo.md(
                         "```jsonc\n"
