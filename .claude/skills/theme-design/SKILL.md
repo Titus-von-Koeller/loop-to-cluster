@@ -226,6 +226,24 @@ interact, and choose the best combination — every step from measurement.
   he was judging palettes by the left two-thirds of each line. Let a comparison row step
   out of the measure and let cards WRAP rather than shrink: two rows of whole pages beat
   one row of cropped ones. Confirm with scrollWidth minus clientWidth, not by eye.
+- **Show the stimulus at the size he actually reads that surface at.** Duels ran at 12-13px
+  on the reasoning that a full screen wants small type; his settings put ordinary editors at
+  14 and notebook code cells at 16, so preference was measured at a size he never reads code
+  at and applied to two he does. Contrast sensitivity falls with glyph scale — the same
+  reason the colour floors are doubled against the 104px threshold — so this is not a free
+  assumption in a colour experiment. Read the real numbers out of settings.jsonc rather than
+  picking a plausible one, and let size follow surface rather than varying independently: in
+  his day they covary, and it is the real pairing whose theme is wanted.
+- **When a stimulus parameter changes mid-experiment, give the model a baseline for it and
+  test that the step is absorbed.** Moving the timed arms from 15 to 14px would otherwise
+  land as a jump in reading time on whatever region of theme space happened to be sampled
+  after the change. A per-(arm, size) baseline is the same device as the per-arm one;
+  measured, a planted 0.45 log-second step then costs the recovered surface nothing.
+- **Count your factor tests before calling one of them a finding.** Four stimulus-factor
+  readings on a page means roughly one lands under p = 0.10 per sitting with nothing behind
+  it. Say how many were run, keep a genuine negative control among them (code kind, which
+  should not move a colour preference and does not: p = 0.58 and 0.27), and let the
+  multiplicity appear in the sentence rather than in a footnote nobody reads.
 - A surface's beauty is allowed to vote and never to overrule the instruments; Titus's eyes
   outrank both — his comparison across a gallery row is the final measurement.
 - Verify a theme change by **pixel-sampling a screenshot against the expected hexes**, never by
