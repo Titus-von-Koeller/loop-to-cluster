@@ -14,10 +14,16 @@ interact, and choose the best combination — every step from measurement.
 - `notebooks/pytorch-basics/theme-gallery.py` — the exhibit color system and the field's
   palettes under three instruments (as designed, Machado deuteranopia, grayscale), the editor
   theme measured on its own grounds, and the lineage of the rules (Bertin through Munzner).
-- `notebooks/pytorch-basics/calibrate-vision.py` — the observer model: a Weibull psychometric
-  over weighted LMS-opponent distance, exact grid posterior, information-gain-generated
-  stimuli. **Current findings and how to read them are in its closing prose**, next to the
-  live numbers; do not restate them elsewhere.
+- `notebooks/pytorch-basics/_observer.py` — **the one observer model** (v2: CAM16-UCS
+  geometry, fitted slope/lapse, free confusion-axis orientation, threshold smooth in
+  ground lightness, small-field exponent), fit from the shared jsonl and cached beside it.
+  Every instrument reads this fit — measurement sharpens preference constraints without a
+  second copy anywhere. Change the model here, nowhere else.
+- `notebooks/pytorch-basics/calibrate-vision.py` — the discrimination instrument on that
+  model: EIG-generated odd-one-out trials over seven grounds (Horizon, Selenized, Modus,
+  GitHub dark) and three patch sizes (104/16/10 px — the glyph-scale stage and the
+  ground-threshold search run in the same loop). **Current findings and how to read them
+  are in its closing prose**, next to the live numbers; do not restate them elsewhere.
 - `~/dotfiles/home/editors/vscode/settings.jsonc` — the applied override layer; its block
   comments are the precedent for method and bar (workbench ~6:1 by day, AA by night).
 - `~/.claude/skills/titus-preferences/SKILL.md` — his standing functionality and aesthetics
@@ -43,9 +49,17 @@ interact, and choose the best combination — every step from measurement.
   near-abutting patches for the sensitive and ecologically honest comparison. Grounds run in
   blocks, never per-trial alternation — adaptation is part of the measurement.
 - Exhibit scale does not transfer to glyph scale: color discrimination collapses for small
-  fields, and editor tokens are ~10px. Editor-theme decisions wait for text-sized stimuli.
-- The background is a variable to search, not only a condition to control (queued: threshold
-  as a smooth function of ground luminance and warmth).
+  fields, and editor tokens are ~10px. Editor-theme decisions wait for text-sized stimuli —
+  now measured in calibrate-vision's 10/16 px blocks; the fitted small-field exponent is the
+  number that decides evolve-vs-switch.
+- The background is a variable to search, not only a condition to control: threshold is
+  modeled as a smooth function of ground lightness (2 params, not per-ground axes), so
+  every measured ground sharpens predictions for grounds never shown. Warmth joins the
+  model only when the ground family decouples it from lightness.
+- A model swap is validated by re-deriving the old verdicts: v2 (CAM16-UCS, free confusion
+  axis) reproduced v1's night-advantage and lapse from the same data before its new claims
+  were trusted — and corrected v1's assumed psychometric slope (fitted beta ~ 1.2, not 2),
+  which recalibrated every threshold number downstream.
 - An information-optimal 4AFC trial sits near threshold: to the observer, most trials should
   feel nearly indistinguishable, and "I'm mostly guessing" is the instrument working. The
   occasional easy trial is an anchor (5%) — with lapse pinned by a long log, easy trials carry
@@ -167,3 +181,9 @@ Beauty votes through these; the instruments still veto, and Titus's eyes outrank
   Okabe-Ito categorical and blue-orange POLARITY stay. Night ground reads ~20% finer than day.
   Horizon stays the editor theme for now, with the measured token/workbench override layer
   applied in dotfiles; the switch-vs-evolve decision waits on glyph-scale data.
+- 2026-09-03, 748 trials, observer v2: the 104-px verdicts survive re-derivation in
+  CAM16-UCS (numbers in calibrate-vision's closing prose); **no color-vision deficiency
+  signal** — confusion-axis orientation unconstrained, red–green threshold 1.5× blue–yellow
+  where anomalous trichromacy shows several-fold. Constraints for the aesthetics search now
+  come from this fit (day ΔE ~3.2, night ~2.5 at 104 px, 2× margin pairwise). Glyph-scale
+  and ground-family data collection is live; those verdicts wait on his clicks.

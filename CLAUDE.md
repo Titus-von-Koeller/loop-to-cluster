@@ -224,31 +224,34 @@ one-line spark. When a queue item is opened, closed, or founded, mirror the one-
   the calibration data as it accumulates. Named 2026-09-02.
 - Screen calibration (hardware/ICC) — named 2026-09-02 as "another day"; until then the
   vision-calibration data is relative-to-this-screen, which its prose says.
+- Residual for Titus (2026-09-03): calibrate-vision.py was rewritten on disk (v2) while
+  open in a VSCode tab with a live kernel — `ctrl+alt+m` in that tab before clicking there
+  again. Until then its stale session keeps recording valid v1-generated trials; the log
+  stays sound either way.
 - **Ownership note (2026-09-03): the four measurement items below — ground optimization,
   observer-model refinements, confusion-axis re-rank, and the glyph-scale stage — are
   absorbed into the aesthetics-instrument session's brief** (Titus's expansion order): one
   session owns the measurement↔preference interlock, so sharpened measurements regenerate
   the constraint set its optimizer searches. They stay listed for their content; resume
   points now live with that session's instrument.
-- Ground optimization (named 2026-09-02): the background is currently a fixed condition,
-  not a searched variable. Promote it: a family of candidate page colors (the two Horizon
-  pages plus the best-in-class candidates' grounds — Selenized, Modus, GitHub — spanning
-  lightness and warmth), with threshold parametrized as a smooth function of ground
-  luminance/warmth (2-3 params, not per-ground axes) so the fit generalizes to unseen
-  grounds. Answers "which page maximizes his discrimination" and feeds the theme program's
-  ground choice directly. Note: discrimination is one criterion; reading comfort (halation,
-  fatigue) is separate and needs its own probe. Signal from the converged fixed-ground stage:
-  night reads 25-30% finer than day on every axis (602 trials).
-- Calibration observer-model refinements (v1 shipped: Weibull over weighted LMS-opponent
-  distance, exact grid posterior, info-gain-generated stimuli with two-stage magnitude search,
-  5% anchors, threshold tiles): move the space to CAM16-UCS,
-  fit slope and lapse instead of fixing them, allow red-green asymmetry, and go GPU
-  (numpyro/BoTorch) when trials pass a few thousand — heavy tools sanctioned by Titus.
+- Ground optimization: **INSTRUMENTED 2026-09-03** — calibrate-vision's blocks now cycle
+  seven grounds (Horizon day/night, Selenized light/dark, Modus white/black, GitHub dark)
+  and the observer models threshold as a smooth function of ground lightness (gL, fitted).
+  Warmth stays out of the model until the ground family decouples it from lightness (noted
+  in _observer.py); reading comfort remains the preference instrument's half. Verdicts wait
+  on trials at the new grounds.
+- Calibration observer-model refinements: **SHIPPED 2026-09-03 as _observer.py v2** —
+  CAM16-UCS space, fitted slope (β ≈ 1.2, correcting v1's assumed 2) and lapse, free
+  confusion-axis rotation (the red–green asymmetry, generalized), threshold smooth in
+  ground lightness, small-field exponent for the glyph stage. Exact grid posterior
+  (3.6M cells, chunked, cached, incremental per click) — still CPU; GPU (numpyro/BoTorch)
+  remains sanctioned when the grid needs to grow past a few thousand trials.
 - The theme gallery's sequential prose still describes the retired blue RAMP; update it to
   the cividis house ramp once the swap survives Titus's reading.
-- When calibration-responses.jsonl has enough trials: fit Titus's personal confusion axis from
-  the misses and re-rank the theme gallery's dropdown with measured rather than simulated
-  discriminability.
+- Confusion-axis re-rank of the theme gallery's dropdown: the axis is now a fitted quantity
+  (φ in _observer.py, currently unconstrained at 1° ± 20°) and `_observer.discriminability`
+  predicts p(tell apart) for any pair on any ground — remaining work is wiring the gallery
+  dropdown's order to it (measured rather than simulated discriminability).
 - The aesthetics-preference instrument: **BUILT 2026-09-03** —
   `notebooks/pytorch-basics/calibrate-aesthetics.py` (torch-free, serves under `marimo run`),
   exactly the kicked-off design: preferential Bayesian optimization (Bradley–Terry duels
