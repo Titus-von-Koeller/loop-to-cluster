@@ -68,3 +68,12 @@ if [ -n "$large" ]; then
     echo "ignore them, or commit with --no-verify if they belong here" >&2
     exit 1
 fi
+
+# Taint gate (dotfiles docs/adr/010): a session that ingested untrusted content may not
+# commit reef-shaped files until a sibling session or Titus reviews it. A session with no
+# state passes — the gate blocks only explicit taint, never missing information.
+colony_py=~/.claude/skills/colony/colony.py
+if [ -f "$colony_py" ] && ! pixi run python "$colony_py" gate --staged; then
+    echo "pre-commit: the taint gate refused this commit (dotfiles docs/adr/010)" >&2
+    exit 1
+fi
