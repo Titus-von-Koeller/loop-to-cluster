@@ -726,6 +726,45 @@ agg_item = agg.item()
             _cursor = {"r": _s["er"] - 1, "c": _s["ec"]}
         _out.append("</pre>")
         _out.append(_card_close)
+        if surface == "panel":
+            # The diff card, because a Claude Code turn is mostly diffs and their colours
+            # are part of what he reads all day. Both backgrounds are DERIVED, not searched:
+            # the theme already carries a cool role colour and a warm one, and mixing each
+            # into the ground keeps added/removed on the cool/warm polarity that survives
+            # colour-vision deficiency while adding no dimension to a nine-dimensional
+            # space that is already the binding constraint on convergence. Line text stays
+            # the code ink -- a diff recolours the field, never the code.
+            def _mix(_hex, _t):
+                _a = theme["ground"].lstrip("#")
+                _b = _hex.lstrip("#")
+                return "#" + "".join(
+                    f"{round(int(_a[_k : _k + 2], 16) * (1 - _t) + int(_b[_k : _k + 2], 16) * _t):02x}"
+                    for _k in (0, 2, 4)
+                )
+
+            _add_bg, _del_bg = _mix(theme["function"], 0.16), _mix(theme["string"], 0.16)
+            _sign = theme["comment"]
+            _diff = [
+                ("-", "    ferrous_voussoir_mark = stipple_plinth(ferrous_bellows_table)", _del_bg),
+                ("+", "    ferrous_voussoir_mark = stipple_plinth(ferrous_bellows_table, 12)", _add_bg),
+                (" ", "    with sift_gantry(opaline_voussoir_walk) as vernal_cistern_gate:", None),
+                ("+", "        prime_mullion_stub = 128", _add_bg),
+            ]
+            _rows = []
+            for _mark, _text, _bg in _diff:
+                _style = f"display:block;padding:0 6px;color:{theme['punct']}"
+                if _bg:
+                    _style += f";background:{_bg}"
+                _rows.append(
+                    f'<span style="{_style}"><span style="color:{_sign}">{_mark}</span>{_html.escape(_text)}</span>'
+                )
+            _out.append(
+                f"{_card_open}<div style=\"font-family:'IBM Plex Serif',serif;font-size:13px;"
+                f'color:{theme["comment"]};margin:0 0 6px 0">edited _codegen.py</div>'
+                f"<pre style=\"font-family:'IosevkaLigated Nerd Font Mono',monospace;"
+                f"font-size:{code_px}px;line-height:1.5;margin:0;white-space:pre;"
+                f'overflow:hidden">' + "".join(_rows) + f"</pre>{_card_close}"
+            )
         if surface == "panel" and prose:
             # An assistant turn continues after the code: the second serif block is what
             # makes this the chat surface rather than a card on a page.
@@ -1074,16 +1113,26 @@ def _(DUEL_WIDTH, POOL, np, prior_mean, qmc, random, realize):
                 _add(np.where(_mask, _elites[_i], _elites[_j]))
         return _out, _n_standing
 
-    def best_set(fit, polarity, thetas, samples=4096, floor=0.02, seed=0):
-        """P(each theme is THE best) by joint posterior sampling, and the credible set.
+    def best_set(fit, polarity, thetas, samples=4096, mass=0.5, seed=0, radius=0.9):
+        """Which theme is best, or which SET is -- as a distribution over argmaxes.
 
-        His question is not only "which theme wins" but "is there a set of equally good
-        ones" -- so the answer is a distribution over argmaxes, not a ranking. Sampling
-        the joint posterior (correlations included) gives P(best) directly; the credible
-        best-set is everything with non-negligible mass, and whether one theme is
-        *strictly* better is then a fact about that distribution rather than a matter of
-        taste: one theme holding more than half the argmax mass is a winner, a spread
-        mass is a genuine plateau and any member of it is a defensible choice.
+        Three things have to be right for this to answer the question honestly.
+
+        Sample the JOINT posterior, because candidates near each other share almost all
+        their uncertainty and marginals would scatter the probability of being best across
+        a cluster of effectively identical pages.
+
+        Then GROUP before counting. A candidate set of eight hundred contains many pages
+        that differ by less than he could ever see, and each sibling steals argmax mass
+        from the others: measured on the real log, the leader held 1.6% while the report
+        claimed a plateau -- a number that says nothing about whether one theme leads. Mass
+        belongs to a perceptually distinct group, not to a coordinate.
+
+        And read the verdict off CUMULATIVE mass, not an absolute cutoff. The credible set
+        is the smallest group of groups holding `mass` of the argmax probability: one group
+        over half of it is a winner; a handful sharing it is a real plateau; and when even
+        the top group is thin, the honest answer is that the log cannot yet tell -- which
+        is a state this reports rather than dressing up as a plateau.
         """
         _mu, _cov = posterior_joint(fit, thetas, polarity)
         try:
@@ -1093,18 +1142,47 @@ def _(DUEL_WIDTH, POOL, np, prior_mean, qmc, random, realize):
             _L = _V * np.sqrt(np.maximum(_w, 1e-12))
         _Z = np.random.default_rng(seed).standard_normal((len(thetas), samples))
         _F = _mu[:, None] + _L @ _Z
-        _win = np.argmax(_F, axis=0)
-        _p = np.bincount(_win, minlength=len(thetas)) / float(samples)
+        _p = np.bincount(np.argmax(_F, axis=0), minlength=len(thetas)) / float(samples)
+
+        # Group into perceptually distinct themes: greedy, best-first, in length-scale
+        # scaled theta space, so a group is "themes his eyes and this model cannot
+        # separate" rather than an arbitrary grid cell.
+        _w_ax = 1.0 / (_LS0[:9] if fit.get("ls") is None else fit["ls"][:9])
+        _P = np.array([np.asarray(_t) * _w_ax for _t in thetas])
         _order = np.argsort(-_p)
-        _keep = [int(_i) for _i in _order if _p[_i] >= floor]
-        if not _keep:
-            _keep = [int(_order[0])]
+        _reps, _group_of = [], np.full(len(thetas), -1)
+        for _i in _order:
+            if _reps:
+                _d = np.linalg.norm(_P[_reps] - _P[_i], axis=1)
+                _j = int(np.argmin(_d))
+                if _d[_j] <= radius:
+                    _group_of[_i] = _j
+                    continue
+            _group_of[_i] = len(_reps)
+            _reps.append(int(_i))
+        _gp = np.zeros(len(_reps))
+        for _i in range(len(thetas)):
+            _gp[_group_of[_i]] += _p[_i]
+        _gorder = np.argsort(-_gp)
+        _keep, _acc = [], 0.0
+        for _g in _gorder:
+            _keep.append(int(_g))
+            _acc += _gp[_g]
+            if _acc >= mass:
+                break
+        _lead = float(_gp[_gorder[0]])
+        _verdict = "single" if _lead > 0.5 else ("plateau" if _lead > 0.12 else "undecided")
         return {
             "p_best": _p,
             "order": _order,
-            "credible": _keep,
+            "groups": _reps,
+            "group_p": _gp,
+            "group_order": _gorder,
+            "credible": [_reps[_g] for _g in _keep],
+            "credible_p": [float(_gp[_g]) for _g in _keep],
+            "lead": _lead,
             "mu": _mu,
-            "verdict": "single" if _p[_order[0]] > 0.5 else "plateau",
+            "verdict": _verdict,
         }
 
     def spread_out(thetas, idx, k, ls=None):
@@ -1695,19 +1773,32 @@ def _(
                 _bs = best_set(_fit, _pol, _thetas, seed=17)
                 _cred = _bs["credible"]
                 _reps = spread_out(_thetas, _cred, 4, _fit.get("ls"))
-                _verdict = (
-                    f"**one theme leads**: it holds "
-                    f"{100 * _bs['p_best'][_bs['order'][0]]:.0f}% of the probability of being best"
-                    if _bs["verdict"] == "single"
-                    else f"**a plateau of {len(_cred)} themes**, none a clear winner — the leader "
-                    f"holds only {100 * _bs['p_best'][_bs['order'][0]]:.0f}% of the probability of "
-                    f"being best, so any of these is a defensible pick"
-                )
+                _lead_pct = 100 * _bs["lead"]
+                if _bs["verdict"] == "single":
+                    _verdict = (
+                        f"**one theme leads** — it holds {_lead_pct:.0f}% of the probability of "
+                        f"being the best theme, so this is the one to apply"
+                    )
+                elif _bs["verdict"] == "plateau":
+                    _verdict = (
+                        f"**a plateau of {len(_cred)} distinct themes** — the leader holds "
+                        f"{_lead_pct:.0f}%, and these together hold half the probability of being "
+                        f"best. They are equally good by measurement, not merely acceptable: every "
+                        f"one has already cleared the legibility floors, so pick by eye"
+                    )
+                else:
+                    _verdict = (
+                        f"**not yet decided** — the strongest theme holds only {_lead_pct:.0f}% of "
+                        f"the probability of being best, which is what a thin log looks like rather "
+                        f"than a real plateau. {len(_cred)} themes share half the mass; more duels "
+                        f"on this polarity will separate them"
+                    )
                 _blocks.append(
                     mo.md(
                         f"### The {_pol} verdict\n\n{_verdict}. Shown below: the leader, then the "
-                        f"most *different* members of the credible set (P(best) ≥ 2%), so a plateau "
-                        f"is legible as choices rather than as near-identical variants."
+                        f"most *different* members of the set holding half the probability mass — "
+                        f"near-identical themes are grouped first, so what you see are choices "
+                        f"rather than variations of one."
                     )
                 )
                 _blocks.append(
@@ -1842,12 +1933,16 @@ def _(mo):
 
     **One theme or several?** The verdict above is a distribution, not a ranking: sampling
     the joint posterior gives each candidate its probability of being *the* best, and the
-    answer is read from how that mass sits. Concentrated on one page, there is a winner.
-    Spread across many, the honest report is a plateau — and the members shown are chosen
-    to be as *different* from each other as the set allows, because a plateau is only worth
-    knowing about if its members are visibly distinct choices rather than variations of one.
-    Either way nothing on that shelf is a compromise: every candidate has already cleared
-    the legibility floors, so a plateau means genuinely equal, not merely acceptable.
+    answer is read from how that mass sits. Two details make that honest. Near-identical
+    candidates are **grouped** before counting, because eight hundred candidates contain
+    many pages that differ by less than you could see and each sibling would otherwise steal
+    argmax mass from the others. And the reading is of *cumulative* mass, not a fixed
+    cutoff: one group holding over half of it is a winner; a handful sharing it is a real
+    plateau, and the members shown are then chosen to be as *different* from each other as
+    the set allows; and when even the strongest group is thin, the report says **not yet
+    decided** rather than dressing a thin log up as a plateau. Nothing on that shelf is a
+    compromise either way — every candidate has already cleared the legibility floors, so a
+    plateau means genuinely equal, not merely acceptable.
 
     Two properties of the machinery were measured rather than assumed, and the tests live in
     `_model_tests.py` beside this file. The position of a card matters to you — over the
