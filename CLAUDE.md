@@ -229,6 +229,17 @@ documentation bug.
 - When calibration-responses.jsonl has enough trials: fit Titus's personal confusion axis from
   the misses and re-rank the theme gallery's dropdown with measured rather than simulated
   discriminability.
+- The aesthetics-preference instrument (Titus is kicking this off in its own session,
+  2026-09-02): `notebooks/pytorch-basics/calibrate-aesthetics.py`, torch-free, modeled on
+  calibrate-vision — preferential Bayesian optimization (Bradley–Terry duels, GP posterior,
+  expected-information-gain acquisition, epsilon uniform probes) over a CAM16-UCS theme
+  space (page lightness/warmth, token roles, accents, and VSCode's find-highlight keys
+  `editor.findMatchBackground`/`editor.findMatchHighlightBackground` as a salience-vs-beauty
+  axis measured by time-to-find trials); reaction time logged per response and used both
+  DDM-style in the likelihood and directly on comprehension micro-tasks; legibility floors
+  (APCA + his measured thresholds in CAM16 units) are constraints, harmony models the prior
+  mean. If its session dies, the kickoff prompt lives in this queue entry's commit and the
+  design in theme-design's method section.
 - The theme program (named 2026-09-02): determine independently the best *editor* theme for
   Titus (best-in-class as the starting field — Selenized, Modus, GitHub accessible, Horizon —
   then self-evolved: token-color overrides tuned by his calibration data and the gallery's
