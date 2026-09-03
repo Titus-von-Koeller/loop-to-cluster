@@ -701,6 +701,20 @@ agg_item = agg.item()
     #             reading measure, then a raised code card, then an output block
     SURFACES = ("editor", "panel", "notebook")
 
+    # And the size he ACTUALLY reads each one at, from his own settings.jsonc: the global
+    # editor.fontSize is unset so ordinary editors sit at VSCode's default 14, notebook code
+    # cells are customised to 16, and the chat panel's code follows the editor at 14.
+    #
+    # This matters more than it looks. Duels ran at 12 and 13px on the reasoning that a full
+    # screen wants small type -- but 12 and 13 are sizes he never reads code at, so a
+    # preference measured there was being applied to reading at 14 and 16. Contrast
+    # sensitivity falls with glyph scale, which is exactly why the colour floors are doubled
+    # against the 104px threshold, so "measure at one size, apply at another" is not a free
+    # assumption in a colour experiment. Each surface is now shown at its true size, which
+    # also stops size and surface from being independently varied for no reason: in his real
+    # day they covary, and it is the real pairing whose theme is wanted.
+    READING_PX = {"editor": 14, "panel": 14, "notebook": 16}
+
     def render_card(theme, snippet, code_px, find_current=None, task=False, prose=True, surface="editor"):
         """One candidate page as HTML: prose in IBM Plex Serif 17px, code in Iosevka at the
         true editor pixel size, on the candidate ground. find_current=None hides the find
@@ -818,7 +832,7 @@ agg_item = agg.item()
         return "".join(_out)
 
     DUEL_WIDTH = _codegen.DUEL_WIDTH
-    return DUEL_WIDTH, SURFACES, render_card, snippet_for
+    return DUEL_WIDTH, READING_PX, SURFACES, render_card, snippet_for
 
 
 @app.cell(hide_code=True)
@@ -832,7 +846,7 @@ def _(LOG, json, mo):
 
 
 @app.cell(hide_code=True)
-def _(DUEL_WIDTH, POOL, SURFACES, math, np, prior_mean, qmc, random, realize):
+def _(DUEL_WIDTH, POOL, READING_PX, SURFACES, math, np, prior_mean, qmc, random, realize):
     # The preference model: a Gaussian process over theme space with a Bradley-Terry
     # likelihood on duels, fit by Laplace approximation — Chu & Ghahramani's preferential
     # GP, QUEST+'s generate-the-most-informative-trial loop on top. Reaction time enters
@@ -1252,7 +1266,7 @@ def _(DUEL_WIDTH, POOL, SURFACES, math, np, prior_mean, qmc, random, realize):
     # one level deeper: the contrast floors keep a page readable in principle, and this
     # keeps it readable in fact.
     def rt_fit(responses, polarity, ls=None, noise_share=0.45):
-        _X, _y, _mode = [], [], []
+        _X, _y, _mode, _px = [], [], [], []
         for _r in responses:
             if _r.get("mode") not in ("comprehension", "search"):
                 continue
@@ -1264,6 +1278,7 @@ def _(DUEL_WIDTH, POOL, SURFACES, math, np, prior_mean, qmc, random, realize):
             _X.append(_coords(_r["theta_a"], polarity))
             _y.append(np.log(_rt))
             _mode.append(1.0 if _r["mode"] == "search" else 0.0)
+            _px.append(float(_r.get("code_px") or 15.0))
         if len(_X) < 8:
             return None
         _X = np.array(_X)
@@ -1279,8 +1294,23 @@ def _(DUEL_WIDTH, POOL, SURFACES, math, np, prior_mean, qmc, random, realize):
         _has_both = 0 < float(_mode.mean()) < 1
         _m_probe = float(_y[_mode == 0].mean()) if (_mode == 0).any() else float(_y.mean())
         _m_hunt = float(_y[_mode == 1].mean()) if (_mode == 1).any() else float(_y.mean())
-        _base = np.where(_mode > 0.5, _m_hunt, _m_probe) if _has_both else np.full(len(_y), _y.mean())
+        _base = (np.where(_mode > 0.5, _m_hunt, _m_probe) if _has_both else np.full(len(_y), _y.mean())).astype(float)
         _mu0 = _m_probe if _has_both else float(_y.mean())
+        # And a per-SIZE offset, for exactly the reason there is a per-arm one. Glyph scale
+        # moves reading time on its own, and the timed arms have not always run at one size:
+        # they were 15 or 16 before the stimulus was pinned to the sizes he actually reads at
+        # (14 in editors, 16 in notebook cells). Without this the step from one size regime
+        # to the next lands on the theme surface as if some region of theme space had got
+        # slower on the day the size changed. Only fitted where a size has enough trials to
+        # mean anything; the rest fall back to the arm's own mean.
+        _px = np.asarray(_px)
+        for _arm in (0.0, 1.0):
+            for _v in np.unique(_px):
+                _sel = (_px == _v) & (_mode == _arm)
+                # A cell needs enough trials for its own mean to beat the arm's; below that
+                # the arm mean is the better estimate and the cell keeps it.
+                if _sel.sum() >= 6:
+                    _base[_sel] = float(_y[_sel].mean())
         # Signal and noise variance estimated from the data rather than borrowed from the
         # preference kernel: the preference GP's prior sd of 2 means a factor of seven in
         # log time, which produced a predicted span of 1.4 to 14 seconds -- nonsense on a
@@ -1512,59 +1542,46 @@ def _(DUEL_WIDTH, POOL, SURFACES, math, np, prior_mean, qmc, random, realize):
     # cell. Underscore-prefixed names must be defined before the functions that use them.
     _SURF_MEMO = {}
 
-    def surface_effect(responses, polarity, nperm=200, seed=7):
-        """Does the preferred theme depend on WHICH surface it is seen on?
+    def factor_effect(responses, polarity, key, nperm=200, seed=7, min_n=24):
+        """Does the preferred theme depend on some logged property of how it was SHOWN?
 
-        A theme is one theme, but it is seen in an editor, in the Claude Code panel, and in
-        a notebook, and those differ in measure, in surrounding chrome and in whether prose
-        sits next to the code. If the optimum moves between them, a single theme is the
-        wrong shape of answer and the instrument should be searching three.
+        The same question for any stimulus factor -- which surface, what pixel size, which
+        kind of code -- because the machinery is identical and a second copy of a
+        permutation test is a second place for it to be subtly wrong. `key` names the field
+        in the log; its distinct values become the levels.
 
-        Asked so a null answer means something. A per-surface tilt on the utility must EARN
-        its extra parameters on HELD-OUT choices -- fit alone always improves. Then the
-        earned amount is compared against its own permutation null: the same thetas, the
-        same clicks, only the surface labels shuffled. That null is exact, and it is
-        necessary, because at these counts adding two parameters clears a fixed threshold
-        by chance in roughly one run in five.
-
-        Returns (n, delta, p, verdict). Verdict is deliberately three-state for the same
-        reason the main one is: "quiet" is not "absent" when the test has little power.
-        """
+        See surface_effect below for what the test does and why the null is permutation."""
         _ds = [
             _r
             for _r in responses
             if _r.get("mode") == "duel"
-            and _r.get("surface")
+            and _r.get(key) is not None
             and _r.get("polarity") == polarity
             and not _r.get("paused")
             and _r.get("choice") in (0, 1)
         ]
-        if len(_ds) < 24:
-            return len(_ds), 0.0, 1.0, "not enough surface-labelled duels"
-        # Keyed by the DATA, not just its length: two different logs of equal length must
-        # not share an answer. (They do in the tests, which is how this was caught.)
-        _key = (
-            "surf",
-            polarity,
-            hash(tuple((_r["choice"], _r["surface"], _r["theta_a"][0]) for _r in _ds)),
-        )
+        _levels = sorted({_r[key] for _r in _ds}, key=str)
+        if len(_ds) < min_n or len(_levels) < 2:
+            return len(_ds), 0.0, 1.0, f"not enough {polarity} duels with a {key} to compare"
+        _key = ("f", key, polarity, hash(tuple((_r["choice"], str(_r[key]), _r["theta_a"][0]) for _r in _ds)))
         if _key in _SURF_MEMO:
             return _SURF_MEMO[_key]
-        _S = np.array([SURFACES.index(_r["surface"]) for _r in _ds])
+        _S = np.array([_levels.index(_r[key]) for _r in _ds])
+        _K = len(_levels)
         _X = np.array(
             [
-                # choice 0 = theme_a won, 1 = theme_b won (duels_from's convention; `swap`
-                # governs only which SIDE a card appeared on, not which theme it was).
+                # choice 0 = theme_a won (duels_from's convention; `swap` governs only which
+                # SIDE a card appeared on, not which theme it was).
                 (np.array(_r["theta_a"]) - np.array(_r["theta_b"])) * (1.0 if _r["choice"] == 0 else -1.0)
                 for _r in _ds
             ]
         )
 
-        def _cvll(_X, _S, _k, _seed):
-            """Held-out Bradley-Terry log-loss. _k = 0 is one shared utility; _k > 0 adds a
-            sum-to-zero per-surface tilt on the _k axes, which is the cheapest form a
-            surface interaction can take and so the one with the best chance of showing up
-            in this little data."""
+        def _cvll(_X, _S, _nax, _seed):
+            """Held-out Bradley-Terry log-loss. _nax = 0 is one shared utility; _nax > 0 adds
+            a sum-to-zero per-level tilt on the _nax leading axes, the cheapest form the
+            interaction can take and so the one with the best chance of showing in the data
+            there is."""
             _r = np.random.default_rng(_seed)
             _idx = _r.permutation(len(_X))
             _tot, _n = 0.0, 0
@@ -1575,13 +1592,13 @@ def _(DUEL_WIDTH, POOL, SURFACES, math, np, prior_mean, qmc, random, realize):
                     continue
 
                 def _feat(_Xa, _Sa):
-                    if not _k:
+                    if not _nax:
                         return _Xa
                     _cols = [_Xa]
-                    for _j in range(_k):
-                        for _sv in range(2):
+                    for _j in range(_nax):
+                        for _sv in range(_K - 1):
                             _cols.append(
-                                np.where(_Sa == _sv, _Xa[:, _j], np.where(_Sa == 2, -_Xa[:, _j], 0.0))[:, None]
+                                np.where(_Sa == _sv, _Xa[:, _j], np.where(_Sa == _K - 1, -_Xa[:, _j], 0.0))[:, None]
                             )
                     return np.hstack(_cols)
 
@@ -1608,14 +1625,36 @@ def _(DUEL_WIDTH, POOL, SURFACES, math, np, prior_mean, qmc, random, realize):
         _null = np.array([_gain(_rng.permutation(_S), 2) for _ in range(nperm)])
         _p = float((_null >= _obs).mean())
         if _p < 0.02:
-            _v = "surface changes the optimum -- one theme is the wrong answer shape"
+            _v = f"{key} changes the optimum -- one theme is the wrong answer shape"
         elif _p < 0.10:
-            _v = "suggestive; keep the surfaces balanced and re-read"
+            _v = f"suggestive; keep {key} balanced and re-read"
         else:
-            _v = "no surface effect this data can see"
+            _v = f"no {key} effect this data can see"
         _out = (len(_ds), _obs, _p, _v)
         _SURF_MEMO[_key] = _out
         return _out
+
+    def surface_effect(responses, polarity, nperm=200, seed=7):
+        """Does the preferred theme depend on WHICH surface it is seen on?
+
+        A theme is one theme, but it is seen in an editor, in the Claude Code panel, and in
+        a notebook, and those differ in measure, in surrounding chrome and in whether prose
+        sits next to the code. If the optimum moves between them, a single theme is the
+        wrong shape of answer and the instrument should be searching three.
+
+        Asked so a null answer means something. A per-surface tilt on the utility must EARN
+        its extra parameters on HELD-OUT choices -- fit alone always improves. Then the
+        earned amount is compared against its own permutation null: the same thetas, the
+        same clicks, only the surface labels shuffled. That null is exact, and it is
+        necessary, because at these counts adding two parameters clears a fixed threshold
+        by chance in roughly one run in five (measured under a true null: 3 to 7 runs of 24).
+
+        Returns (n, delta, p, verdict). Verdict is deliberately three-state for the same
+        reason the main one is: "quiet" is not "absent" when the test has little power. At
+        48 duels a tilt of 1 logit was detected 1 run in 12, so read a quiet answer as "not
+        visible here" and collect more rather than as "settled".
+        """
+        return factor_effect(responses, polarity, "surface", nperm=nperm, seed=seed)
 
     def schedule_mode(n, n_duels):
         """Twenty-four-trial polarity blocks, each a run of sixteen duels, then four
@@ -1733,6 +1772,7 @@ def _(DUEL_WIDTH, POOL, SURFACES, math, np, prior_mean, qmc, random, realize):
                 _ta, _tha = _cand[_i1], _cthemes[_i1]
                 _tb, _thb = _cand[_i2], _cthemes[_i2]
             _snip = n * 7919 + 17
+            _surface = duel_surface(n, len(responses))
             _trial = {
                 "mode": "duel",
                 # Both arms share surface and page: a duel varies the theme, nothing else.
@@ -1743,7 +1783,7 @@ def _(DUEL_WIDTH, POOL, SURFACES, math, np, prior_mean, qmc, random, realize):
                 # editor itself. Both stay logged as stimulus parameters.
                 "snippet_width": DUEL_WIDTH,
                 "snippet_lines": 28,
-                "surface": duel_surface(n, len(responses)),
+                "surface": _surface,
                 "kind": _kind,
                 "polarity": _pol,
                 "theta_a": [round(float(_v), 6) for _v in _ta],
@@ -1751,7 +1791,9 @@ def _(DUEL_WIDTH, POOL, SURFACES, math, np, prior_mean, qmc, random, realize):
                 "theme_a": _tha,
                 "theme_b": _thb,
                 "snippet": _snip,
-                "code_px": 12 if _rng.random() < 0.5 else 13,
+                # The size he reads THIS surface at (see READING_PX): the stimulus is then
+                # the thing the answer is for, rather than a shrunken proxy for it.
+                "code_px": READING_PX[_surface],
                 "swap": _rng.random() < 0.5,
                 "find_current": None,  # filled by the widget cell from the snippet
             }
@@ -1794,9 +1836,12 @@ def _(DUEL_WIDTH, POOL, SURFACES, math, np, prior_mean, qmc, random, realize):
                 "theta_a": [round(float(_v), 6) for _v in _ta],
                 "theme_a": _tha,
                 "snippet": _snip,
-                # One page on the screen, so it is read at the size his editor actually uses --
-                # a duel halves the screen and takes the smaller end of the same range.
-                "code_px": 15 if _rng.random() < 0.5 else 16,
+                # A size he actually reads at. 15 was not one: his editors sit at 14 and his
+                # notebook code cells at 16, so a legibility constraint measured at 15 was
+                # constraining a size that never appears. These arms run on the editor
+                # surface, so they take the editor's size. The per-size baseline in rt_fit
+                # absorbs the step from the earlier 15/16 trials.
+                "code_px": READING_PX["editor"],
             }
         else:  # search
             if _fit is not None:
@@ -1843,7 +1888,7 @@ def _(DUEL_WIDTH, POOL, SURFACES, math, np, prior_mean, qmc, random, realize):
                 "theta_a": [round(float(_v), 6) for _v in _bt],
                 "theme_a": _tha,
                 "snippet": _snip,
-                "code_px": 15 if _rng.random() < 0.5 else 16,
+                "code_px": READING_PX["editor"],
             }
         _TRIAL_MEMO[n] = _trial
         return _trial
@@ -1852,6 +1897,7 @@ def _(DUEL_WIDTH, POOL, SURFACES, math, np, prior_mean, qmc, random, realize):
         axis_consensus,
         best_set,
         candidates,
+        factor_effect,
         fitted,
         mu_at,
         posterior_joint,
@@ -2423,6 +2469,7 @@ def _(
     AXES,
     DE_MIN,
     axis_consensus,
+    factor_effect,
     POOL,
     THRESH_DETAIL,
     VISION_N,
@@ -2580,6 +2627,12 @@ def _(
                 # panel and a notebook, then converging one theme onto all three averages
                 # over a real difference instead of resolving it.
                 _sn, _sd_gain, _sp, _sv = surface_effect(_log, _pol)
+                # Duels used to run at 12-13px, which is a size he never reads code at; they
+                # now run at the size he reads each surface at (14 in editors, 16 in notebook
+                # cells). That pools two stimulus regimes in one log, so the same test asks
+                # whether they can be pooled: a code_px interaction means the older small-type
+                # duels are answering a different question and should be discounted.
+                _zn, _zd, _zp, _zv = factor_effect(_log, _pol, "code_px")
                 if _sn < 24:
                     _surf_note = (
                         f" Surface (editor / panel / notebook) is logged but only {_sn} {_pol} duels "
@@ -2593,16 +2646,32 @@ def _(
                         f"the notebook want different pages."
                     )
                 elif _sp < 0.10:
+                    # Two stimulus factors are tested here (surface, type size) across two
+                    # polarities, so about one reading in every two or three sittings lands
+                    # this side of 0.10 with nothing real behind it. Saying so is the
+                    # difference between a finding and a coincidence with a p-value.
                     _surf_note = (
                         f" Surface may matter: a per-surface tilt earns {_sd_gain:+.3f} nats/duel "
-                        f"held out (p = {_sp:.3f} over {_sn} duels) — suggestive, not established. "
-                        f"Duels are surface-balanced in groups of three, so this reading sharpens on "
-                        f"its own; worth re-reading around twice this many."
+                        f"held out (p = {_sp:.3f} over {_sn} duels) — suggestive, not established, "
+                        f"and one of four such factor readings, of which roughly one lands here by "
+                        f"chance anyway. Duels are surface-balanced in groups of three, so this "
+                        f"sharpens on its own; worth re-reading at about twice this many duels."
                     )
                 else:
                     _surf_note = (
                         f" No surface effect this data can see (p = {_sp:.2f} over {_sn} duels), so "
                         f"one theme across editor, panel and notebook remains the right shape of answer."
+                    )
+                if _zn >= 24 and _zp < 0.10:
+                    _surf_note += (
+                        f" Type size also tilts the answer (p = {_zp:.3f} over {_zn} duels): the "
+                        f"early duels judged at 12-13px are measuring a different question from "
+                        f"those at his real 14 and 16, and should carry less weight."
+                    )
+                elif _zn >= 24:
+                    _surf_note += (
+                        f" Duels judged at different type sizes agree (p = {_zp:.2f}), so the early "
+                        f"12-13px rounds pool safely with the ones at his real reading sizes."
                     )
                 # What the plateau actually disagrees about. Without this, four pages that
                 # share a ground and differ only in accent hue read as "four identical

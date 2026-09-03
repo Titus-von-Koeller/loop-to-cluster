@@ -78,6 +78,7 @@ def load_model():
             "realize": lambda th, pol: {"ok": True},
             "mo": types.SimpleNamespace(),
             "SURFACES": ("editor", "panel", "notebook"),
+            "READING_PX": {"editor": 14, "panel": 14, "notebook": 16},
             "DUEL_WIDTH": 64,
         }
         exec(compile(ast.Module(body=body, type_ignores=[]), "<model-cell>", "exec"), ns)
@@ -501,6 +502,47 @@ def main() -> int:
         "the settled axis reports where it settled",
         abs(m0 - 0.8) < 0.05,
         f"posterior-weighted mean of the settled axis {m0:.3f} against a planted 0.80",
+    )
+
+    print("\nT15 -- a change of type size does not land on the theme surface")
+
+    def timed_rows(n=48, size_step=0.0, seed=3):
+        """Half the trials at 15px, half at 14px, with a planted size effect of size_step
+        log-seconds. The THEME effect is identical in both halves, so a model that absorbs
+        the size step recovers the same surface either way."""
+        r = np.random.default_rng(seed)
+        rows = []
+        for i in range(n):
+            th = r.random(9)
+            px = 15.0 if i < n // 2 else 14.0
+            base = 1.4 - 0.5 * th[0] + (size_step if px == 14.0 else 0.0)
+            rows.append(
+                {
+                    "mode": "comprehension" if i % 2 else "search",
+                    "polarity": "day",
+                    "theta_a": list(map(float, th)),
+                    "correct": True,
+                    "paused": False,
+                    "code_px": px,
+                    "rt_ms": float(np.exp(base + r.normal(0, 0.18)) * 1000),
+                }
+            )
+        return rows
+
+    def surface_corr(rows):
+        rf = M["rt_fit"](rows, "day", None)
+        rg = np.random.default_rng(11)
+        grid = [rg.random(9) for _ in range(300)]
+        mu = M["rt_at"](rf, grid, "day")[0]
+        truth = np.array([1.4 - 0.5 * g[0] for g in grid])
+        return float(np.corrcoef(mu, truth)[0, 1])
+
+    c_flat = surface_corr(timed_rows(size_step=0.0))
+    c_step = surface_corr(timed_rows(size_step=0.45))
+    check(
+        "a 0.45 log-second size step costs the surface nothing",
+        c_step > c_flat - 0.08,
+        f"corr with truth {c_step:.3f} with the step against {c_flat:.3f} without it",
     )
 
     print("\n" + ("all recovery tests pass" if not fails else f"FAILED: {fails}"))
