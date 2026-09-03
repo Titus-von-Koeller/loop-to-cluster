@@ -602,10 +602,13 @@ agg_item = agg.item()
             }
         )
 
+    # Filler prose so the page is judged as a page (serif reading text above code) —
+    # deliberately plain and unrelated to the instrument, since a sentence about theming
+    # invites judging the claim instead of the type. Should become fresh-per-trial text
+    # from the same corpus as the code, for the same reason the snippets must be fresh.
     _PROSE = (
-        "The palette carries the data; the page carries the palette. A theme is judged in "
-        "the reading — the same tokens, the same light, the same hour you actually work — "
-        "never in the swatch."
+        "A buffer is filled once per frame and drained by the consumer thread; the queue "
+        "length bounds how far the two can drift apart before a reader blocks."
     )
 
     def render_card(theme, snippet, code_px, find_current=None, task=False, prose=True):
