@@ -46,6 +46,7 @@ change that degrades an instrument is the expensive kind of mistake:
 from __future__ import annotations
 
 import ast
+import math
 import sys
 import types
 from pathlib import Path
@@ -70,6 +71,7 @@ def load_model():
         ns = {
             "np": np,
             "qmc": qmc,
+            "math": math,
             "random": __import__("random"),
             "POOL": {"day": [(t, {"ok": True}) for t in POOL_THETA], "night": []},
             "prior_mean": lambda th, pol: 0.0,
@@ -193,6 +195,39 @@ def low_dim(seed, active=(1, 4, 7)):
     return u
 
 
+def synth_timed(n, active=(2, 5), offset=0.0, noise=0.25, seed=3, hunt_share=0.4):
+    """Timed trials from an observer whose reading speed depends on a few theme axes.
+
+    `offset` is a per-arm task difference in log seconds -- a find hunt highlights its
+    matches and is genuinely faster than a cold probe -- injected so the surface can be
+    checked for attributing it to the theme instead of the task.
+    """
+    r = np.random.default_rng(seed)
+    w = np.zeros(9)
+    for a in active:
+        w[a] = 1.0
+
+    def truth(theta):
+        return 0.9 + 0.6 * float(w @ np.asarray(theta))
+
+    rows = []
+    for _ in range(n):
+        th = r.random(9)
+        hunt = r.random() < hunt_share
+        y = truth(th) - (offset if hunt else 0.0) + r.normal(0, noise)
+        rows.append(
+            {
+                "mode": "search" if hunt else "comprehension",
+                "polarity": "day",
+                "theta_a": list(map(float, th)),
+                "correct": True,
+                "paused": False,
+                "rt_ms": float(np.exp(y) * 1000.0),
+            }
+        )
+    return rows, truth
+
+
 def main() -> int:
     fails = []
 
@@ -256,6 +291,78 @@ def main() -> int:
         res["bred"][0] > res["pool"][0],
         f"argmax bred {res['bred'][0]:.2f} vs pool {res['pool'][0]:.2f}; "
         f"ARD found the active axes in {res['bred'][1]}/4 runs",
+    )
+
+    print("\nT7/T8 -- the legibility surface")
+    rows, truth = synth_timed(90, seed=5, offset=0.0)
+    rf = M["rt_fit"](rows, "day", None)
+    probe = [np.random.default_rng(900 + i).random(9) for i in range(300)]
+    pred, _ = M["rt_at"](rf, probe, "day")
+    true = np.array([truth(t) for t in probe])
+    rho = float(np.corrcoef(pred, true)[0, 1])
+    check("rt surface recovers reading speed", rho > 0.5, f"corr(predicted, true log-time) = {rho:.2f}")
+
+    # The same truth, but with the two arms 0.55 log-seconds apart. A single pooled mean
+    # would push that constant into the theme surface; per-arm means should not.
+    rows_off, truth_off = synth_timed(90, seed=5, offset=0.55)
+    rf_off = M["rt_fit"](rows_off, "day", None)
+    pred_off, _ = M["rt_at"](rf_off, probe, "day")
+    rho_off = float(np.corrcoef(pred_off, np.array([truth_off(t) for t in probe]))[0, 1])
+    check(
+        "per-arm baselines absorb the task offset",
+        rho_off > rho - 0.12,
+        f"corr {rho_off:.2f} with a 0.55 log-s arm offset vs {rho:.2f} without",
+    )
+
+    # The constraint must exclude the genuinely slow and spare the genuinely fast.
+    excl, _secs = M["rt_penalty"](rf, probe, "day")
+    if excl.any():
+        slow_rank = float(np.mean([np.mean(true[excl] > t) for t in true[~excl]]))
+        check(
+            "excluded candidates are the slow ones",
+            slow_rank > 0.75,
+            f"{int(excl.sum())} excluded, and an excluded page is slower than "
+            f"{100 * slow_rank:.0f}% of the kept ones on the truth",
+        )
+    else:
+        check("constraint is conservative when unsure", True, "nothing excluded at this noise")
+
+    print("\nT9 -- grouping before counting P(best)")
+    X, duels, lam, m, sides, w = synth_duels(300, active=(0, 3, 6), seed=8)
+    responses = []
+    for (a, b), sd in zip(duels, sides, strict=True):
+        responses.append(
+            {
+                "mode": "duel",
+                "choice": 0,
+                "theta_a": list(map(float, X[a][:9])),
+                "theta_b": list(map(float, X[b][:9])),
+                "polarity": "day",
+                "rt_ms": 3000.0,
+                "swap": sd < 0,
+            }
+        )
+    fit = M["fitted"](responses)
+    base = np.random.default_rng(11).random(9)
+    clones = [np.clip(base + np.random.default_rng(50 + i).normal(0, 0.004, 9), 0, 1) for i in range(20)]
+    spread = [np.random.default_rng(80 + i).random(9) for i in range(20)]
+    bs = M["best_set"](fit, "day", clones + spread, seed=3)
+    n_clone_groups = len({int(np.argmin([np.linalg.norm(np.asarray(g) - c) for g in bs["groups"]])) for c in clones})
+    check(
+        "near-identical themes count once",
+        n_clone_groups <= 2 and len(bs["groups"]) <= 25,
+        f"20 clones fell into {n_clone_groups} group(s); {len(bs['groups'])} groups from 40 candidates",
+    )
+
+    print("\nT10 -- the convergence readout")
+    prog = M["progress_report"](responses, "day", spread + clones, back=40)
+    check(
+        "progress compares two fits and reports movement",
+        prog is not None and prog["duels"] == 300 and prog["set_now"] >= 1,
+        "None (needs more duels)"
+        if prog is None
+        else f"leader {100 * prog['lead_then']:.0f}% -> {100 * prog['lead_now']:.0f}%, "
+        f"set {prog['set_then']} -> {prog['set_now']} over {prog['back']} duels",
     )
 
     print("\n" + ("all recovery tests pass" if not fails else f"FAILED: {fails}"))

@@ -1745,11 +1745,11 @@ def _(SESSION_START_N, get_responses, mo, random, render_card, run_info, schedul
           // page would be measured in two different conditions.
           const fullCss =
             `background:${model.get("strip_bg")};padding:0;display:flex;` +
-            // Above every piece of marimo's own chrome: its logo sat over the instruction
-            // chip and its scrollbar showed at the edge. A trial that takes the screen
-            // takes all of it -- stacking below the host's furniture and then padding
-            // around it would be a hack that breaks whenever the host moves something.
-            `flex-direction:column;gap:0;position:fixed;inset:0;z-index:2147483000;` +
+            // Above every piece of marimo's own chrome (its logo sat over the instruction
+            // chip, its scrollbar showed at the edge) and, since the stage is parented to
+            // <body>, outside marimo's stacking context rather than merely bidding against
+            // it. The frame fills the stage; the stage owns the position.
+            `flex-direction:column;gap:0;position:absolute;inset:0;` +
             `box-sizing:border-box;color:${model.get("ink")}`;
           wrap.style.cssText = inlineCss;
           const setFrame = (full) => {
@@ -1759,9 +1759,31 @@ def _(SESSION_START_N, get_responses, mo, random, render_card, run_info, schedul
             // inside one of marimo's. Moving the frame to the root context is the fix that
             // holds however the host rearranges its own furniture; it returns to its slot
             // when the frame goes inline, so nothing leaks.
-            if (full && wrap.parentElement !== document.body) {
-              document.body.appendChild(wrap);
+            if (full) {
+              // A PERSISTENT stage owned by the page, not by the widget. The widget is torn
+              // down and rebuilt for every trial, and removing the frame each time left a
+              // gap in which marimo's own loading placeholders showed through -- Titus:
+              // "the loading graphic with the weird transparent things". The stage survives
+              // the gap holding the previous trial, and the next render swaps its contents
+              // in one step, so the screen is never anything but a trial. It also keeps its
+              // ground colour, so even a slow kernel shows a uniform page rather than
+              // chrome.
+              let host = document.getElementById("theme-trial-stage");
+              if (!host) {
+                host = document.createElement("div");
+                host.id = "theme-trial-stage";
+                document.body.appendChild(host);
+              }
+              host.style.cssText =
+                "position:fixed;inset:0;z-index:2147483000;background:" + model.get("strip_bg");
+              if (wrap.parentElement !== host) {
+                host.replaceChildren(wrap);
+              }
             } else if (!full && wrap.parentElement !== el) {
+              const host = document.getElementById("theme-trial-stage");
+              if (host) {
+                host.remove();
+              }
               el.appendChild(wrap);
             }
             wrap.style.cssText = full ? fullCss : inlineCss;
@@ -1966,9 +1988,10 @@ def _(SESSION_START_N, get_responses, mo, random, render_card, run_info, schedul
             // keypress answering several) and a frame left parented to <body> would sit
             // over the next trial as an orphan.
             document.removeEventListener("keydown", onKey);
-            if (wrap.parentElement === document.body) {
-              wrap.remove();
-            }
+            // The stage is deliberately NOT removed here: leaving the last trial on screen
+            // is what stops the loading placeholders from flashing between trials. The next
+            // render replaces its contents; the inline path removes it when a trial is
+            // gated and the page should be reachable again.
           };
         }
         export default { render };
