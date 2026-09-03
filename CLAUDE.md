@@ -196,6 +196,11 @@ pedagogy.md) are proposed to Titus, never self-ratified — and a proposal he ha
 on is parked below rather than left to die with the conversation. A friction met twice is a
 documentation bug.
 
+This file is one reef among several: **the global reef map** — the registry of every living
+knowledge file across his machine and projects, and the tending protocol that maintains
+them — lives in the `titus-preferences` skill. Founding, moving, or retiring any reef
+updates that map in the same commit.
+
 **Queue** (work Titus has named but not yet aimed a session at; take an item only on his go):
 
 - The full polish pass over 01 and 05–08: **COMPLETE 2026-09-02** — 01 fcbbed4, 05 108479e,
