@@ -117,8 +117,9 @@ Two operational corollaries, both applied and liked:
   code share a central axis, not an edge (Titus dropped the shared-edge constraint: moving
   to code is a context switch anyway; symmetric margins read calmer than a one-sided
   desert). Prose sits on the page, only machine artifacts are cards — and **elevation
-  tracks open state**: an expanded cell is raised, a collapsed one flattens into the page,
-  so under fold hygiene the raised card follows the reader's focus for free.
+  tracks open state, never selection** (Titus, confirmed): every expanded cell carries the
+  identical shadow, every collapsed one flattens into the page. Under fold hygiene the
+  raised card happens to follow the reader's focus — emergent, not the rule.
 - **Shadows in a flat design**: y-offset only (light from top-center), two layers (tight
   contact + wide ambient), alphas low, tinted with the page's darkened hue on warm paper —
   never gray-black. **Negative spread on both layers** (`0 5px 14px -6px`): side chrome

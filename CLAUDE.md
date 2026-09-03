@@ -201,7 +201,10 @@ knowledge file across his machine and projects, and the tending protocol that ma
 them — lives in the `titus-preferences` skill. Founding, moving, or retiring any reef
 updates that map in the same commit.
 
-**Queue** (work Titus has named but not yet aimed a session at; take an item only on his go):
+**Queue** (work Titus has named but not yet aimed a session at; take an item only on his go).
+This queue is the operational truth — resume points and mechanics; the owner-level ledger is
+`~/src/orga/membrane/inbox.md` (local-only, never push), where each deferred program carries a
+one-line spark. When a queue item is opened, closed, or founded, mirror the one-liner there:
 
 - The full polish pass over 01 and 05–08: **COMPLETE 2026-09-02** — 01 fcbbed4, 05 108479e,
   06 fcfb57b, 07 baad8e5, 08 ee20cb2, all pushed; salvage stash dropped after both halves
