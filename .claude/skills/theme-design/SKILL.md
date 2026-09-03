@@ -244,6 +244,21 @@ interact, and choose the best combination — every step from measurement.
   it. Say how many were run, keep a genuine negative control among them (code kind, which
   should not move a colour preference and does not: p = 0.58 and 0.27), and let the
   multiplicity appear in the sentence rather than in a footnote nobody reads.
+- **Publish the measured answer to a file; never make a human retype it.** The analysis
+  printed twelve hex codes per polarity to paste into settings.jsonc, which made the last
+  step of a measured pipeline the only unmeasured one — the failure mode is a dropped digit
+  nobody notices for a week. The instrument writes `measured-theme.json` (palette plus the
+  verdict and its confidence, so a consumer can see it is a plateau leader at 18% rather
+  than the answer) and `apply-measured-theme` rewrites marked regions of settings.jsonc.
+  Dry run by default: which theme he lives in is his call, not the model's. The applier
+  validates the result as JSONC and refuses to write if it does not parse — a broken
+  settings.jsonc is a broken editor.
+- **textMate rules are LAST-WINS among equally specific scopes.** A generated block must go
+  at the END of `textMateRules`; inserted at the top, where the obvious anchor puts it,
+  every hand-written rule below overrides it and the change appears to apply while doing
+  nothing. Scope specificity still beats order, which is usually what you want: a
+  hand-written `variable.parameter` survives a generated `variable`, so refinements the
+  instrument does not model (the body-versus-definition split) are not flattened by it.
 - A surface's beauty is allowed to vote and never to overrule the instruments; Titus's eyes
   outrank both — his comparison across a gallery row is the final measurement.
 - Verify a theme change by **pixel-sampling a screenshot against the expected hexes**, never by
