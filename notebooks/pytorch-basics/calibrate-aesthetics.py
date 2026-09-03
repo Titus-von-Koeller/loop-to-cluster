@@ -1606,7 +1606,17 @@ def _(DUEL_WIDTH, POOL, math, np, prior_mean, qmc, random, realize):
                 _bred = candidates(_fit, _pol, _nprng, n_trial=n)[0]
                 _mu, _var, _ks, _A = _posterior_over(_fit, [_b[0] for _b in _bred], _pol)
                 _samp = _mu + np.sqrt(_var) * _nprng.standard_normal(len(_mu))
-                _ta, _tha = _bred[int(np.argmax(_samp))]
+                # Among the pages he might plausibly live in (the top of a Thompson draw),
+                # probe the one whose reading time the model is least sure of. Probing a
+                # page he would never choose measures legibility nobody will use; probing
+                # the champion again measures what is already known.
+                _top_idx = np.argsort(-_samp)[: max(8, len(_samp) // 20)]
+                _rf_now = rt_fit(_hist, _pol, _fit.get("ls"))
+                if _rf_now is not None:
+                    _vv = rt_at(_rf_now, [_bred[int(_i)][0] for _i in _top_idx], _pol)[1]
+                    _ta, _tha = _bred[int(_top_idx[int(np.argmax(_vv))])]
+                else:
+                    _ta, _tha = _bred[int(np.argmax(_samp))]
             else:
                 _ta, _tha = _pool[_rng.randrange(len(_pool))]
             # Comprehension probes require a CALL-site target (Titus spotted this): a name
@@ -1641,10 +1651,30 @@ def _(DUEL_WIDTH, POOL, math, np, prior_mean, qmc, random, realize):
                 _base = np.array(_bred[int(np.argmax(_mu))][0])
             else:
                 _base = np.array(_pool[_rng.randrange(len(_pool))][0])
-            # Sweep the find axes over their whole range on an otherwise-fixed page: the
-            # regression of time-to-find on predicted salience needs coverage, not comfort.
+            # Sweep the find axes where the LEGIBILITY SURFACE is least certain, not
+            # uniformly. Measured after 29 uniform hunts: the surface's posterior sd along
+            # these axes (~0.38 log-units, a factor of 1.5 in time) dwarfed the effect it
+            # was trying to see (a 10-15% swing), so uniform coverage was not identifying
+            # them -- while ax8 meanwhile ranks second of nine for PREFERENCE, so the
+            # question is worth answering. Uncertainty sampling is the standard active
+            # choice for a GP regression and costs one posterior evaluation over a grid.
+            # A quarter of hunts stay uniform, because an acquisition that only ever probes
+            # its own uncertainty can leave a region unvisited that it is wrongly confident
+            # about.
             _bt = _base.copy()
-            _bt[7], _bt[8] = _rng.random(), _rng.random()
+            _rf_now = rt_fit(_hist, _pol, _fit.get("ls") if _fit else None)
+            if _rf_now is not None and _rng.random() > 0.25:
+                _g = np.linspace(0.05, 0.95, 7)
+                _cands_h = []
+                for _v7 in _g:
+                    for _v8 in _g:
+                        _c = _base.copy()
+                        _c[7], _c[8] = _v7, _v8
+                        _cands_h.append(_c)
+                _var_h = rt_at(_rf_now, _cands_h, _pol)[1]
+                _bt = _cands_h[int(np.argmax(_var_h))]
+            else:
+                _bt[7], _bt[8] = _rng.random(), _rng.random()
             _tha = realize(_bt, _pol)
             if _tha is None:
                 _idx = _rng.randrange(len(_pool))

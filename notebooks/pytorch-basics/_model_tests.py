@@ -365,6 +365,59 @@ def main() -> int:
         f"set {prog['set_then']} -> {prog['set_now']} over {prog['back']} duels",
     )
 
+    print("\nT11 -- active hunting beats uniform sweeps")
+
+    def hunt_run(strategy, n=40, seed=1, noise=0.22):
+        base = POOL_THETA[3].copy()
+
+        def truth(th):
+            return 1.5 - 0.5 * th[7] - 0.35 * th[8] + 0.3 * th[7] * th[8]
+
+        r = np.random.default_rng(seed)
+        rows = []
+        for _ in range(n):
+            rf = M["rt_fit"](rows, "day", None) if len(rows) >= 8 else None
+            if strategy == "active" and rf is not None and r.random() > 0.25:
+                g = np.linspace(0.05, 0.95, 7)
+                cands = []
+                for v7 in g:
+                    for v8 in g:
+                        c = base.copy()
+                        c[7], c[8] = v7, v8
+                        cands.append(c)
+                th = cands[int(np.argmax(M["rt_at"](rf, cands, "day")[1]))]
+            else:
+                th = base.copy()
+                th[7], th[8] = r.random(), r.random()
+            rows.append(
+                {
+                    "mode": "search",
+                    "polarity": "day",
+                    "theta_a": list(map(float, th)),
+                    "correct": True,
+                    "paused": False,
+                    "rt_ms": float(np.exp(truth(th) + r.normal(0, noise)) * 1000),
+                }
+            )
+        rf = M["rt_fit"](rows, "day", None)
+        rg = np.random.default_rng(99)
+        grid = []
+        for _ in range(400):
+            t = base.copy()
+            t[7], t[8] = rg.random(), rg.random()
+            grid.append(t)
+        mu = M["rt_at"](rf, grid, "day")[0]
+        tv = np.array([truth(t) for t in grid])
+        return float(np.corrcoef(mu, tv)[0, 1])
+
+    uni = float(np.mean([hunt_run("uniform", seed=s) for s in (1, 2, 3, 4, 5)]))
+    act = float(np.mean([hunt_run("active", seed=s) for s in (1, 2, 3, 4, 5)]))
+    check(
+        "uncertainty sampling identifies the find axes faster",
+        act > uni,
+        f"corr(pred, truth) active {act:.3f} vs uniform {uni:.3f} at 40 hunts",
+    )
+
     print("\n" + ("all recovery tests pass" if not fails else f"FAILED: {fails}"))
     return 1 if fails else 0
 
