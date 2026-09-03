@@ -172,54 +172,50 @@ def _():
 @app.cell(hide_code=True)
 def _(graph_of, mo):
     # The viewing vocabulary is shared with the sibling notebooks and lives in _viz.py.
-    # Graphviz takes literal colors, so the node fills are computed from the palette
-    # constants -- each hue mixed toward the card's white -- rather than typed in by hand.
-    import graphviz
+    # mo.mermaid is marimo's native graph surface: it sizes to its content and follows
+    # the reader's theme, where raw graphviz SVG arrived at poster size (graphviz margins
+    # are in INCHES) on a hand-rolled white card. Node fills stay computed from the
+    # palette constants; each node carries its own light fill, so the label ink is the
+    # calibrated dark regardless of the page.
     from _palette import tint
     from _viz import ACCENT, BASE, INK_DARK, OKABE_ITO, show
 
     def draw(root, named):
-        """Hand graph_of's findings to graphviz.
+        """Hand graph_of's findings to mermaid.
 
         The three node kinds are told apart by shape first and color second: a rectangle,
-        an oval and a doubled outline survive color-vision deficiency, and survive printing
-        in gray as well. Labels are the exact class names, so the picture matches what
-        `type(node).__name__` prints.
+        a stadium and a doubled outline survive color-vision deficiency, and survive
+        printing in gray as well. Labels are the exact class names, so the picture
+        matches what `type(node).__name__` prints.
         """
-        dot = graphviz.Digraph()
-        dot.attr(bgcolor="transparent", rankdir="BT", margin="8")
-        dot.attr("node", style="rounded,filled", fontname="Helvetica", fontsize="11", fontcolor=INK_DARK)
-        dot.attr("edge", color=tint(INK_DARK, 0.45))
         nodes, edges = graph_of(root)
+        green = OKABE_ITO["green"]
+        lines = ["flowchart BT"]
         for node in nodes.values():
             kind = type(node).__name__
+            nid = f"n{id(node)}"
             if kind == "AccumulateGrad":
-                label = f"{named.get(id(node.variable), 'leaf')}\\n{tuple(node.variable.shape)}"
-                green = OKABE_ITO["green"]
-                dot.node(str(id(node)), label, shape="oval", fillcolor=tint(green, 0.82), color=green)
+                label = f"{named.get(id(node.variable), 'leaf')}<br/>{tuple(node.variable.shape)}"
+                lines.append(f'{nid}(["{label}"]):::leaf')
             elif node is root.grad_fn:
-                dot.node(str(id(node)), kind, shape="box", peripheries="2", fillcolor=tint(ACCENT, 0.82), color=ACCENT)
+                lines.append(f'{nid}[["{kind}"]]:::root')
             else:
-                dot.node(str(id(node)), kind, shape="box", fillcolor=tint(BASE, 0.82), color=BASE)
-        for producer, consumer in edges:
-            dot.edge(str(id(producer)), str(id(consumer)))
-        return dot
+                lines.append(f'{nid}["{kind}"]:::op')
+        lines += [f"n{id(p)} --> n{id(c)}" for p, c in edges]
+        lines += [
+            f"classDef leaf fill:{tint(green, 0.82)},stroke:{green},color:{INK_DARK}",
+            f"classDef root fill:{tint(ACCENT, 0.82)},stroke:{ACCENT},color:{INK_DARK}",
+            f"classDef op fill:{tint(BASE, 0.82)},stroke:{BASE},color:{INK_DARK}",
+            f"linkStyle default stroke:{tint(INK_DARK, 0.45)}",
+        ]
+        return mo.mermaid("\n".join(lines))
 
-    def as_svg(dot):
-        # On its own white card: a graph drawn in dark ink should not inherit whatever
-        # page color the reader's theme paints.
-        svg = dot.pipe(format="svg").decode()
-        return mo.Html(
-            '<div style="background:white;border-radius:8px;padding:12px;display:inline-block">'
-            f"{svg[svg.index('<svg') :]}</div>"
-        )
-
-    return as_svg, draw, show
+    return draw, show
 
 
 @app.cell(hide_code=True)
-def _(as_svg, b, draw, loss, w):
-    as_svg(draw(loss, {id(w): "w", id(b): "b"}))
+def _(b, draw, loss, w):
+    draw(loss, {id(w): "w", id(b): "b"})
     return
 
 
@@ -403,7 +399,7 @@ def _(torch, track_b, track_w, under_no_grad, x, y):
 
 
 @app.cell(hide_code=True)
-def _(as_svg, b_live, draw, loss_live, mo, w_live):
+def _(b_live, draw, loss_live, mo, w_live):
     if loss_live.grad_fn is None:
         _drawing = mo.callout(
             mo.md(
@@ -414,7 +410,7 @@ def _(as_svg, b_live, draw, loss_live, mo, w_live):
             kind="neutral",
         )
     else:
-        _drawing = as_svg(draw(loss_live, {id(w_live): "w", id(b_live): "b"}))
+        _drawing = draw(loss_live, {id(w_live): "w", id(b_live): "b"})
     _drawing
     return
 
