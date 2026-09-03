@@ -1615,8 +1615,11 @@ def _(SESSION_START_N, get_responses, mo, random, render_card, run_info, schedul
             const card = document.createElement("div");
             card.innerHTML = c.html;
             card.style.cssText = isDuel
-              ? `background:${c.ground};padding:24px;flex:1 1 0;min-width:0;` +
-                `overflow:hidden;display:flex;align-items:center;justify-content:center`
+              // Content at the top-left of its half, not centred: an editor page starts
+              // there, and a block floating mid-field is a picture of a card rather than
+              // of the surface being judged (the standalone render made it obvious).
+              ? `background:${c.ground};padding:34px 40px;flex:1 1 0;min-width:0;` +
+                `overflow:hidden;display:flex;align-items:flex-start;justify-content:flex-start`
               : `background:${c.ground};border-radius:10px;padding:20px;` +
                 `flex:1 1 0;min-width:0;overflow:hidden`;
             if (isDuel) {
