@@ -74,10 +74,11 @@ def _():
     import colour
     import numpy as np
     import pandas as pd
+    from scipy.stats import qmc
 
     LOG = Path(__file__).parent / "aesthetics-responses.jsonl"
     VISION_LOG = Path(__file__).parent / "calibration-responses.jsonl"
-    return LOG, VISION_LOG, colour, datetime, json, math, np, pd, random, timezone
+    return LOG, VISION_LOG, colour, datetime, json, math, np, pd, qmc, random, timezone
 
 
 @app.cell(hide_code=True)
@@ -663,19 +664,60 @@ def _(LOG, json, mo):
 
 
 @app.cell(hide_code=True)
-def _(POOL, np, prior_mean, random, realize):
+def _(POOL, np, prior_mean, qmc, random, realize):
     # The preference model: a Gaussian process over theme space with a Bradley-Terry
     # likelihood on duels, fit by Laplace approximation — Chu & Ghahramani's preferential
     # GP, QUEST+'s generate-the-most-informative-trial loop on top. Reaction time enters
     # the likelihood drift-diffusion-style: decision time falls as the utility gap grows,
     # so a fast click steepens that duel's slope and a slow one flattens it toward a tie.
-    _LS = np.array([0.35] * 9 + [0.9])
+    # Length-scales are ARD: one per axis, estimated from the data rather than fixed, so
+    # axes his choices ignore get long scales and stop costing sample efficiency. Nine
+    # dimensions at ~100 duels is the binding constraint on how fast this converges, and
+    # ARD is the cheapest honest way to shrink the effective dimension.
+    _LS0 = np.array([0.35] * 9 + [0.9])
     _SF2 = 4.0
 
-    def _kmat(A, B):
-        _d2 = (((A[:, None, :] - B[None, :, :]) / _LS) ** 2).sum(-1)
+    def _kmat(A, B, ls=None):
+        _l = _LS0 if ls is None else ls
+        _d2 = (((A[:, None, :] - B[None, :, :]) / _l) ** 2).sum(-1)
         _r = np.sqrt(_d2 + 1e-12)
         return _SF2 * (1 + np.sqrt(5) * _r + 5 * _r**2 / 3) * np.exp(-np.sqrt(5) * _r)
+
+    def _ard_scales(X, duels, lam):
+        """Per-axis length-scales from a ridge-regularized linear Bradley-Terry fit.
+
+        The principled route is maximizing the Laplace log-marginal-likelihood over ten
+        log-length-scales, which costs a hundred-odd GP refits per trial and would make
+        the instrument wait on itself. A linear BT model on the winner-minus-loser axis
+        differences is the same question asked cheaply -- which axes move his choices --
+        and its coefficient magnitudes plug straight in as relevances. Empirical-Bayes
+        shortcut, deliberately: the fit runs in milliseconds and the GP keeps the
+        nonlinearity.
+        """
+        # Shrinkage toward isotropy, because relevance is not identifiable early: with 60
+        # duels the estimated ranking of nine axes was measured to be noise (0 of 4
+        # simulated runs recovered the truly active axes, against reliable recovery at
+        # 400). Blending toward the isotropic default with weight n/160 keeps a thin log
+        # from distorting the kernel and converges on full ARD as duels accumulate.
+        if len(duels) < 12:
+            return _LS0.copy()
+        _w_ard = min(1.0, len(duels) / 160.0)
+        _D = np.array([(X[_w] - X[_l]) * _lm for (_w, _l), _lm in zip(duels, lam, strict=True)])
+        _w = np.zeros(_D.shape[1])
+        for _ in range(60):
+            _p = 1.0 / (1.0 + np.exp(-(_D @ _w)))
+            _g = _D.T @ (1.0 - _p) - 2.0 * _w
+            _H = -(_D.T * (_p * (1 - _p))) @ _D - 2.0 * np.eye(_D.shape[1])
+            _step = np.linalg.solve(_H, -_g)
+            _w = _w + _step
+            if np.abs(_step).max() < 1e-10:
+                break
+        _rel = np.abs(_w) / max(float(np.abs(_w).max()), 1e-9)
+        _ls = 0.30 / np.sqrt(np.clip(_rel, 0.10, 1.0))
+        _ls = np.clip(_ls, 0.25, 1.4)
+        _ls = (1.0 - _w_ard) * _LS0 + _w_ard * _ls
+        _ls[9] = 0.9
+        return _ls
 
     def _coords(theta, polarity):
         return np.concatenate([np.asarray(theta, dtype=float), [1.0 if polarity == "night" else 0.0]])
@@ -683,7 +725,7 @@ def _(POOL, np, prior_mean, random, realize):
     def duels_from(responses):
         """(X, duel index pairs, per-duel slopes, prior mean at X) from the log's duels."""
         _pts, _index = [], {}
-        _duels, _rts, _paused = [], [], []
+        _duels, _rts, _paused, _sides = [], [], [], []
         for _r in responses:
             if _r.get("mode") != "duel" or _r.get("choice") not in (0, 1):
                 continue
@@ -699,6 +741,12 @@ def _(POOL, np, prior_mean, random, realize):
             _duels.append((_win, _lose))
             _rts.append(float(_r.get("rt_ms", 2500.0)))
             _paused.append(bool(_r.get("paused")))
+            # Which SIDE the winner was displayed on. Measured 2026-09-03 over 79 duels:
+            # he picks the right-hand card 61% of the time (z = -1.91 against no bias).
+            # Unmodelled, that lands on the utility as noise; as a fitted term it is
+            # subtracted out. Reconstructible from the log, so no past duel is wasted.
+            _shown = (1 - _r["choice"]) if _r.get("swap") else _r["choice"]
+            _sides.append(1.0 if _shown == 0 else -1.0)
         if not _pts:
             return None
         _X = np.array(_pts)
@@ -710,40 +758,80 @@ def _(POOL, np, prior_mean, random, realize):
         # at the neutral slope, neither sharpened nor flattened by the clock.
         _lam[_paused] = 1.0
         _m = np.array([prior_mean(_x[:9], "night" if _x[9] > 0.5 else "day") for _x in _X])
-        return _X, _duels, _lam, _m
+        return _X, _duels, _lam, _m, np.array(_sides)
 
-    def fit_laplace(X, duels, lam, m):
+    def fit_laplace(X, duels, lam, m, sides=None, ls=None):
+        """Laplace posterior over utilities, alternating with the position-bias term.
+
+        delta is one number shared by every duel: the log-odds advantage of the card on
+        the left. f and delta are identifiable because side is randomized independently
+        of theme, and they are fitted by alternation -- f given delta by Newton, then
+        delta given f by its own one-dimensional Newton -- which converges in two or
+        three rounds at this scale.
+        """
         _n = len(X)
-        _K = _kmat(X, X) + 1e-6 * np.eye(_n)
+        _K = _kmat(X, X, ls) + 1e-6 * np.eye(_n)
         _Ki = np.linalg.inv(_K)
         _f = m.copy()
         _W = np.zeros((_n, _n))
-        for _ in range(60):
-            _g = np.zeros(_n)
-            _W[:] = 0.0
-            for (_w, _l), _lm in zip(duels, lam, strict=True):
-                _z = _lm * (_f[_w] - _f[_l])
-                _p = 1.0 / (1.0 + np.exp(-_z))
-                _g[_w] += _lm * (1 - _p)
-                _g[_l] -= _lm * (1 - _p)
-                _q = _lm * _lm * _p * (1 - _p)
-                _W[_w, _w] += _q
-                _W[_l, _l] += _q
-                _W[_w, _l] -= _q
-                _W[_l, _w] -= _q
-            _step = np.linalg.solve(_Ki + _W, _g - _Ki @ (_f - m))
-            _f = _f + _step
-            if np.abs(_step).max() < 1e-8:
+        _sd = np.zeros(len(duels)) if sides is None else np.asarray(sides, dtype=float)
+        _delta = 0.0
+        for _round in range(3):
+            for _ in range(60):
+                _g = np.zeros(_n)
+                _W[:] = 0.0
+                for _k, ((_w, _l), _lm) in enumerate(zip(duels, lam, strict=True)):
+                    _z = _lm * (_f[_w] - _f[_l]) + _delta * _sd[_k]
+                    _p = 1.0 / (1.0 + np.exp(-_z))
+                    _g[_w] += _lm * (1 - _p)
+                    _g[_l] -= _lm * (1 - _p)
+                    _q = _lm * _lm * _p * (1 - _p)
+                    _W[_w, _w] += _q
+                    _W[_l, _l] += _q
+                    _W[_w, _l] -= _q
+                    _W[_l, _w] -= _q
+                _step = np.linalg.solve(_Ki + _W, _g - _Ki @ (_f - m))
+                _f = _f + _step
+                if np.abs(_step).max() < 1e-8:
+                    break
+            if sides is None or len(duels) < 12:
                 break
+            _gap = np.array([_lm * (_f[_w] - _f[_l]) for (_w, _l), _lm in zip(duels, lam, strict=True)])
+            for _ in range(40):
+                _p = 1.0 / (1.0 + np.exp(-(_gap + _delta * _sd)))
+                _gd = float(_sd @ (1.0 - _p)) - 4.0 * _delta
+                _hd = -float((_sd * _sd) @ (_p * (1 - _p))) - 4.0
+                _d_step = -_gd / _hd
+                _delta = float(np.clip(_delta + _d_step, -2.0, 2.0))
+                if abs(_d_step) < 1e-10:
+                    break
         _cov = np.linalg.inv(_Ki + _W)
-        return _f, _cov, _Ki
+        return _f, _cov, _Ki, _delta
 
-    def predict(X, f, m, cov, Ki, Xs, ms):
-        _ks = _kmat(Xs, X)
+    def predict(X, f, m, cov, Ki, Xs, ms, ls=None):
+        _ks = _kmat(Xs, X, ls)
         _mu = ms + _ks @ (Ki @ (f - m))
         _A = Ki - Ki @ cov @ Ki
         _var = np.maximum(_SF2 - np.einsum("ij,jk,ik->i", _ks, _A, _ks), 1e-9)
         return _mu, _var, _ks, _A
+
+    def posterior_joint(fit, thetas, polarity):
+        """Mean and FULL covariance over candidates -- what P(best) needs.
+
+        Marginal variances cannot answer "which of these is the best theme": candidates
+        near each other in theme space share almost all their uncertainty, and ignoring
+        that correlation would scatter the probability of being best across a cluster of
+        effectively identical pages.
+        """
+        _Xs = np.array([_coords(_t, polarity) for _t in thetas])
+        _ms = np.array([prior_mean(_t, polarity) for _t in thetas])
+        _ls = fit.get("ls")
+        _ks = _kmat(_Xs, fit["X"], _ls)
+        _mu = _ms + _ks @ (fit["Ki"] @ (fit["f"] - fit["m"]))
+        _A = fit["Ki"] - fit["Ki"] @ fit["cov"] @ fit["Ki"]
+        _cov = _kmat(_Xs, _Xs, _ls) - _ks @ _A @ _ks.T
+        _cov = 0.5 * (_cov + _cov.T) + 1e-8 * np.eye(len(thetas))
+        return _mu, _cov
 
     def _h2(p):
         p = np.clip(p, 1e-9, 1 - 1e-9)
@@ -756,19 +844,189 @@ def _(POOL, np, prior_mean, random, realize):
         _X, _duels, _lam, _m = fit["X"], fit["duels"], fit["lam"], fit["m"]
         _Xs = np.array([_coords(_t, polarity) for _t in thetas])
         _ms = np.array([prior_mean(_t, polarity) for _t in thetas])
-        return predict(_X, fit["f"], _m, fit["cov"], fit["Ki"], _Xs, _ms)
+        return predict(_X, fit["f"], _m, fit["cov"], fit["Ki"], _Xs, _ms, fit.get("ls"))
 
     def fitted(responses):
         _d = duels_from(responses)
         if _d is None:
             return None
-        _X, _duels, _lam, _m = _d
-        _f, _cov, _Ki = fit_laplace(_X, _duels, _lam, _m)
-        return {"X": _X, "duels": _duels, "lam": _lam, "m": _m, "f": _f, "cov": _cov, "Ki": _Ki}
+        _X, _duels, _lam, _m, _sides = _d
+        _ls = _ard_scales(_X, _duels, _lam)
+        _f, _cov, _Ki, _delta = fit_laplace(_X, _duels, _lam, _m, _sides, _ls)
+        return {
+            "X": _X,
+            "duels": _duels,
+            "lam": _lam,
+            "m": _m,
+            "f": _f,
+            "cov": _cov,
+            "Ki": _Ki,
+            "ls": _ls,
+            "delta": _delta,
+            "sides": _sides,
+        }
 
     def mu_at(fit, thetas, polarity):
         """Posterior-mean utility at arbitrary thetas — the analysis cell's window in."""
         return _posterior_over(fit, thetas, polarity)[0]
+
+    # ---- candidate generation: global reach PLUS bred refinement --------------------
+    #
+    # The pool was 512 points drawn once with a fixed seed, and the only refinement was 48
+    # jittered children of the single argmax champion. Measured against a synthetic
+    # two-mode utility (see the escape test in the commit that added this), that design
+    # has good REACH -- 512 uniform points cover nine dimensions well enough for Thompson
+    # sampling to discover a distant better mode -- and poor RESOLUTION: nothing can sit
+    # between pool points except near one champion, at a fixed step size.
+    #
+    # The first attempt at fixing it replaced the pool with bred children and lost the
+    # reach, scoring *worse* in simulation. So candidates are now reach and refinement
+    # together, every trial:
+    #
+    #   standing    the full pool plus a SMALL fresh scrambled-Sobol block (64), advanced
+    #               by trial number. The pool is a codebook: revisiting the same points
+    #               concentrates information there and sharpens the posterior, where a
+    #               fully churning candidate set spreads every duel over ground never
+    #               seen again -- measured, a 512-per-trial immigrant flood scored worse
+    #               than no immigrants at all. Sixty-four is the measured sweet spot: a
+    #               trickle of genuinely new ground each trial, never enough to drown the
+    #               codebook, and enough that no region stays permanently unvisited.
+    #   elites      the best already-evaluated themes, chosen for spread as well as for
+    #               posterior mean, so refinement is not confined to one basin.
+    #   mutation    Gaussian children of each elite, per-axis sigma proportional to the
+    #               ARD length-scale: fine steps where utility actually turns, coarse
+    #               where the model has learned that nothing rides.
+    #   crossover   uniform per-axis recombination between elite pairs. Worth having
+    #               because the axes are semi-separable (ground, accent set, comment
+    #               recession, find-highlight): a good ground and a good accent set
+    #               recombine into a plausible page, the building-block case where
+    #               crossover earns its keep rather than adding noise.
+    #
+    # Infeasible children are dropped by the floors rather than penalized, so the whole
+    # candidate set is legible-by-construction.
+    def _sobol_block(n_log2, offset_blocks):
+        """A power-of-two block from one fixed scrambled Sobol sequence.
+
+        Deterministic in the block index, so trial n always draws the same immigrants and
+        successive trials continue the sequence instead of resampling the same clumps.
+        random() rather than random_base2(): the latter also demands that the TOTAL drawn
+        be a power of two, which a fast-forwarded engine cannot satisfy. n itself is a
+        power of two, which is what the balance property needs.
+        """
+        _n = 2**n_log2
+        _eng = qmc.Sobol(d=9, scramble=True, seed=0xC0FFEE)
+        _skip = (offset_blocks * _n) % 65536
+        if _skip:
+            _eng.fast_forward(_skip)
+        return _eng.random(_n)
+
+    def candidates(fit, polarity, nprng, n_trial=0, n_elite=10, n_mut=20, n_cross=48, imm_log2=6):
+        """(candidates, index where the standing global stratum ends) for this trial."""
+        _out, _seen = [], set()
+
+        def _add(_t, _theme=None):
+            _t = np.clip(np.asarray(_t, dtype=float), 0.0, 1.0)
+            _key = tuple(np.round(_t, 4))
+            if _key in _seen:
+                return
+            _th = _theme if _theme is not None else realize(_t, polarity)
+            if _th is None:
+                return
+            _seen.add(_key)
+            _out.append((_t, _th))
+
+        for _t, _theme in POOL[polarity]:
+            _add(_t, _theme)
+        for _imm in _sobol_block(imm_log2, n_trial):
+            _add(_imm)
+        _n_standing = len(_out)
+        if fit is None:
+            return _out, _n_standing
+        _want = 1.0 if polarity == "night" else 0.0
+        _arch = [_x[:9] for _x in fit["X"] if abs(_x[9] - _want) < 0.5]
+        _seed_set = _arch + [_c[0] for _c in _out]
+        _mu = _posterior_over(fit, _seed_set, polarity)[0]
+        _ls = fit.get("ls")
+        _top = np.argsort(-_mu)[: 6 * n_elite]
+        # Elites for spread as well as for mean: the best few, then the most different
+        # among the rest of the leaders, so refinement is not confined to one basin.
+        # Deliberately NOT Thompson-sampled elites: tried, and measured clearly worse
+        # (reach 3/12 runs, t = -2.6). Refining around a high-variance region spends the
+        # mutation budget on noise and displaces elites that are actually good; explore
+        # belongs in the standing stratum, refine belongs where the mean is high.
+        _keep = [int(_i) for _i in _top[: n_elite // 2]]
+        _w = 1.0 / (_LS0[:9] if _ls is None else _ls[:9])
+        _P = np.array([np.asarray(_seed_set[int(_i)]) * _w for _i in _top])
+        _top_list = list(_top)
+        while len(_keep) < n_elite and len(_keep) < len(_top):
+            _chosen = [_top_list.index(_i) for _i in _keep if _i in _top_list]
+            if not _chosen:
+                _chosen = [0]
+            _d = np.min(np.linalg.norm(_P[:, None, :] - _P[None, _chosen, :], axis=-1), axis=1)
+            _d[_chosen] = -1.0
+            _keep.append(int(_top[int(np.argmax(_d))]))
+        _elites = [np.asarray(_seed_set[_i]) for _i in _keep]
+        _sig = 0.25 * (_LS0[:9] if _ls is None else _ls[:9])
+        for _e in _elites:
+            _add(_e)
+            for _child in np.clip(_e[None, :] + nprng.normal(0, _sig, (n_mut, 9)), 0, 1):
+                _add(_child)
+        if len(_elites) >= 2:
+            for _ in range(n_cross):
+                _i, _j = nprng.choice(len(_elites), 2, replace=False)
+                _mask = nprng.random(9) < 0.5
+                _add(np.where(_mask, _elites[_i], _elites[_j]))
+        return _out, _n_standing
+
+    def best_set(fit, polarity, thetas, samples=4096, floor=0.02, seed=0):
+        """P(each theme is THE best) by joint posterior sampling, and the credible set.
+
+        His question is not only "which theme wins" but "is there a set of equally good
+        ones" -- so the answer is a distribution over argmaxes, not a ranking. Sampling
+        the joint posterior (correlations included) gives P(best) directly; the credible
+        best-set is everything with non-negligible mass, and whether one theme is
+        *strictly* better is then a fact about that distribution rather than a matter of
+        taste: one theme holding more than half the argmax mass is a winner, a spread
+        mass is a genuine plateau and any member of it is a defensible choice.
+        """
+        _mu, _cov = posterior_joint(fit, thetas, polarity)
+        try:
+            _L = np.linalg.cholesky(_cov)
+        except np.linalg.LinAlgError:
+            _w, _V = np.linalg.eigh(_cov)
+            _L = _V * np.sqrt(np.maximum(_w, 1e-12))
+        _Z = np.random.default_rng(seed).standard_normal((len(thetas), samples))
+        _F = _mu[:, None] + _L @ _Z
+        _win = np.argmax(_F, axis=0)
+        _p = np.bincount(_win, minlength=len(thetas)) / float(samples)
+        _order = np.argsort(-_p)
+        _keep = [int(_i) for _i in _order if _p[_i] >= floor]
+        if not _keep:
+            _keep = [int(_order[0])]
+        return {
+            "p_best": _p,
+            "order": _order,
+            "credible": _keep,
+            "mu": _mu,
+            "verdict": "single" if _p[_order[0]] > 0.5 else "plateau",
+        }
+
+    def spread_out(thetas, idx, k, ls=None):
+        """k maximally different members of a set -- greedy max-min in scaled theta space.
+
+        A plateau is only useful if its members actually look different; picking the top-k
+        by probability would return k variations of one page.
+        """
+        if not idx:
+            return []
+        _w = 1.0 / (_LS0[:9] if ls is None else ls[:9])
+        _P = np.array([np.asarray(thetas[_i]) * _w for _i in idx])
+        _pick = [0]
+        while len(_pick) < min(k, len(idx)):
+            _d = np.min(np.linalg.norm(_P[:, None, :] - _P[None, _pick, :], axis=-1), axis=1)
+            _d[_pick] = -1.0
+            _pick.append(int(np.argmax(_d)))
+        return [idx[_i] for _i in _pick]
 
     def schedule_mode(n, n_duels):
         """Twenty-four-trial polarity blocks, each a run of sixteen duels, then four
@@ -804,10 +1062,12 @@ def _(POOL, np, prior_mean, random, realize):
     def trial_for(n, responses):
         """The nth trial, generated to maximize expected information about the utility.
 
-        Duels: one arm is a Thompson sample's argmax (explore where the optimum might be),
-        the other the challenger with maximal expected information gain about the duel's
-        outcome — plus a 7% share of uniform feasible pairs against model misspecification
-        and, once a champion exists, a 5% share of champion-vs-worst anchors that double as
+        Duels: candidates are bred fresh (see candidates() -- elites, mutation, crossover,
+        Sobol immigrants), one arm is a Thompson sample's argmax over them (explore where
+        the optimum might be), the other the challenger with maximal expected information
+        gain about the duel's outcome — plus a 7% share of uniform feasible pairs against
+        model misspecification and, once a champion exists, a 5% share of
+        champion-vs-worst anchors that double as
         engagement breathers and sanity checks. Comprehension probes ride the Thompson
         argmax; find hunts hold the champion's page and sweep the find axes uniformly."""
         if n in _TRIAL_MEMO:
@@ -829,18 +1089,9 @@ def _(POOL, np, prior_mean, random, realize):
             if _fit is None or _rng.random() < 0.07:
                 (_ta, _tha), (_tb, _thb) = _pick_pool(2)
             else:
-                _thetas = [_p[0] for _p in _pool]
-                _mu, _var, _ks, _A = _posterior_over(_fit, _thetas, _pol)
-                _champ_i = int(np.argmax(_mu))
-                # Local refinement: candidates jittered around the champion, kept only if
-                # they still clear every floor.
-                _loc = np.clip(_thetas[_champ_i] + _nprng.normal(0, 0.08, (48, 9)), 0, 1)
-                _cand, _cthemes = list(_thetas), [_p[1] for _p in _pool]
-                for _lt in _loc:
-                    _lth = realize(_lt, _pol)
-                    if _lth is not None:
-                        _cand.append(_lt)
-                        _cthemes.append(_lth)
+                _bred, _n_std = candidates(_fit, _pol, _nprng, n_trial=n)
+                _cand = [_b[0] for _b in _bred]
+                _cthemes = [_b[1] for _b in _bred]
                 _mu, _var, _ks, _A = _posterior_over(_fit, _cand, _pol)
                 if _rng.random() < 0.054:
                     _kind = "anchor"
@@ -848,10 +1099,18 @@ def _(POOL, np, prior_mean, random, realize):
                 else:
                     _kind = "eig"
                     _samp = _mu + np.sqrt(_var) * _nprng.standard_normal(len(_mu))
-                    _i1 = int(np.argmax(_samp))
+                    # Stratified Thompson: the explore/exploit split is DECLARED, not left
+                    # to however many candidates each stratum happened to contribute.
+                    # Measured: adding local children silently pulled the sampled argmax
+                    # toward the incumbent's basin and cost reach (paired diff -0.14 on the
+                    # two-mode test). Drawing the champion arm from the global stratum half
+                    # the time restores it without giving up refinement.
+                    _lo, _hi = (_n_std, len(_cand)) if (_rng.random() < 0.5 and _n_std < len(_cand)) else (0, _n_std)
+                    _i1 = _lo + int(np.argmax(_samp[_lo:_hi]))
                     _cross = _kmat(
                         np.array([_coords(_t, _pol) for _t in _cand]),
                         np.array([_coords(_cand[_i1], _pol)]),
+                        _fit.get("ls"),
                     )[:, 0] - np.einsum("ij,jk,k->i", _ks, _A, _ks[_i1])
                     _mud = _mu - _mu[_i1]
                     _s2 = np.maximum(_var + _var[_i1] - 2 * _cross, 1e-9)
@@ -880,13 +1139,12 @@ def _(POOL, np, prior_mean, random, realize):
             }
         elif _mode == "comprehension":
             if _fit is not None and _rng.random() > 0.25:
-                _thetas = [_p[0] for _p in _pool]
-                _mu, _var, _ks, _A = _posterior_over(_fit, _thetas, _pol)
+                _bred = candidates(_fit, _pol, _nprng, n_trial=n)[0]
+                _mu, _var, _ks, _A = _posterior_over(_fit, [_b[0] for _b in _bred], _pol)
                 _samp = _mu + np.sqrt(_var) * _nprng.standard_normal(len(_mu))
-                _i = int(np.argmax(_samp))
+                _ta, _tha = _bred[int(np.argmax(_samp))]
             else:
-                _i = _rng.randrange(len(_pool))
-            _ta, _tha = _pool[_i]
+                _ta, _tha = _pool[_rng.randrange(len(_pool))]
             _snip = _rng.randrange(4)
             _trial = {
                 "mode": "comprehension",
@@ -899,9 +1157,9 @@ def _(POOL, np, prior_mean, random, realize):
             }
         else:  # search
             if _fit is not None:
-                _thetas = [_p[0] for _p in _pool]
-                _mu, _var, _ks, _A = _posterior_over(_fit, _thetas, _pol)
-                _base = np.array(_thetas[int(np.argmax(_mu))])
+                _bred = candidates(_fit, _pol, _nprng, n_trial=n)[0]
+                _mu = _posterior_over(_fit, [_b[0] for _b in _bred], _pol)[0]
+                _base = np.array(_bred[int(np.argmax(_mu))][0])
             else:
                 _base = np.array(_pool[_rng.randrange(len(_pool))][0])
             # Sweep the find axes over their whole range on an otherwise-fixed page: the
@@ -925,7 +1183,7 @@ def _(POOL, np, prior_mean, random, realize):
         _TRIAL_MEMO[n] = _trial
         return _trial
 
-    return fitted, mu_at, run_info, schedule_mode, trial_for
+    return best_set, candidates, fitted, mu_at, posterior_joint, run_info, schedule_mode, spread_out, trial_for
 
 
 @app.cell(hide_code=True)
