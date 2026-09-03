@@ -890,7 +890,7 @@ def _(DUEL_WIDTH, POOL, math, np, prior_mean, qmc, random, realize):
     def _coords(theta, polarity):
         return np.concatenate([np.asarray(theta, dtype=float), [1.0 if polarity == "night" else 0.0]])
 
-    def duels_from(responses):
+    def duels_from(responses, rt_p=0.5):
         """(X, duel index pairs, per-duel slopes, prior mean at X) from the log's duels."""
         _pts, _index = [], {}
         _duels, _rts, _paused, _sides = [], [], [], []
@@ -921,7 +921,10 @@ def _(DUEL_WIDTH, POOL, math, np, prior_mean, qmc, random, realize):
         _paused = np.array(_paused)
         _clean = np.array(_rts)[~_paused]
         _rt_med = float(np.median(_clean)) if len(_clean) >= 8 else 2500.0
-        _lam = np.clip(np.sqrt(_rt_med / np.maximum(np.array(_rts), 200.0)), 0.6, 1.8)
+        # The exponent is FITTED, not assumed (see rt_exponent below). p = 0.5 was a
+        # hand-rolled square root; p = 0 means the clock is ignored entirely, so the same
+        # search that calibrates this channel also tests whether it earns its keep.
+        _lam = np.clip((_rt_med / np.maximum(np.array(_rts), 200.0)) ** rt_p, 0.6, 1.8)
         # A paused trial's time says nothing about the utility gap: its choice still counts,
         # at the neutral slope, neither sharpened nor flattened by the clock.
         _lam[_paused] = 1.0
@@ -1026,14 +1029,73 @@ def _(DUEL_WIDTH, POOL, math, np, prior_mean, qmc, random, realize):
 
     _FIT_MEMO = {}
 
-    def fitted(responses):
+    def cv_logloss(responses, rt_p, folds=5, seed=0):
+        """Held-out log-loss of predicted duel outcomes at a given RT exponent.
+
+        Cross-validation rather than marginal likelihood: the Laplace approximation makes
+        the latter awkward to compare across likelihoods, while held-out predictive accuracy
+        asks the question that matters -- does weighting a duel by how fast he answered it
+        predict his NEXT answer better than ignoring the clock?
+        """
+        _d = duels_from(responses, rt_p)
+        if _d is None:
+            return None
+        _X, _duels, _lam, _m, _sides = _d
+        if len(_duels) < 5 * folds:
+            return None
+        _rng = np.random.default_rng(seed)
+        _order = _rng.permutation(len(_duels))
+        _ls = _ard_scales(_X, _duels, _lam)
+        _total, _n = 0.0, 0
+        for _k in range(folds):
+            _test = set(_order[_k::folds].tolist())
+            _tr = [_i for _i in range(len(_duels)) if _i not in _test]
+            if len(_tr) < 8:
+                continue
+            _f, _cov, _Ki, _delta = fit_laplace(_X, [_duels[_i] for _i in _tr], _lam[_tr], _m, _sides[_tr], _ls)
+            for _i in _test:
+                _w, _l = _duels[_i]
+                _z = _lam[_i] * (_f[_w] - _f[_l]) + _delta * _sides[_i]
+                _p = 1.0 / (1.0 + np.exp(-_z))
+                _total -= np.log(max(_p, 1e-9))
+                _n += 1
+        return None if _n == 0 else _total / _n
+
+    _RTP_MEMO = {}
+
+    def rt_exponent(responses, grid=(0.0, 0.25, 0.5, 0.75), refit_every=25):
+        """The RT exponent that predicts his next answer best, refit occasionally.
+
+        Returns (best exponent, {exponent: held-out log-loss}). Zero is in the grid on
+        purpose: if ignoring the clock predicts as well, the channel is noise dressed as
+        evidence and the model should say so rather than carry a flattering heuristic.
+        """
+        _nd = sum(1 for _r in responses if _r.get("mode") == "duel" and _r.get("choice") in (0, 1))
+        _bucket = _nd // refit_every
+        if _bucket in _RTP_MEMO:
+            return _RTP_MEMO[_bucket]
+        _scores = {}
+        for _p in grid:
+            _v = cv_logloss(responses, _p)
+            if _v is not None:
+                _scores[_p] = _v
+        _out = (0.5, {}) if not _scores else (min(_scores, key=_scores.get), _scores)
+        if len(_RTP_MEMO) > 3:
+            _RTP_MEMO.pop(next(iter(_RTP_MEMO)))
+        _RTP_MEMO[_bucket] = _out
+        return _out
+
+    def fitted(responses, rt_p=None):
         # Keyed by how many duels have been answered: the fit is a pure function of the
         # log, three cells ask for the same one, and it is the cubic-cost step. Only the
         # newest entry is kept -- an older fit is never asked for again.
         _key = sum(1 for _r in responses if _r.get("mode") == "duel" and _r.get("choice") in (0, 1))
+        if rt_p is None:
+            rt_p = rt_exponent(responses)[0]
+        _key = (_key, rt_p)
         if _key in _FIT_MEMO:
             return _FIT_MEMO[_key]
-        _d = duels_from(responses)
+        _d = duels_from(responses, rt_p)
         if _d is None:
             return None
         _X, _duels, _lam, _m, _sides = _d
@@ -1050,6 +1112,7 @@ def _(DUEL_WIDTH, POOL, math, np, prior_mean, qmc, random, realize):
             "ls": _ls,
             "delta": _delta,
             "sides": _sides,
+            "rt_p": rt_p,
         }
         # A few entries rather than one: the progress readout fits the log as it stood some
         # duels ago and compares, which needs two fits alive at once.
@@ -1608,6 +1671,7 @@ def _(DUEL_WIDTH, POOL, math, np, prior_mean, qmc, random, realize):
         mu_at,
         posterior_joint,
         progress_report,
+        rt_exponent,
         rt_at,
         rt_fit,
         rt_penalty,
@@ -2185,6 +2249,7 @@ def _(
     pd,
     progress_report,
     render_card,
+    rt_exponent,
     rt_fit,
     rt_penalty,
     snippet_for,
@@ -2407,6 +2472,19 @@ def _(
                     f"**Comprehension**: {len(_tasks)} probes, {100 * _tasks['correct'].mean():.0f}% correct; "
                     f"median time-to-click {_ok['rt_ms'].median():.0f} ms "
                     f"(fastest quartile {_ok['rt_ms'].quantile(0.25):.0f} ms — the gap is what theming can win)."
+                )
+            )
+        _rtp, _rtp_scores = rt_exponent(_log)
+        if _rtp_scores and 0.0 in _rtp_scores:
+            _gain = _rtp_scores[0.0] - _rtp_scores[_rtp]
+            _blocks.append(
+                mo.md(
+                    f"**The clock's weight is fitted, not assumed**: duels are weighted by "
+                    f"(median time / this time) to the power {_rtp}, chosen by held-out log-loss "
+                    f"over {{0, ¼, ½, ¾}} and refit every 25 duels. Zero is in that set on purpose — "
+                    f"it means ignoring the clock — and it currently loses by {_gain:.4f} nats per "
+                    f"duel, so reading a fast click as strong evidence is "
+                    + ("earning its keep." if _gain > 0.002 else "not earning much; watch it.")
                 )
             )
         _hunts = _frame[_frame["mode"] == "search"]
