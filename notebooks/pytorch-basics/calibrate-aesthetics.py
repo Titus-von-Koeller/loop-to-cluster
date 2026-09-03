@@ -170,100 +170,26 @@ def _(colour, np):
 
 
 @app.cell(hide_code=True)
-def _(VISION_LOG, json, np, rgb_to_hex, rgb_to_ucs):
-    # Your measured discrimination thresholds, re-expressed in CAM16-UCS. The observer model
-    # is calibrate-vision's, verbatim in structure (Weibull over weighted LMS-opponent
-    # distance, exact grid posterior); it is refit here from the shared log rather than
-    # copied as numbers, so new vision trials sharpen these constraints automatically.
-    _SRGB2XYZ = np.array([[0.4124, 0.3576, 0.1805], [0.2126, 0.7152, 0.0722], [0.0193, 0.1192, 0.9505]])
-    _XYZ2LMS = np.array([[0.4002, 0.7076, -0.0808], [-0.2263, 1.1653, 0.0457], [0.0, 0.0, 0.9182]])
-    _OPP = np.array([[1.0, 1.0, 0.0], [1.0, -1.0, 0.0], [-0.5, -0.5, 1.0]])
-    _RGB2LMS = _XYZ2LMS @ _SRGB2XYZ
-    _LMS2RGB = np.linalg.inv(_RGB2LMS)
-    _OPP_INV = np.linalg.inv(_OPP)
+def _(VISION_LOG):
+    # The observer is fit in ONE place — _observer.py, the home of the measurement<->
+    # preference interlock. It refits lazily from the shared vision log (cached beside it),
+    # so every new vision trial sharpens these constraints automatically and no instrument
+    # carries its own copy of the model. v2 fits the psychometric slope, the lapse, a
+    # chromatic confusion-axis rotation, and threshold as a smooth function of ground
+    # lightness — all in CAM16-UCS, the same geometry this notebook searches.
+    from _observer import fit as _observer_fit
 
-    def _opp(hex_color):
-        _c = np.array([int(hex_color.lstrip("#")[i : i + 2], 16) / 255 for i in (0, 2, 4)])
-        _lin = np.where(_c <= 0.04045, _c / 12.92, ((_c + 0.055) / 1.055) ** 2.4)
-        return _OPP @ np.cbrt(np.clip(_RGB2LMS @ _lin, 0.0, None))
-
-    def _opp_to_rgb(v):
-        _lin = np.clip(_LMS2RGB @ (_OPP_INV @ v) ** 3, 0.0, 1.0)
-        return np.where(_lin <= 0.0031308, _lin * 12.92, 1.055 * _lin ** (1 / 2.4) - 0.055)
-
-    _resp = [json.loads(_l) for _l in VISION_LOG.read_text().splitlines() if _l.strip()] if VISION_LOG.exists() else []
-    if len(_resp) >= 100:
-        _d = np.array([np.linalg.norm(_opp(_r["base"]) - _opp(_r["odd_color"])) for _r in _resp])
-        _taus = np.geomspace(float(np.quantile(_d, 0.05)) / 10, float(np.quantile(_d, 0.9)), 12)
-        _grid = np.stack(
-            np.meshgrid(
-                np.geomspace(0.05, 12.0, 12),
-                np.geomspace(0.05, 6.0, 10),
-                _taus,
-                _taus,
-                np.array([0.005, 0.02, 0.05, 0.1]),
-                indexing="ij",
-            )
-        )
-        _da = np.array([np.abs(_opp(_r["base"]) - _opp(_r["odd_color"])) for _r in _resp])
-        _night = np.array([_r["ground"] == "night" for _r in _resp])
-        _ok = np.array([bool(_r["correct"]) for _r in _resp])
-        _flat = _grid.reshape(5, -1)
-        # Chunked over trials: the full broadcast peaks well past a gigabyte for no benefit.
-        _logp = np.zeros(_flat.shape[1])
-        for _i in range(0, len(_resp), 128):
-            _sl = slice(_i, _i + 128)
-            _d2 = _da[_sl, 0:1] ** 2 + _flat[0] * _da[_sl, 1:2] ** 2 + _flat[1] * _da[_sl, 2:3] ** 2
-            _tau = np.where(_night[_sl, None], _flat[3], _flat[2])
-            _p = 0.25 + (0.75 - _flat[4]) * (1.0 - np.exp(-_d2 / _tau**2))
-            _logp += np.log(np.where(_ok[_sl, None], _p, 1.0 - _p)).sum(axis=0)
-        _logp -= _logp.max()
-        _post = np.exp(_logp).reshape(_grid.shape[1:])
-        _post /= _post.sum()
-
-        def _thresh(_w_ax, _tau_ax):
-            _m = _post.sum(axis=tuple(_i for _i in range(5) if _i not in (_w_ax, _tau_ax)))
-            _w = np.unique(_grid[_w_ax])
-            _t = np.unique(_grid[_tau_ax])
-            return float(np.exp((_m * np.log(_t[None, :] / np.sqrt(_w[:, None]))).sum()))
-
-        _th = {
-            ("lum", "day"): float(np.exp((_post.sum(axis=(0, 1, 3, 4)) * np.log(np.unique(_grid[2]))).sum())),
-            ("lum", "night"): float(np.exp((_post.sum(axis=(0, 1, 2, 4)) * np.log(np.unique(_grid[3]))).sum())),
-            ("rg", "day"): _thresh(0, 2),
-            ("rg", "night"): _thresh(0, 3),
-            ("by", "day"): _thresh(1, 2),
-            ("by", "night"): _thresh(1, 3),
-        }
-        # Re-expression: step every base color the vision trials actually used by one
-        # threshold along each opponent axis, convert both endpoints to CAM16-UCS, take the
-        # median distance — dropping steps the gamut clipped, which would understate it.
-        _bases = sorted({_r["base"] for _r in _resp})
-        _axvec = {"lum": np.array([1.0, 0, 0]), "rg": np.array([0, 1.0, 0]), "by": np.array([0, 0, 1.0])}
-        DE_MIN, THRESH_DETAIL = {}, {}
-        for _grd in ("day", "night"):
-            _per = {}
-            for _ax in ("lum", "rg", "by"):
-                _t = _th[(_ax, _grd)]
-                _b_opp = np.array([_opp(_b) for _b in _bases])
-                _stepped = _b_opp + _axvec[_ax] * _t
-                _rgb_a = np.array([_opp_to_rgb(_v) for _v in _b_opp])
-                _rgb_b = np.array([_opp_to_rgb(_v) for _v in _stepped])
-                _back = np.array([_opp(rgb_to_hex(_r)[0]) for _r in _rgb_b])
-                _keep = np.abs(_back - _stepped).max(axis=1) < _t * 0.2
-                if _keep.sum() < 5:
-                    _keep[:] = True
-                _de = np.linalg.norm(rgb_to_ucs(_rgb_a[_keep]) - rgb_to_ucs(_rgb_b[_keep]), axis=1)
-                _per[_ax] = float(np.median(_de))
-            DE_MIN[_grd] = min(_per.values())
-            THRESH_DETAIL[_grd] = _per
-        VISION_N = len(_resp)
+    if VISION_LOG.exists():
+        _fit = _observer_fit(VISION_LOG)
+        DE_MIN = {"day": _fit.de_min_day, "night": _fit.de_min_night}
+        THRESH_DETAIL = {"day": _fit.de_dir_day, "night": _fit.de_dir_night}
+        VISION_N = _fit.n
     else:
-        # No (or too little) vision data on this machine: conservative defaults near the
-        # 2026-09-02 fit, flagged in the analysis so the substitution is never silent.
-        DE_MIN = {"day": 3.0, "night": 1.9}
+        # No vision data on this machine: the v2.0 fit at 748 trials (2026-09-03),
+        # flagged in the analysis so the substitution is never silent.
+        DE_MIN = {"day": 3.2, "night": 2.5}
         THRESH_DETAIL = {"day": {}, "night": {}}
-        VISION_N = len(_resp)
+        VISION_N = 0
     return DE_MIN, THRESH_DETAIL, VISION_N
 
 
@@ -1270,10 +1196,10 @@ def _(AXES, DE_MIN, POOL, SNIPPETS, THRESH_DETAIL, VISION_N, fitted, get_respons
         if THRESH_DETAIL.get("day"):
             _blocks.append(
                 mo.md(
-                    "Constraint provenance — your 104-px thresholds re-expressed as CAM16-UCS ΔE (day / night): "
+                    "Constraint provenance — your fitted 75%-correct thresholds in CAM16-UCS ΔE (day / night): "
                     + ", ".join(
                         f"{_ax} {THRESH_DETAIL['day'][_ax]:.1f} / {THRESH_DETAIL['night'][_ax]:.1f}"
-                        for _ax in ("lum", "rg", "by")
+                        for _ax in THRESH_DETAIL["day"]
                     )
                     + " — the pairwise floor is 2× the minimum "
                     + f"({2 * DE_MIN['day']:.1f} day, {2 * DE_MIN['night']:.1f} night)."
