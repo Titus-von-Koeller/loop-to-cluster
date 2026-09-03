@@ -44,3 +44,8 @@ notebooks/**/data/
 # Checkpoints the save/load tutorials write beside themselves. Re-created by running
 # the notebook that saves them, which is the only thing that reads them back.
 notebooks/**/*.pth
+
+# The observer's dense log-posterior cache (28 MB, derived from the response log by
+# _observer.py; regenerated whenever model version or log length disagree). The small
+# observer-fit.json summary IS committed; this binary sidecar is not.
+observer-logp-*

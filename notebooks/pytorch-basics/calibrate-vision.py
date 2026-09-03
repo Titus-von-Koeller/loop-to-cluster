@@ -28,23 +28,31 @@ def _(mo):
 
     The gallery's deuteranopia column is a population model; what decides legibility is what
     *your* eyes distinguish on *this* screen, in the theme and light you actually read in. This
-    notebook measures that directly: each trial shows four squares on one of the two Horizon
-    page grounds — three of one color, one of another, both drawn from the palettes under
-    evaluation (the editor theme's own accents included). Click the odd one out. Chance is 25%;
-    a pair you can no longer beat chance on is, for you, one color.
+    notebook measures that directly: each trial shows four squares on one of seven candidate
+    page grounds — the two Horizon pages and the best-in-class field (Selenized, Modus, GitHub
+    dark) — at one of three patch sizes, from the exhibit scale (104 px) down to editor-token
+    scale (10 px), where color discrimination is known to collapse and no large-patch result
+    can be trusted. Three squares share one color, one differs; both are drawn from the
+    palettes under evaluation (the editor theme's own accents included). Click the odd one
+    out. Chance is 25%; a pair you can no longer beat chance on is, for you, at that size, on
+    that page, one color.
 
-    What is being optimized is not your score but your **threshold surface**: a Bayesian
-    observer model (a Weibull psychometric over weighted opponent-space distance — the QUEST+
-    family) learns how far apart two colors must be, per direction (red–green, blue–yellow,
-    lightness) and per ground, before you can tell them apart. Each trial is *generated* to be
-    maximally informative about that model, which parks it near your ~75%-correct zone —
-    **feeling hard means it is working**, and every answer moves the whole surface, not one
-    pair's tally. A fraction of trials stay easy palette pairs, as anchors and breathers.
+    What is being optimized is not your score but your **observer model** (v2, shared with
+    every other instrument through `_observer.py`): thresholds live in CAM16-UCS — the same
+    space the aesthetics search runs in — with a fitted psychometric slope, a fitted lapse, a
+    chromatic weight ellipse whose orientation is free to find any red–green confusion axis,
+    threshold as a *smooth function of ground lightness* (so the fit generalizes to pages
+    never shown), and a small-field exponent that the 10–16 px trials identify. Each trial is
+    *generated* to be maximally informative about that model, which parks it near your
+    ~75%-correct zone — **feeling hard means it is working**, and every answer moves the whole
+    surface, not one pair's tally. A fraction of trials stay easy palette pairs, as anchors
+    and breathers.
 
     Protocol: glance, decide within about a second, click — hesitation measures reasoning, not
     perception. Sixty-plus trials make a sitting; every response appends to
     `calibration-responses.jsonl` beside this file, so sittings accumulate across days, themes,
-    and ambient light. The screen itself is uncalibrated for now (parked in the queue) — that
+    and ambient light. Grounds and sizes run in sixteen-trial blocks (adaptation is part of the
+    measurement). The screen itself is uncalibrated for now (parked in the queue) — that
     limits absolute claims, not relative ones: which pairs and which palettes fail *you* on
     *this* screen is exactly what accumulates below.
     """)
@@ -119,10 +127,28 @@ def _():
     PAIRS = [
         (name, a, b) for name, hexes in PALETTES.items() for i, a in enumerate(hexes) for b in hexes[i + 1 :] if a != b
     ]
-    GROUNDS = {"day": "#fdf0ed", "night": "#1c1e26"}
+
+    # The ground family spans the theme program's whole candidate field in lightness (and,
+    # weakly for now, warmth): threshold is modeled as a smooth function of ground, so every
+    # page here sharpens the prediction for pages never shown. Sources: the two Horizon
+    # pages; Selenized light/dark (jan-warchol/selenized, the-values.md); Modus operandi/
+    # vivendi (pure white/black by design); GitHub dark default.
+    GROUND_LIST = [
+        ("horizon-day", "#fdf0ed"),
+        ("horizon-night", "#1c1e26"),
+        ("selenized-light", "#fbf3db"),
+        ("selenized-dark", "#103c48"),
+        ("modus-light", "#ffffff"),
+        ("modus-dark", "#000000"),
+        ("github-dark", "#0d1117"),
+    ]
+    # Patch sizes: exhibit scale, and the glyph scale that actually decides the editor theme.
+    # Gap scales with size (near-abutting, like adjacent glyphs); both are logged per trial.
+    SIZES = (104, 16, 10)
+    GAPS = {104: 12, 16: 2, 10: 1}
     LOG = Path(__file__).parent / "calibration-responses.jsonl"
 
-    return GROUNDS, LOG, PAIRS, datetime, json, np, pd, random, timezone
+    return GAPS, GROUND_LIST, LOG, PAIRS, SIZES, datetime, json, np, pd, random, timezone
 
 
 @app.cell(hide_code=True)
@@ -133,154 +159,151 @@ def _(LOG, json, mo):
 
 
 @app.cell(hide_code=True)
-def _(GROUNDS, PAIRS, np, random):
-    # The observer model. sRGB -> cone-opponent space: linearize, project to LMS
-    # (Hunt-Pointer-Estevez on D65 XYZ), cube-root compress, then opponent axes —
-    # lum = L+M, rg = L-M, by = S-(L+M)/2. Deliberately approximate; the fitted weights
-    # absorb each axis's scale. Probability correct in 4AFC is a Weibull psychometric over
-    # the weighted opponent distance, with a 2% lapse ceiling.
-    _SRGB2XYZ = np.array([[0.4124, 0.3576, 0.1805], [0.2126, 0.7152, 0.0722], [0.0193, 0.1192, 0.9505]])
-    _XYZ2LMS = np.array([[0.4002, 0.7076, -0.0808], [-0.2263, 1.1653, 0.0457], [0.0, 0.0, 0.9182]])
-    _OPP = np.array([[1.0, 1.0, 0.0], [1.0, -1.0, 0.0], [-0.5, -0.5, 1.0]])
-    _RGB2LMS = _XYZ2LMS @ _SRGB2XYZ
-    _LMS2RGB = np.linalg.inv(_RGB2LMS)
-    _OPP_INV = np.linalg.inv(_OPP)
+def _(GAPS, GROUND_LIST, LOG, PAIRS, SIZES, np, random):
+    # The observer model lives in _observer.py — one model, one fit, shared with the
+    # aesthetics instrument so constraints never fork from measurements. This cell only
+    # maintains a live posterior over its parameter grid and generates informative trials.
+    import _observer as obs
 
-    def opp(hex_color):
-        c = np.array([int(hex_color.lstrip("#")[i : i + 2], 16) / 255 for i in (0, 2, 4)])
-        lin = np.where(c <= 0.04045, c / 12.92, ((c + 0.055) / 1.055) ** 2.4)
-        return _OPP @ np.cbrt(np.clip(_RGB2LMS @ lin, 0.0, None))
+    _COLS = obs.grid_columns()
+    _N_CELLS = len(_COLS[0])
+    # Dense log-posterior, bootstrapped from a binary sidecar so a fresh kernel does not
+    # pay the full ~35 s refit; per-response updates are incremental (~60 ms) and equal to
+    # a from-scratch fit up to float accumulation noise (~1e-4 log units, measured).
+    _LOGP_NPY = LOG.parent / f"observer-logp-{obs.MODEL_VERSION}.npy"
+    _LOGP_META = LOG.parent / f"observer-logp-{obs.MODEL_VERSION}.json"
+    _PSTATE = {"n": -1, "logp": None}
 
-    def _to_hex(opp_vec):
-        lin = np.clip(_LMS2RGB @ (_OPP_INV @ opp_vec) ** 3, 0.0, 1.0)
-        srgb = np.where(lin <= 0.0031308, lin * 12.92, 1.055 * lin ** (1 / 2.4) - 0.055)
-        return "#" + "".join(f"{round(255 * v):02x}" for v in srgb)
+    def _posterior_logp(responses):
+        import json as _json
 
-    # Parameter grid, QUEST+-style: exact discrete posterior, no sampler to tune. Axis
-    # weights are relative to lightness (fixed 1); thresholds are per ground, on a scale
-    # set by the palette pairs' own distance distribution.
-    _dref = np.array([np.linalg.norm(opp(_a) - opp(_b)) for _pal, _a, _b in PAIRS])
-    _TAUS = np.geomspace(float(np.quantile(_dref, 0.05)) / 10, float(np.quantile(_dref, 0.9)), 12)
-    # Lapse is a fitted axis, not a constant: the model can attribute rare misses to the
-    # finger instead of the eyes, and stimulus placement marginalizes over that belief —
-    # an accidental miss or lucky guess costs a few misplaced trials, never a bad path,
-    # because the posterior is global and self-correcting.
-    GRID = np.stack(
-        np.meshgrid(
-            np.geomspace(0.05, 12.0, 12),
-            np.geomspace(0.05, 6.0, 10),
-            _TAUS,
-            _TAUS,
-            np.array([0.005, 0.02, 0.05, 0.1]),
-            indexing="ij",
-        )
-    )
-
-    def p_correct(delta, ground):
-        """P(correct) over the whole grid for one trial's opponent delta."""
-        _d2 = delta[0] ** 2 + GRID[0] * delta[1] ** 2 + GRID[1] * delta[2] ** 2
-        _tau = GRID[2] if ground == "day" else GRID[3]
-        return 0.25 + (0.75 - GRID[4]) * (1.0 - np.exp(-_d2 / _tau**2))
+        if _PSTATE["n"] == len(responses):
+            return _PSTATE["logp"]
+        if _PSTATE["logp"] is None:
+            _logp, _base = None, 0
+            if _LOGP_NPY.exists() and _LOGP_META.exists():
+                _meta = _json.loads(_LOGP_META.read_text())
+                if _meta.get("n", 0) <= len(responses) and _meta.get("cells") == _N_CELLS:
+                    _logp, _base = np.load(_LOGP_NPY), _meta["n"]
+            if _logp is None:
+                _logp, _base = np.zeros(_N_CELLS), 0
+            if responses[_base:]:
+                obs.add_loglik(_logp, responses[_base:], chunk=40_000)
+            np.save(_LOGP_NPY, _logp)
+            _LOGP_META.write_text(_json.dumps({"n": len(responses), "cells": _N_CELLS}))
+        elif _PSTATE["n"] < len(responses):
+            _logp = obs.add_loglik(_PSTATE["logp"], responses[_PSTATE["n"] :])
+        else:  # log shrank (external edit): refit from scratch
+            _logp = obs.add_loglik(np.zeros(_N_CELLS), responses, chunk=40_000)
+        _PSTATE["n"], _PSTATE["logp"] = len(responses), _logp
+        return _logp
 
     def posterior_for(responses):
-        if not responses:
-            _post = np.ones(GRID.shape[1:])
-            return _post / _post.sum()
-        # Vectorized over trials: deltas (n,3), grounds (n,), one broadcast against the grid.
-        _da = np.array([np.abs(opp(_r["base"]) - opp(_r["odd_color"])) for _r in responses])
-        _night = np.array([_r["ground"] == "night" for _r in responses])
-        _ok = np.array([bool(_r["correct"]) for _r in responses])
-        _flat = GRID.reshape(5, -1)
-        _d2 = _da[:, 0:1] ** 2 + _flat[0] * _da[:, 1:2] ** 2 + _flat[1] * _da[:, 2:3] ** 2
-        _tau = np.where(_night[:, None], _flat[3], _flat[2])
-        _p = 0.25 + (0.75 - _flat[4]) * (1.0 - np.exp(-_d2 / _tau**2))
-        _logp = np.log(np.where(_ok[:, None], _p, 1.0 - _p)).sum(axis=0)
-        _logp -= _logp.max()
-        _post = np.exp(_logp).reshape(GRID.shape[1:])
-        return _post / _post.sum()
+        """(condensed posterior, condensed grid columns) — the trial generator's view."""
+        _logp = _posterior_logp(responses)
+        if len(responses) < 16:
+            # A near-flat posterior makes top-k selection an arbitrary corner of the grid;
+            # a strided subset spans it evenly until the data has an opinion.
+            _idx = np.arange(0, _N_CELLS, max(1, _N_CELLS // 25_000))
+            _p = np.exp(_logp[_idx] - _logp[_idx].max())
+            return _p / _p.sum(), [c[_idx] for c in _COLS]
+        return obs.condense(_logp, _COLS)
+
+    def full_posterior(responses):
+        """The full-grid normalized posterior — the analysis cell's view."""
+        _logp = _posterior_logp(responses)
+        _p = np.exp(_logp - _logp.max())
+        return _p / _p.sum()
+
+    def _entropy(q):
+        return -(q * np.log(q + 1e-12) + (1 - q) * np.log(1 - q + 1e-12))
+
+    # Deterministic given the log; the memo only spares two sibling cells the recompute.
+    _TRIAL_MEMO = {}
 
     def trial_for(n, responses):
-        """The nth trial, generated to maximize expected information about the model.
+        """The nth trial, generated to maximize expected information about the observer.
 
-        Candidate stimuli are built from a palette color plus an offset along the opponent
-        axes at magnitudes bracketing the current threshold estimate; the winner maximizes
-        mutual information between the response and the posterior — which parks trials
-        where each answer says the most (with a tight posterior that is often harder than
-        75%: most trials *should* feel nearly indistinguishable). 5% of trials stay plain
-        palette pairs, as anchors against model misspecification — no more, because the
-        slip rate is already pinned by the log and easy trials carry almost no
-        information. Deterministic given the shared log.
-        """
+        Grounds and sizes run in 16-trial blocks (adaptation stays part of the measurement;
+        blocks cycle all grounds, then rotate patch size). Within a block, candidate stimuli
+        are built from a palette color plus offsets along the CAM16-UCS axes, the diagonals,
+        and the current confusion-axis estimate, at magnitudes swept coarse-then-fine; the
+        winner maximizes mutual information between the response and the posterior. 5% stay
+        plain palette pairs as anchors against model misspecification."""
+        if n in _TRIAL_MEMO:
+            return _TRIAL_MEMO[n]
         _rng = random.Random(n * 2654435761 % (2**31))
-        # Blocked, not alternating: flipping the page every click churns light/dark
-        # adaptation and adds measurement noise. Sixteen-trial blocks keep the eye in one
-        # adapted state while still balancing the two grounds over a sitting.
-        _ground = ("day", "night")[(n // 16) % 2]
-        _pal, _a, _b = _rng.choice(PAIRS)
+        _b = n // 16
+        _glabel, _ghex = GROUND_LIST[_b % len(GROUND_LIST)]
+        _size = SIZES[(_b // len(GROUND_LIST)) % len(SIZES)]
+        _pal, _a, _b2 = _rng.choice(PAIRS)
         if _rng.random() < 0.05:
             if _rng.random() < 0.5:
-                _a, _b = _b, _a
-            _base, _odd, _kind = _a, _b, _pal
+                _a, _b2 = _b2, _a
+            _base, _odd, _kind = _a, _b2, _pal
         else:
-            _post = posterior_for(responses[:n])
-            _base_o = opp(_a)
+            _post, _cols = posterior_for(responses[:n])
+            _base_u = obs.hex_to_ucs(_a)[0]
+            _gj = np.array([obs.hex_to_ucs(_ghex)[0, 0] / 100.0], dtype=np.float32)
+            _sz = np.array([float(_size)], dtype=np.float32)
             _s2 = 1 / np.sqrt(2)
+            _phi_hat = float((_post * _cols[0]).sum())
+            _rad = np.radians(_phi_hat)
             _dirs = [
                 np.array(_v)
                 for _v in [
+                    (1, 0, 0),
+                    (-1, 0, 0),
                     (0, 1, 0),
                     (0, -1, 0),
                     (0, 0, 1),
                     (0, 0, -1),
-                    (1, 0, 0),
-                    (-1, 0, 0),
                     (0, _s2, _s2),
                     (0, -_s2, _s2),
+                    (0, np.cos(_rad), np.sin(_rad)),
+                    (0, -np.cos(_rad), np.sin(_rad)),
                 ]
             ]
 
-            def _entropy(q):
-                return -(q * np.log(q + 1e-12) + (1 - q) * np.log(1 - q + 1e-12))
+            def _eig_batch(_dv, _mags):
+                """(best_eig, best_mag, best_hex) along one direction at several magnitudes."""
+                _cands = np.array([_base_u + _dv * _m for _m in _mags])
+                _hexes = obs.ucs_to_hex(_cands)
+                _du = (_base_u[None, :] - obs.hex_to_ucs(_hexes)).astype(np.float32)
+                _p = obs.p_correct_cells(_cols, _du, np.repeat(_gj, len(_mags)), np.repeat(_sz, len(_mags)))
+                _pbar = _post @ _p
+                _eig = _entropy(_pbar) - _post @ _entropy(_p)
+                for _i, _h in enumerate(_hexes):
+                    if _h == _a:
+                        _eig[_i] = -1.0
+                _j = int(np.argmax(_eig))
+                return float(_eig[_j]), float(_mags[_j]), _hexes[_j]
 
-            def _eig_at(_dv, _m):
-                _cand = _to_hex(_base_o + _dv * _m)
-                if _cand == _a:
-                    return -1.0, None
-                _pth = p_correct(np.abs(_base_o - opp(_cand)), _ground)
-                _pbar = float((_post * _pth).sum())
-                return _entropy(_pbar) - float((_post * _entropy(_pth)).sum()), _cand
-
-            # Two-stage search per direction: a coarse sweep over the full magnitude range
-            # localizes the informative zone, then a fine sweep around that winner finds the
-            # optimum. The coarse grid alone steps by ~2.8x, so whenever the threshold falls
-            # between its steps the chosen trial lands either trivially easy or invisibly
-            # hard — measured at ~28% of achievable information lost per trial.
+            # Two-stage magnitude search per direction (a coarse-only grid measured ~28%
+            # information lost when the threshold falls between its steps).
             _best, _best_hex = -1.0, None
             for _dv in _dirs:
-                _dir_best, _dir_m = -1.0, None
-                for _m in np.geomspace(_TAUS[0] * 0.5, _TAUS[-1] * 1.5, 6):
-                    _eig, _cand = _eig_at(_dv, _m)
-                    if _eig > _dir_best:
-                        _dir_best, _dir_m = _eig, _m
-                    if _eig > _best:
-                        _best, _best_hex = _eig, _cand
-                if _dir_m is None:
-                    continue
-                for _m in np.geomspace(_dir_m / 2.5, _dir_m * 2.5, 8):
-                    _eig, _cand = _eig_at(_dv, _m)
-                    if _eig > _best:
-                        _best, _best_hex = _eig, _cand
+                _e1, _m1, _h1 = _eig_batch(_dv, np.geomspace(0.3, 90.0, 7))
+                if _e1 > _best:
+                    _best, _best_hex = _e1, _h1
+                _e2, _, _h2 = _eig_batch(_dv, np.geomspace(_m1 / 2.5, min(_m1 * 2.5, 110.0), 8))
+                if _e2 > _best:
+                    _best, _best_hex = _e2, _h2
             _base, _odd, _kind = _a, _best_hex, "probe"
-        return {
+        _trial = {
             "palette": _kind,
             "base": _base,
             "odd_color": _odd,
-            "ground": _ground,
-            "ground_hex": GROUNDS[_ground],
+            "ground": _glabel,
+            "ground_hex": _ghex,
+            "size_px": _size,
+            "gap_px": GAPS[_size],
             "odd_position": _rng.randrange(4),
         }
+        _TRIAL_MEMO[n] = _trial
+        return _trial
 
-    return GRID, posterior_for, trial_for
+    return full_posterior, obs, trial_for
 
 
 @app.cell(hide_code=True)
@@ -288,12 +311,16 @@ def _(get_responses, mo, trial_for):
     # The trial number doubles as a staleness indicator: if it ever disagrees with the
     # squares below, the surface lagged and clicks are being dropped by the guard.
     _n = len(get_responses())
-    mo.hstack([mo.md(f"**Trial {_n + 1}** — click the odd square.")], justify="center")
+    _t = trial_for(_n, get_responses())
+    mo.hstack(
+        [mo.md(f"**Trial {_n + 1}** · {_t['ground']} · {_t['size_px']} px — click the odd square.")],
+        justify="center",
+    )
     return
 
 
 @app.cell(hide_code=True)
-def _(LOG, datetime, get_responses, json, mo, set_responses, timezone, trial_for):
+def _(get_responses, mo, trial_for):
     _n = len(get_responses())
     _t = trial_for(_n, get_responses())
     _colors = [_t["base"]] * 4
@@ -302,6 +329,9 @@ def _(LOG, datetime, get_responses, json, mo, set_responses, timezone, trial_for
     # A real widget instead of styled buttons: the squares are plain clickable divs on one
     # ground, so nothing of a button's chrome shows. anywidget syncs the click back as the
     # chosen index; a fresh widget renders per trial and the guard drops stale clicks.
+    # At glyph scale the squares are near-unclickable targets, so the wrap resolves any
+    # click to the nearest square within a generous radius — the click is the answer, not
+    # the motor test.
     import anywidget
     import traitlets
 
@@ -312,32 +342,47 @@ def _(LOG, datetime, get_responses, json, mo, set_responses, timezone, trial_for
           const wrap = document.createElement("div");
           wrap.style.cssText = `background:${model.get("ground")};padding:22px;` +
             `border-radius:10px;display:flex;justify-content:center;align-items:center;` +
-            `gap:12px;width:100%;box-sizing:border-box;aspect-ratio:1.618/1`;
+            `gap:${model.get("gap")}px;width:100%;box-sizing:border-box;aspect-ratio:1.618/1`;
+          const size = model.get("size");
+          const squares = [];
           model.get("colors").forEach((c, i) => {
             const sq = document.createElement("div");
             // Fixed pixels on purpose: patch size AND separation are stimulus parameters
             // (spatial summation; near-abutting fields give the most sensitive
-            // comparison, and match how adjacent glyphs and chart marks are actually
-            // read). Both are logged with every response.
-            sq.style.cssText = `width:104px;height:104px;border-radius:10px;background:${c};` +
-              `cursor:pointer`;
-            sq.onclick = () => {
-              model.set("clicks", model.get("clicks") + 1);
-              model.set("choice", i);
-              model.save_changes();
-            };
+            // comparison, and match how adjacent glyphs and chart marks are read).
+            sq.style.cssText = `width:${size}px;height:${size}px;` +
+              `border-radius:${Math.max(1, Math.round(size / 10))}px;background:${c}`;
+            squares.push(sq);
             wrap.appendChild(sq);
           });
+          wrap.style.cursor = "pointer";
+          wrap.onclick = (ev) => {
+            let best = -1, bestD = Infinity;
+            squares.forEach((sq, i) => {
+              const r = sq.getBoundingClientRect();
+              const dx = ev.clientX - (r.x + r.width / 2), dy = ev.clientY - (r.y + r.height / 2);
+              const d = Math.hypot(dx, dy);
+              if (d < bestD) { bestD = d; best = i; }
+            });
+            if (bestD > Math.max(size, 30)) return;  // a click far from every square is no answer
+            model.set("clicks", model.get("clicks") + 1);
+            model.set("choice", best);
+            model.save_changes();
+          };
           el.replaceChildren(wrap);
         }
         export default { render };
         """
         colors = traitlets.List([]).tag(sync=True)
         ground = traitlets.Unicode("#ffffff").tag(sync=True)
+        size = traitlets.Int(104).tag(sync=True)
+        gap = traitlets.Int(12).tag(sync=True)
         choice = traitlets.Int(-1).tag(sync=True)
         clicks = traitlets.Int(0).tag(sync=True)
 
-    answer_squares = mo.ui.anywidget(_OddOneOut(colors=_colors, ground=_t["ground_hex"]))
+    answer_squares = mo.ui.anywidget(
+        _OddOneOut(colors=_colors, ground=_t["ground_hex"], size=_t["size_px"], gap=_t["gap_px"])
+    )
     answer_squares
     return (answer_squares,)
 
@@ -362,12 +407,14 @@ def _(LOG, answer_squares, datetime, get_responses, json, set_responses, timezon
             "base": _now["base"],
             "odd_color": _now["odd_color"],
             "ground": _now["ground"],
+            "ground_hex": _now["ground_hex"],
             "odd_position": _now["odd_position"],
             "choice": choice,
             "correct": choice == _now["odd_position"],
-            # Patch size is a stimulus parameter; log it so size changes stay analyzable.
-            "size_px": 104,
-            "gap_px": 12,
+            # Size, gap and ground are stimulus parameters; the observer model fits
+            # threshold as a function of them, so they ride with every response.
+            "size_px": _now["size_px"],
+            "gap_px": _now["gap_px"],
         }
         # Append-only, one record per line: concurrent sessions interleave instead of
         # overwriting each other's history.
@@ -382,7 +429,7 @@ def _(LOG, answer_squares, datetime, get_responses, json, set_responses, timezon
 
 
 @app.cell(hide_code=True)
-def _(GRID, get_responses, mo, np, pd, posterior_for):
+def _(full_posterior, get_responses, mo, np, obs, pd):
     _log = get_responses()
     if not _log:
         _out = mo.md("*No responses yet — the analysis fills in as you answer.*")
@@ -401,51 +448,56 @@ def _(GRID, get_responses, mo, np, pd, posterior_for):
             .sort_values("accuracy")
         )
         _by_ground = _frame.groupby("ground").correct.mean()
-        _post = posterior_for(_log)
-        _lapse = float((GRID[4] * _post).sum())
-
-        # The identified quantities are per-axis THRESHOLDS tau/sqrt(w): raw weights ride a
-        # ridge to the grid ceiling (only w/tau^2 enters the likelihood), thresholds do not.
-        # Geometric mean over the joint (weight, tau) marginal, since both axes are log-spaced.
-        def _thresh(_w_ax, _tau_ax):
-            _m = _post.sum(axis=tuple(_i for _i in range(5) if _i not in (_w_ax, _tau_ax)))
-            _w = np.unique(GRID[_w_ax])
-            _t = np.unique(GRID[_tau_ax])
-            return float(np.exp((_m * np.log(_t[None, :] / np.sqrt(_w[:, None]))).sum()))
-
-        _lum_d = float(np.exp((_post.sum(axis=(0, 1, 3, 4)) * np.log(np.unique(GRID[2]))).sum()))
-        _lum_n = float(np.exp((_post.sum(axis=(0, 1, 2, 4)) * np.log(np.unique(GRID[3]))).sum()))
-        _rg_d = _thresh(0, 2)
-        _rg_n = _thresh(0, 3)
-        _by_d = _thresh(1, 2)
-        _by_n = _thresh(1, 3)
+        _post = full_posterior(_log)
+        _cols = obs.grid_columns()
+        _dirs = {
+            "lightness": np.array([1.0, 0, 0]),
+            "red–green (a')": np.array([0.0, 1, 0]),
+            "blue–yellow (b')": np.array([0.0, 0, 1]),
+        }
+        _gj = {"day": 0.966, "night": 0.147}  # Horizon pages, J'/100
+        _tiles = [
+            mo.stat(
+                f"{obs.threshold_de(_post, _cols, _v, _gj[_g]):.2f}",
+                label=f"{_name} · {_g} (ΔE)",
+                bordered=True,
+            )
+            for _name, _v in _dirs.items()
+            for _g in ("day", "night")
+        ]
+        _beta = float((obs.marginal(_post, "beta")[1] * obs.marginal(_post, "beta")[0]).sum())
+        _lam = float((obs.marginal(_post, "lam")[1] * obs.marginal(_post, "lam")[0]).sum())
+        _phi_v, _phi_p = obs.marginal(_post, "phi")
+        _phi = float((_phi_p * _phi_v).sum())
+        _phi_sd = float(np.sqrt(max((_phi_p * _phi_v**2).sum() - _phi**2, 0.0)))
+        _gl = float((obs.marginal(_post, "gL")[1] * obs.marginal(_post, "gL")[0]).sum())
+        _gam_v, _gam_p = obs.marginal(_post, "gamma")
+        _gam_sd = float(np.sqrt(max((_gam_p * _gam_v**2).sum() - ((_gam_p * _gam_v).sum()) ** 2, 0.0)))
+        _model_tiles = [
+            mo.stat(f"{_beta:.2f}", label="psychometric slope β", bordered=True),
+            mo.stat(f"{100 * _lam:.1f}%", label="your fitted slip rate", bordered=True),
+            mo.stat(f"{_phi:.0f}° ± {_phi_sd:.0f}°", label="confusion-axis angle", bordered=True),
+            mo.stat(f"{np.exp(_gl * (0.147 - 0.966)):.2f}×", label="dark-page threshold ratio", bordered=True),
+            mo.stat(
+                f"{(_gam_p * _gam_v).sum():.2f} ± {_gam_sd:.2f}",
+                label="small-field exponent γ (needs glyph trials)",
+                bordered=True,
+            ),
+        ]
         _out = mo.vstack(
             [
                 mo.md(
-                    "**What the model has learned about your eyes** — the just-visible opponent-space "
-                    "difference per axis and ground (smaller is finer discrimination):"
+                    "**What the model has learned about your eyes** — CAM16-UCS distance per "
+                    "direction and Horizon ground at which you reach 75% correct, at 104 px "
+                    "(smaller is finer discrimination):"
                 ),
-                mo.hstack(
-                    [
-                        mo.stat(f"{_lum_d:.3f}", label="lightness · day", bordered=True),
-                        mo.stat(f"{_lum_n:.3f}", label="lightness · night", bordered=True),
-                        mo.stat(f"{_rg_d:.3f}", label="red–green · day", bordered=True),
-                        mo.stat(f"{_rg_n:.3f}", label="red–green · night", bordered=True),
-                        mo.stat(f"{_by_d:.3f}", label="blue–yellow · day", bordered=True),
-                        mo.stat(f"{_by_n:.3f}", label="blue–yellow · night", bordered=True),
-                        mo.stat(f"{100 * _lapse:.1f}%", label="your fitted slip rate", bordered=True),
-                    ],
-                    justify="start",
-                    gap=1,
-                ),
+                mo.hstack(_tiles, justify="start", gap=1),
+                mo.hstack(_model_tiles, justify="start", gap=1),
                 mo.hstack(
                     [
                         mo.stat(f"{len(_frame):,}", label="responses", bordered=True),
                         mo.stat(f"{100 * _acc:.0f}%", label="overall accuracy (chance 25%)", bordered=True),
-                        *[
-                            mo.stat(f"{100 * v:.0f}%", label=f"on the {g} ground", bordered=True)
-                            for g, v in _by_ground.items()
-                        ],
+                        *[mo.stat(f"{100 * v:.0f}%", label=f"on {g}", bordered=True) for g, v in _by_ground.items()],
                     ],
                     justify="start",
                     gap=1,
@@ -468,29 +520,46 @@ def _(mo):
 
     A pair at 25% is invisible to you; at 100% it is trivially yours; sequential ramps live or
     die by their *adjacent* pairs, categorical palettes by their worst pair anywhere. The tiles
-    report each axis's identified *threshold* τ/√w (the raw fitted weights are not comparable
-    across axes — their units are arbitrary, so a weight will happily chase the grid's edge);
-    everything measured here is at the trial patch size. Findings at 602 trials, where this
-    stage **converged** (68% credible intervals on all six thresholds within ±5%, so further
-    104-pixel trials sharpen nothing the grid can still resolve): slip rate ≤0.5%; night ground
-    reads 25–30% finer than day on every axis; red–green threshold ~0.017 day / ~0.012 night,
-    blue–yellow ~0.041 / ~0.028, lightness ~0.058 / ~0.040 (thresholds are in each axis's own
-    opponent units — compare grounds within an axis, not axes against each other). Every
-    candidate palette's worst pair sits at the lapse-limited ceiling on both
-    grounds — at exhibit scale, palette choice is freed from color-vision constraints and
-    belongs to aesthetics, ground contrast, and luminance monotonicity. A note on how trials
-    *feel*: an information-optimal trial sits near your threshold, so most should look nearly
-    indistinguishable — a run of "I'm mostly guessing" is the instrument working, not failing;
-    the model expects and absorbs those misses. What that does **not** settle is glyph scale:
-    color discrimination
-    collapses for small fields, editor tokens are ~10px, and text-sized stimuli are this
-    instrument's queued next stage — the measurement that actually decides the editor theme. Grounds
-    are logged because simultaneous contrast shifts discrimination — the same pair can pass on
-    one page and fail on the other. Trials accumulate in `calibration-responses.jsonl`, which is
-    committed like any measurement: future sessions (and future exhibits) read it to weight
-    palette choices by *your measured* confusions instead of the population model. When enough
-    trials exist, the next step is written in the queue: fit your personal confusion axis from
-    the misses and re-rank the theme gallery's dropdown with it.
+    report 75%-correct thresholds as CAM16-UCS distances (ΔE) — one perceptual currency for
+    every direction, ground, and instrument in the theme program, fit by the shared observer
+    model in `_observer.py` (v2: fitted slope and lapse, free confusion-axis orientation,
+    threshold smooth in ground lightness, small-field exponent). The v1 findings survive the
+    re-derivation at 748 trials, most of them sharpened:
+
+    - **Slip rate ~0.6%** — unchanged; your motor errors are negligible.
+    - **Dark pages read finer, ~0.76× the light-page threshold** — v1's 25–30% night
+      advantage, re-derived as a smooth lightness slope (gL ≈ 0.33) that now predicts
+      *every* candidate ground, not just the two Horizon pages.
+    - **Thresholds at 104 px, Horizon day / night**: lightness 3.2 / 2.5 ΔE, blue–yellow
+      3.6 / 2.8, red–green 5.3 / 4.1. v1's per-axis numbers were conditioned on an assumed
+      psychometric slope of 2; the fitted slope is **β ≈ 1.2** (shallower — misses fade in
+      gradually rather than cliff), so these are the better-calibrated figures.
+    - **Are you colorblind? The data says no.** The model lets a red–green confusion axis
+      emerge freely (orientation φ and a weight ellipse in the chromatic plane). What it
+      finds: your weakest chromatic direction sits at φ ≈ 1° ± 20° — too uncertain to even
+      call an axis — and your red–green threshold is 1.5× your blue–yellow one. Anomalous
+      trichromats show *several-fold* red–green elevation in comparable discrimination
+      tasks (Boehm, MacLeod & Bosten 2014, JOV; Bosten 2021, Vision Research reviews the
+      2–10× range), and a deficiency would pin φ near the protan/deutan line with a
+      strongly depressed weight — your weight ratio is a mild 0.39 with an unconstrained
+      angle. Mild red–green coarseness at this magnitude is within the normal range for a
+      4AFC patch task on an uncalibrated display. Every candidate palette's worst pair
+      still sits at the lapse-limited ceiling at 104 px on both Horizon grounds.
+    - **What 104 px does not settle, this instrument now measures**: blocks cycle three
+      patch sizes (104/16/10 px) and seven grounds (Horizon, Selenized, Modus, GitHub
+      dark). The small-field exponent γ starts flat by design and tightens as 10–16 px
+      trials accumulate — that number, not the exhibit-scale one, decides evolve-vs-switch
+      for the editor theme. Ground *warmth* stays out of the model until the ground family
+      decouples it from lightness; the hexes ride with every response either way.
+
+    A note on how trials *feel*: an information-optimal trial sits near your threshold, so
+    most should look nearly indistinguishable — a run of "I'm mostly guessing" is the
+    instrument working, not failing; the model expects and absorbs those misses. At 10 px
+    everything will feel hard: that is the point. Trials accumulate in
+    `calibration-responses.jsonl`, committed like any measurement; the fit is cached beside
+    it (`observer-fit.json`, plus an uncommitted binary posterior sidecar) and every
+    instrument — the aesthetics duels' hard constraints included — reads the same fit, so a
+    sitting here immediately retunes what the preference optimizer is allowed to show you.
     """)
     return
 
