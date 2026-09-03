@@ -76,6 +76,14 @@ interact, and choose the best combination — every step from measurement.
   threshold — so string and number are one literal family in anything built on these
   measurements, and any per-role color plan is checked pairwise against the thresholds
   before it is searched or shipped.
+- **A comparison splits the viewport; it does not lay cards on a shared page.** Painting a
+  duel's shared page with either candidate's ground advantages that one, and a neutral
+  surround puts BOTH candidates on a mismatched field — the very adaptation error the rule
+  below forbids, just at card scale. Splitting the viewport in two full-bleed halves, each
+  in its own ground with no gutter and no radius between them, is the only arrangement that
+  is matched and symmetric at once (Titus asked for it; a gutter would reintroduce a third
+  colour between the two things being compared). Content sits at the top-left of its half,
+  where an editor page starts, not centred in the field.
 - **The whole page takes the ground under test, not just the stimulus card.** He judges in
   full screen, where the surround is most of the adapting field, and adaptation state is
   part of the measurement by this program's own rule — a dark candidate read inside a light

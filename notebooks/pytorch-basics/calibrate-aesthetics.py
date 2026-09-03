@@ -1486,10 +1486,23 @@ def _(SESSION_START_N, get_responses, mo, random, render_card, run_info, schedul
           const wrap = document.createElement("div");
           // Full-bleed: marimo's prose column is ~700 px, too narrow for two code pages
           // at true editor sizes; the band breaks out to the viewport, capped at 1400 px.
-          wrap.style.cssText = `background:${model.get("strip_bg")};padding:18px;` +
+          // Inline while gated (so the page around it stays reachable), viewport-owning
+          // once a duel is revealed: he judges these in full screen and half a screen of
+          // unrelated page would be half the adapting field. Pausing returns it inline.
+          const inlineCss =
+            `background:${model.get("strip_bg")};padding:18px;` +
             `border-radius:10px;display:flex;flex-direction:column;gap:14px;` +
             `position:relative;left:50%;transform:translateX(-50%);` +
             `width:min(96vw, 1400px);box-sizing:border-box;color:${model.get("ink")}`;
+          const fullCss =
+            `background:${model.get("strip_bg")};padding:0;display:flex;` +
+            `flex-direction:column;gap:0;position:fixed;inset:0;z-index:60;` +
+            `box-sizing:border-box;color:${model.get("ink")}`;
+          wrap.style.cssText = inlineCss;
+          const setFrame = (full) => {
+            wrap.style.cssText = full ? fullCss : inlineCss;
+            top.style.padding = full ? "14px 20px 10px 20px" : "0";
+          };
           // The instruction bar: what kind of run (chip), what to do (question, large),
           // where you are in the run (progress). One glance, then act.
           const top = document.createElement("div");
@@ -1522,9 +1535,20 @@ def _(SESSION_START_N, get_responses, mo, random, render_card, run_info, schedul
           // opaque overlay on exactly that box, so reveal/pause never move the page.
           const stage = document.createElement("div");
           stage.style.cssText = "position:relative";
+          // A duel splits the VIEWPORT rather than laying two cards on a shared page.
+          // Each half is full-bleed in its own ground, so each candidate is judged in its
+          // own adaptation state -- the same reason the page takes the ground on a
+          // single-card trial. A neutral surround would put every card on a mismatched
+          // field, and painting the shared page with either candidate's ground would
+          // advantage that one; splitting is the only arrangement that is both matched and
+          // symmetric. No gap and no radius between the halves: a gutter would reintroduce
+          // a third colour between the two things being compared.
+          const isDuel = model.get("mode") === "duel";
           const row = document.createElement("div");
-          row.style.cssText = "display:flex;gap:16px;justify-content:center;" +
-            "align-items:stretch;width:100%;visibility:hidden";
+          row.style.cssText = isDuel
+            ? "display:flex;gap:0;align-items:stretch;width:100%;visibility:hidden;flex:1 1 auto"
+            : "display:flex;gap:16px;justify-content:center;align-items:stretch;" +
+              "width:100%;visibility:hidden";
           const cover = document.createElement("div");
           cover.style.cssText = `position:absolute;inset:0;display:flex;flex-direction:column;` +
             `align-items:center;justify-content:center;gap:16px;border-radius:10px;` +
@@ -1543,6 +1567,7 @@ def _(SESSION_START_N, get_responses, mo, random, render_card, run_info, schedul
             cover.style.display = "flex";
             row.style.visibility = "hidden";
             pauseBtn.style.visibility = "hidden";
+            if (isDuel) setFrame(false);
           };
           let idleTimer = null;
           const armIdle = () => {
@@ -1550,6 +1575,7 @@ def _(SESSION_START_N, get_responses, mo, random, render_card, run_info, schedul
             idleTimer = setTimeout(() => doPause("paused after 25 s without a click"), 25000);
           };
           const reveal = () => {
+            if (isDuel) setFrame(true);
             cover.style.display = "none";
             row.style.visibility = "visible";
             pauseBtn.style.visibility = "visible";
@@ -1588,9 +1614,12 @@ def _(SESSION_START_N, get_responses, mo, random, render_card, run_info, schedul
           model.get("cards").forEach((c, i) => {
             const card = document.createElement("div");
             card.innerHTML = c.html;
-            card.style.cssText = `background:${c.ground};border-radius:10px;padding:20px;` +
-              `flex:1 1 0;min-width:0;overflow:hidden`;
-            if (model.get("mode") === "duel") {
+            card.style.cssText = isDuel
+              ? `background:${c.ground};padding:24px;flex:1 1 0;min-width:0;` +
+                `overflow:hidden;display:flex;align-items:center;justify-content:center`
+              : `background:${c.ground};border-radius:10px;padding:20px;` +
+                `flex:1 1 0;min-width:0;overflow:hidden`;
+            if (isDuel) {
               card.style.cursor = "pointer";
               card.onclick = () => pick(i);
             } else {
