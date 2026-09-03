@@ -159,8 +159,11 @@ each with its operational form:
   toward flat — one expressive accent family stays alive (Horizon's warm corals) so the page
   keeps its character. If a quieting pass makes a surface feel dead, it overshot the ridge.
 - **Ecological valence** (Palmer, Schloss): color preference is accumulated personal
-  association, so the optimal accents are colors Titus names as loved — an input only he can
-  give (asked 2026-09-02, pending). Until then the theme's own hues stand in.
+  association — so it must be MEASURED, not asked for. Titus's standing instruction is
+  that his preferences are discovered rather than declared, which makes the prior mean
+  carry only the field's general harmony models and puts his particular hues in the
+  duel data. Consequence for the search: hue axes must keep getting explored, since a
+  search that settles on lightness can never surface a hue preference.
 - **Peak shift** (Ramachandran): mild exaggeration of a signature reads as more beautiful than
   the original. Licensed only on rare surfaces (links, errors, selection) and never on body
   tokens; wants glyph-scale data first.

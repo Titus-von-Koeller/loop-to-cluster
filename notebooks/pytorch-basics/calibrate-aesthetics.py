@@ -60,11 +60,20 @@ def _(mo):
     Trials run in twenty-four-trial blocks per polarity (light page, dark page), each a run
     of sixteen duels, then four comprehension probes, then four find hunts — same-kind
     trials batched so one instruction serves a run and you never switch task mid-stride; a
-    begin button gates each run. Blocks by polarity so your adaptation
-    state is part of the measurement, not noise in it. Every response appends to
-    `aesthetics-responses.jsonl` beside this file with the full stimulus and both timestamps;
-    sittings accumulate. One input the model still wants and cannot infer: **the colors you
-    love** — name them in any session and the ecological-valence prior stops being a stand-in.
+    begin button gates each run. Blocks by polarity so your adaptation state is part of the
+    measurement, not noise in it — and the **whole page**, not just the band, takes the
+    ground under test, because in full screen the surround is most of what your eyes adapt
+    to. A duel keeps the polarity's neutral surround, since the two candidates have
+    different grounds and painting the page with either would advantage it; a single-card
+    trial paints the page with the theme under test, which is what a theme owning the screen
+    actually looks like. Every response appends to `aesthetics-responses.jsonl` beside this
+    file with the full stimulus, the surround and both timestamps; sittings accumulate.
+
+    Nothing is asked of you but clicks. Which colors you love is **inferred, never
+    declared**: the prior mean carries only the field's general harmony models, and your own
+    hues emerge from the duels — which is why the search deliberately keeps exploring hue
+    rather than settling on lightness alone, and why a stated favourite would be worth less
+    than a measured one anyway.
     """)
     return
 
@@ -1392,6 +1401,9 @@ def _(SESSION_START_N, get_responses, mo, random, render_card, run_info, schedul
     _rng = random.Random(_n * 48271 % (2**31))
     _snip = snippet_for(_t["snippet"], _t.get("snippet_width"))
     _strip = {"day": "#d8d2cf", "night": "#14161c"}[_t["polarity"]]
+    # A duel's surround must not favour either arm, so it stays the polarity's neutral; a
+    # single-card trial paints the page with the theme under test.
+    _page_bg = _strip if _t["mode"] == "duel" else _t["theme_a"]["ground"]
     _ptxt = {"day": "#3a3532", "night": "#b8bcc6"}[_t["polarity"]]
 
     import anywidget
@@ -1415,6 +1427,24 @@ def _(SESSION_START_N, get_responses, mo, random, render_card, run_info, schedul
           let pausedNow = false;
           let pauses = 0;            // pauses AFTER the first reveal only
           el.style.cssText = "display:block;width:100%";
+          // The WHOLE page takes the surround, not just the band. Titus judges these in
+          // full screen, and in the vision instrument's own rule adaptation state is part
+          // of the measurement: a dark candidate read inside a light page is measured in
+          // the wrong adaptation state, and the surround dominates the field in full
+          // screen. For a duel the surround is the polarity's fixed neutral -- the two
+          // candidates have DIFFERENT grounds and painting the page with either would
+          // advantage it -- while a single-card trial takes the candidate's own ground,
+          // which is what a theme owning the screen actually looks like.
+          let pageStyle = document.getElementById("theme-trial-surround");
+          if (!pageStyle) {
+            pageStyle = document.createElement("style");
+            pageStyle.id = "theme-trial-surround";
+            document.head.appendChild(pageStyle);
+          }
+          const surround = model.get("page_bg");
+          pageStyle.textContent =
+            "html, body, #root, #App, .marimo, main { background: " + surround +
+            " !important; } body { transition: background 120ms linear; }";
           const wrap = document.createElement("div");
           // Full-bleed: marimo's prose column is ~700 px, too narrow for two code pages
           // at true editor sizes; the band breaks out to the viewport, capped at 1400 px.
@@ -1547,6 +1577,7 @@ def _(SESSION_START_N, get_responses, mo, random, render_card, run_info, schedul
         """
         mode = traitlets.Unicode("duel").tag(sync=True)
         strip_bg = traitlets.Unicode("#888888").tag(sync=True)
+        page_bg = traitlets.Unicode("#888888").tag(sync=True)
         ink = traitlets.Unicode("#808080").tag(sync=True)
         prompt_html = traitlets.Unicode("").tag(sync=True)
         chip = traitlets.Unicode("").tag(sync=True)
@@ -1620,6 +1651,7 @@ def _(SESSION_START_N, get_responses, mo, random, render_card, run_info, schedul
         _ThemeTrial(
             mode=_t["mode"],
             strip_bg=_strip,
+            page_bg=_page_bg,
             ink=_ptxt,
             prompt_html=_prompt,
             chip=_chip,
@@ -1657,6 +1689,11 @@ def _(LOG, datetime, get_responses, json, random, set_responses, snippet_for, ti
             "snippet_kind": _snip.get("kind"),
             "snippet_fresh": bool(_snip.get("fresh", True)),
             "surface": _t.get("surface", "editor"),
+            "page_bg": (
+                {"day": "#d8d2cf", "night": "#14161c"}[_t["polarity"]]
+                if _t["mode"] == "duel"
+                else _t["theme_a"]["ground"]
+            ),
             "code_px": _t["code_px"],
             "theta_a": _t["theta_a"],
             "theme_a": _t["theme_a"],
