@@ -110,12 +110,27 @@ Two operational corollaries, both applied and liked:
 - **Content over commentary**: comments sit a deliberate contrast step below body tokens
   (context, not figure), with the italic carrying the rest of the distinction — but never below
   4.5:1 on the deepest surface they appear on.
-- **Reading typography** (iterated live 2026-09-02): running prose holds the 66–70-character
-  measure (38em at 17px serif), leading 1.6 body / 1.3 headings, kerning pinned; code and
-  tables stay uncapped — data may be wide, running text never. Prose sits on the page, only
-  machine artifacts are cards. Shadows in a flat design: y-offset only (light from
-  top-center), two layers (tight contact + wide ambient), alphas low, and tinted with the
-  page's darkened hue on warm paper — never gray-black.
+- **Reading typography**: running prose is a CENTERED reading column — one ~70-character
+  measure (40em at 17px serif) shared by body and headings so the column keeps a single
+  internal left edge, leading 1.6 body / 1.3 headings, kerning pinned; code cells and
+  in-markdown tables run full ensemble width as deliberate full-bleed breakouts. Prose and
+  code share a central axis, not an edge (Titus dropped the shared-edge constraint: moving
+  to code is a context switch anyway; symmetric margins read calmer than a one-sided
+  desert). Prose sits on the page, only machine artifacts are cards — and **elevation
+  tracks open state**: an expanded cell is raised, a collapsed one flattens into the page,
+  so under fold hygiene the raised card follows the reader's focus for free.
+- **Shadows in a flat design**: y-offset only (light from top-center), two layers (tight
+  contact + wide ambient), alphas low, tinted with the page's darkened hue on warm paper —
+  never gray-black. **Negative spread on both layers** (`0 5px 14px -6px`): side chrome
+  (gutters, focus indicators) repaints over anything drawn beneath it during scroll, so a
+  shadow that reaches sideways flickers there. And radius without overflow-clipping rounds
+  each element's OWN paint only — every background-painting child (monaco's `.margin`
+  gutter, `.monaco-editor-background`) needs the radius itself or its corners bleed.
+- **Embedded monaco follows the host palette by variable capture**: capture the host
+  theme's `--vscode-*` values on body before monaco's own theme shadows the same names on
+  its container, then pin `.monaco-editor` to the captured copies. The Claude Code diff
+  pane works this way (dotfiles patch `claude_code_diff_theme.py`), so palette changes in
+  settings.jsonc flow through with no re-patching.
 - **Iterate live, bake the winner**: candidate styles go into the running workbench through
   the CDP CSS domain (and adoptedStyleSheets for shadow DOM) for instant screenshots; only
   the converged values are baked into dotfiles (workbench-fonts.css, notebook-prose.py,
