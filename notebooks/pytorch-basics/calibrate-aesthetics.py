@@ -1051,7 +1051,10 @@ def _(DUEL_WIDTH, POOL, math, np, prior_mean, qmc, random, realize):
             "delta": _delta,
             "sides": _sides,
         }
-        _FIT_MEMO.clear()
+        # A few entries rather than one: the progress readout fits the log as it stood some
+        # duels ago and compares, which needs two fits alive at once.
+        if len(_FIT_MEMO) > 4:
+            _FIT_MEMO.pop(next(iter(_FIT_MEMO)))
         _FIT_MEMO[_key] = _out
         return _out
 
@@ -1327,6 +1330,48 @@ def _(DUEL_WIDTH, POOL, math, np, prior_mean, qmc, random, realize):
             "verdict": _verdict,
         }
 
+    def progress_report(responses, polarity, thetas, back=25):
+        """Is another sitting worth clicking? Compare the verdict now with the verdict as
+        it stood `back` duels ago, on the SAME candidate set so the comparison is about
+        evidence rather than about which themes happened to be bred.
+
+        Two honest numbers come out of it: how the leader's share of the argmax mass moved,
+        and how much the credible set shrank. The extrapolation to "duels still needed" is
+        deliberately labelled naive -- it assumes the current rate continues, which it will
+        not exactly, and it is there to answer "another hundred or another thousand" rather
+        than to promise a finish line.
+        """
+        _duels = [_r for _r in responses if _r.get("mode") == "duel" and _r.get("choice") in (0, 1)]
+        if len(_duels) < back + 12:
+            return None
+        _now = fitted(responses)
+        _cut = len(_duels) - back
+        _seen, _hist = 0, []
+        for _r in responses:
+            if _r.get("mode") == "duel" and _r.get("choice") in (0, 1):
+                if _seen >= _cut:
+                    continue
+                _seen += 1
+            _hist.append(_r)
+        _then = fitted(_hist)
+        if _then is None:
+            return None
+        _b_now = best_set(_now, polarity, thetas, seed=17)
+        _b_then = best_set(_then, polarity, thetas, seed=17)
+        _lead_gain = _b_now["lead"] - _b_then["lead"]
+        _need = None
+        if _lead_gain > 1e-3 and _b_now["lead"] < 0.5:
+            _need = int(np.ceil((0.5 - _b_now["lead"]) / (_lead_gain / back)))
+        return {
+            "duels": len(_duels),
+            "lead_now": _b_now["lead"],
+            "lead_then": _b_then["lead"],
+            "set_now": len(_b_now["credible"]),
+            "set_then": len(_b_then["credible"]),
+            "back": back,
+            "duels_to_decide": _need,
+        }
+
     def spread_out(thetas, idx, k, ls=None):
         """k maximally different members of a set -- greedy max-min in scaled theta space.
 
@@ -1531,6 +1576,7 @@ def _(DUEL_WIDTH, POOL, math, np, prior_mean, qmc, random, realize):
         fitted,
         mu_at,
         posterior_joint,
+        progress_report,
         rt_at,
         rt_fit,
         rt_penalty,
@@ -2083,6 +2129,7 @@ def _(
     mu_at,
     np,
     pd,
+    progress_report,
     render_card,
     rt_fit,
     rt_penalty,
@@ -2179,9 +2226,45 @@ def _(
                         f"than a real plateau. {len(_cred)} themes share half the mass; more duels "
                         f"on this polarity will separate them"
                     )
+                _prog = progress_report(_log, _pol, _thetas)
+                _prog_note = ""
+                if _prog is not None:
+                    _moved = 100 * (_prog["lead_now"] - _prog["lead_then"])
+                    _shrunk = _prog["set_then"] - _prog["set_now"]
+                    _head = (
+                        f" Over the last {_prog['back']} duels the leader's share moved "
+                        f"{_moved:+.0f} points and the credible set changed by {-_shrunk:+d} themes"
+                    )
+                    if _prog["duels_to_decide"] is not None:
+                        # A leader gaining ground: extrapolate, and say plainly that it is
+                        # a straight line through two points.
+                        _prog_note = (
+                            f"{_head}; at that rate roughly {_prog['duels_to_decide']} more duels "
+                            f"would give one theme a majority — a naive straight-line estimate, "
+                            f"worth reading as 'another sitting' or 'another ten'."
+                        )
+                    elif _shrunk > 0:
+                        # The distinction that matters and that a two-case reading gets
+                        # wrong: mass can move AWAY from the leader while the set shrinks.
+                        # That is not stalling, it is the model resolving a real plateau --
+                        # evidence still arriving, just not concentrating on one page.
+                        _prog_note = (
+                            f"{_head} — so evidence is still arriving and the field is narrowing, "
+                            f"but the mass is spreading across the survivors rather than "
+                            f"concentrating: what a genuine plateau looks like as it comes into "
+                            f"focus. More duels sharpen WHICH themes are on the shelf, not which "
+                            f"one wins."
+                        )
+                    else:
+                        _prog_note = (
+                            f"{_head} — flat on both counts, so more duels on this polarity are "
+                            f"buying little and the shelf above is the answer rather than a "
+                            f"waypoint."
+                        )
                 _blocks.append(
                     mo.md(
-                        f"### The {_pol} verdict\n\n{_verdict}.{_rt_note} Shown below: the leader, then the "
+                        f"### The {_pol} verdict\n\n{_verdict}.{_rt_note}{_prog_note}"
+                        f" Shown below: the leader, then the "
                         f"most *different* members of the set holding half the probability mass — "
                         f"near-identical themes are grouped first, so what you see are choices "
                         f"rather than variations of one."
