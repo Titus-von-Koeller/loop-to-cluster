@@ -574,41 +574,27 @@ def _(mo):
     digits stay, so what changes is exactly the reinforcement layer the verdict above weighs.
 
     The dropdown is ordered as a ranking for *this* use — digit-bearing grids, read on both
-    Horizon pages, by an author with mild red-green deficiency: CVD-safe uniformity first
-    (cividis, batlow, viridis), then the integrated incumbent, then the remaining uniform and
-    single-hue maps by local contrast, with the two luminance-non-monotonic rainbows last —
-    present for comparison, not candidacy.
+    Horizon pages — by **your measured observer** (`_observer.py`, fit from your odd-one-out
+    responses), not by a population simulation: each ramp is scored by its worst adjacent-pair
+    discriminability, the minimum over both grounds of the fitted probability that you tell
+    neighboring steps apart at exhibit scale. (An earlier ordering here leaned on an assumed
+    mild red-green deficiency; the fitted observer shows no deficiency signal, so the
+    measurement retired that assumption.) The two luminance-non-monotonic rainbows stay last
+    regardless of score — luminance monotonicity is a house rule, and their adjacent-step
+    contrast is exactly the property that makes them lie about magnitude — present for
+    comparison, not candidacy.
     """)
     return
 
 
 @app.cell(hide_code=True)
-def _(mo):
-    ramp_choice = mo.ui.dropdown(
-        options=[
-            "cividis",
-            "batlow (Crameri)",
-            "viridis",
-            "RAMP (house)",
-            "YlGnBu (Brewer)",
-            "magma",
-            "plasma",
-            "inferno",
-            "Blues (Brewer)",
-            "cubehelix",
-            "turbo",
-            "jet",
-        ],
-        value="RAMP (house)",
-        label="sequential ramp, ranked",
-    )
-    ramp_choice
-    return (ramp_choice,)
+def _(RAMP, cmc, luminance, mo, sample_cmap):
+    from pathlib import Path as _P
 
+    from _observer import discriminability as _disc
+    from _observer import fit as _obs_fit
 
-@app.cell(hide_code=True)
-def _(INK_DARK, INK_LIGHT, RAMP, alt, cmc, luminance, mo, pd, ramp_choice, sample_cmap, torch):
-    _ramps = {
+    RAMPS = {
         "cividis": sample_cmap("cividis", 5),
         "batlow (Crameri)": sample_cmap(cmc.batlow, 5),
         "viridis": sample_cmap("viridis", 5),
@@ -622,7 +608,39 @@ def _(INK_DARK, INK_LIGHT, RAMP, alt, cmc, luminance, mo, pd, ramp_choice, sampl
         "turbo": sample_cmap("turbo", 5),
         "jet": sample_cmap("jet", 5),
     }
-    _ramp = _ramps[ramp_choice.value]
+    # Measured ranking: worst adjacent-pair discriminability under the fitted observer,
+    # minimum over both Horizon grounds — replacing the earlier hand order that leaned on
+    # an assumed (and since falsified) red-green deficiency. Luminance-non-monotonic
+    # rainbows sort last regardless: monotonicity is a house rule the score cannot buy back.
+    _log = _P(__file__).parent / "calibration-responses.jsonl"
+
+    def _monotone(hexes):
+        from itertools import pairwise as _pw
+
+        _l = [luminance(_h) for _h in hexes]
+        return all(_a < _b for _a, _b in _pw(_l)) or all(_a > _b for _a, _b in _pw(_l))
+
+    if _log.exists():
+        _fit = _obs_fit(_log)
+
+        def _score(hexes):
+            from itertools import pairwise as _pw2
+
+            return min(_disc(_fit, _a, _b, _g) for _a, _b in _pw2(hexes) for _g in ("#fdf0ed", "#1c1e26"))
+
+        _ranked = sorted(RAMPS, key=lambda k: (not _monotone(RAMPS[k]), -_score(RAMPS[k]), k))
+        _label = f"sequential ramp, ranked by your measured eyes ({_fit.n} trials)"
+    else:
+        _ranked = list(RAMPS)
+        _label = "sequential ramp, ranked (no calibration log on this machine: hand order)"
+    ramp_choice = mo.ui.dropdown(options=_ranked, value="RAMP (house)", label=_label)
+    ramp_choice
+    return RAMPS, ramp_choice
+
+
+@app.cell(hide_code=True)
+def _(INK_DARK, INK_LIGHT, RAMPS, alt, luminance, mo, pd, ramp_choice, torch):
+    _ramp = RAMPS[ramp_choice.value]
     _values = torch.arange(48).reshape(6, 8)
     _limit = float(_values.max())
     _frame = pd.DataFrame(
