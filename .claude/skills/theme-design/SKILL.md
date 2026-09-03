@@ -76,6 +76,47 @@ interact, and choose the best combination — every step from measurement.
   threshold — so string and number are one literal family in anything built on these
   measurements, and any per-role color plan is checked pairwise against the thresholds
   before it is searched or shipped.
+- **A candidate pool is a codebook, and that cuts both ways.** Revisiting the same
+  candidate points concentrates information and sharpens the posterior; a fully churning
+  candidate set spreads every answer over ground never seen again. Measured on synthetic
+  observers: replacing the standing pool with bred children scored WORSE, and a
+  512-per-trial immigrant flood scored worse than no immigrants at all. Breed refinement
+  *on top of* a standing pool, with a small Sobol trickle (64) for genuinely new ground.
+- **Declare the explore/exploit split; never let the candidate mix decide it.** Adding
+  local children silently pulled Thompson's argmax toward the incumbent's basin and cost
+  reach. Stratified Thompson — draw the champion arm from the global stratum a declared
+  fraction of the time — restores it without giving up refinement.
+- **Refine where the mean is high, explore where variance is.** Thompson-sampled elites
+  (refining around high-variance regions) were tried and measured clearly worse.
+- **Dimensionality beats sampler.** In nine dimensions with ~60 duels, no strategy finds a
+  mode narrower than the kernel length-scale — both the old and new candidate schemes score
+  ~0 on such a landscape. What buys convergence is reducing effective dimension (ARD) and an
+  informative prior, not a cleverer search. ARD length-scales must be shrunk toward isotropy
+  while relevance is unidentifiable (weight n/160): at 60 duels the raw estimate is noise.
+- **Randomize position AND fit its effect.** He picks the right-hand card 61% of the time
+  (z = -1.91 over 79 duels). Randomization alone leaves that on the estimate as noise; a
+  fitted side-advantage term subtracts it, and it is reconstructible from a logged swap flag
+  so no past duel is wasted.
+- **A stimulus shown twice measures memory.** Four snippets over 116 trials turned
+  time-to-find into a practice curve (find-hunt RT vs trial index r = -0.47). Reaction-time
+  stimuli are generated fresh per trial, with the page's hash and a freshness flag logged so
+  corpus exhaustion is visible rather than silent. Hold role statistics, line count and
+  nesting constant across pages, or a reaction-time difference is a difference between pages
+  rather than between themes.
+- **Report a verdict as a distribution, not a ranking.** P(best) sampled from the JOINT
+  posterior (marginals scatter the probability across near-identical neighbours) says whether
+  one theme leads or a plateau of equals exists; plateau members are then chosen for maximal
+  difference from each other, since a plateau is only useful if its members are visibly
+  distinct choices. Everything on that shelf has already cleared the legibility floors, so a
+  plateau means equally good, not merely acceptable.
+- **Surface is a stimulus factor, not a theme axis.** A theme is one theme seen in several
+  arrangements (bare editor, chat panel, notebook). Keep utility defined over the theme and
+  log the surface, so an interaction can be tested later instead of assumed away.
+- **A statistical instrument needs recovery tests.** Give the model synthetic observers whose
+  truth is known and check it recovers them; keep the tests beside the instrument, load its
+  code by AST rather than duplicating it, and record the changes that measured WORSE — a
+  plausible-sounding change that degrades an instrument is the expensive kind of mistake.
+  loop-to-cluster: `notebooks/pytorch-basics/_model_tests.py`.
 - A surface's beauty is allowed to vote and never to overrule the instruments; Titus's eyes
   outrank both — his comparison across a gallery row is the final measurement.
 - Verify a theme change by **pixel-sampling a screenshot against the expected hexes**, never by
