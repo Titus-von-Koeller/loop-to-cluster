@@ -324,20 +324,11 @@ def _(DE_MIN, apca_lc, composite, hex_to_rgb, math, np, rgb_to_hex, rgb_to_ucs, 
     def _theta_key(theta, polarity):
         return (tuple(round(float(_v), 6) for _v in theta), polarity)
 
-    def realize(theta, polarity):
-        """theta in [0,1]^9 -> a full, floor-satisfying theme (hexes + meta), or None when
-        the hard constraints cannot be met. Floors are constraints, never objectives: WCAG
-        4.5:1 and APCA |Lc| >= 60 for body tokens (comments >= 4.5:1, |Lc| >= 45), and
-        pairwise CAM16-UCS separation >= 2x your measured 104-px threshold between any two
-        colored roles and ink — doubled because discrimination collapses toward glyph
-        scale; the comprehension probes measure the truth of that margin directly."""
-        _key = _theta_key(theta, polarity)
-        if _key in _REALIZE_CACHE:
-            return _REALIZE_CACHE[_key]
-        _theme = _realize_uncached(theta, polarity)
-        _REALIZE_CACHE[_key] = _theme
-        return _theme
-
+    # NOTE (marimo name mangling, measured 2026-09-03): a cell-local (underscore) name
+    # referenced from inside an exported function resolves only if it is defined ABOVE
+    # that function in the cell — a later definition stays unmangled in the function body
+    # and NameErrors at call time under `marimo run`, invisibly to script execution.
+    # Helpers therefore precede their exported callers.
     def _realize_uncached(theta, polarity):
         _t = np.asarray(theta, dtype=float)
         _night = polarity == "night"
@@ -434,6 +425,20 @@ def _(DE_MIN, apca_lc, composite, hex_to_rgb, math, np, rgb_to_hex, rgb_to_ucs, 
             "salience": round(_sal, 2),
             "body_ratio": round(float(_rr[:4].min()), 2),
         }
+
+    def realize(theta, polarity):
+        """theta in [0,1]^9 -> a full, floor-satisfying theme (hexes + meta), or None when
+        the hard constraints cannot be met. Floors are constraints, never objectives: WCAG
+        4.5:1 and APCA |Lc| >= 60 for body tokens (comments >= 4.5:1, |Lc| >= 45), and
+        pairwise CAM16-UCS separation >= 2x your measured 104-px threshold between any two
+        colored roles and ink — doubled because discrimination collapses toward glyph
+        scale; the comprehension probes measure the truth of that margin directly."""
+        _key = _theta_key(theta, polarity)
+        if _key in _REALIZE_CACHE:
+            return _REALIZE_CACHE[_key]
+        _theme = _realize_uncached(theta, polarity)
+        _REALIZE_CACHE[_key] = _theme
+        return _theme
 
     # ------------------------------------------------------------------ the prior mean
     def _lab(hexes):

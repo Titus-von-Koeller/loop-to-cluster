@@ -96,7 +96,13 @@ its `.value` from a downstream cell, and dedupe (first click of a fresh widget c
 No surface reliably repaints the cell the user just interacted with, so displays that must
 change live in their own cells, controls stay static or trial-agnostic, and recorded data is
 derived from state at event time — never from a rendering's closure — with a state-generation
-guard so a stale surface drops a click instead of mis-recording. UI elements interpolate into
+guard so a stale surface drops a click instead of mis-recording. A cell-local (underscore)
+name referenced from inside an exported function resolves only if it is defined *above* that
+function in the cell: a later definition stays unmangled in the function body and NameErrors
+at call time — **only under `marimo run`/`edit`**, because script execution shares one
+namespace and never mangles. So helpers precede their exported callers, and an interactive
+instrument's checks include a served-page smoke test, not just the script run (measured
+2026-09-03, calibrate-aesthetics). UI elements interpolate into
 `mo.md` f-strings (how controls sit on a styled ground); multi-paragraph `mo.md` inside an
 `hstack` lays its paragraphs out horizontally in the VSCode renderer — use explicit stacks.
 Interactive instruments are verified by clicking them in a real browser (`marimo run` +
@@ -254,8 +260,11 @@ one-line spark. When a queue item is opened, closed, or founded, mirror the one-
   constraints realized by walking lightness to the bar; Ou–Luo/Berlyne/warm-tilt prior
   mean. Verified: strict check, headless exit 0, 160-trial synthetic sitting recovers a
   planted optimum (100% day / 47% night at ~35 duels each), deterministic replay from the
-  log across fresh kernels. Data: `aesthetics-responses.jsonl`. Remaining: real-browser
-  interactive verification, then Titus clicks. Ecological-valence prior is a stand-in
+  log across fresh kernels; browser-verified 2026-09-03 (12 duels + both task modes clicked
+  over CDP against a served copy: rows carry both timestamps, double-click dedupes, grounds
+  pixel-match the log, and the loop resumed correctly across a server restart). Data:
+  `aesthetics-responses.jsonl`. **Serving on port 2919** (zellij pane `calibrate-aesthetics`,
+  lock `port-2919`) — Titus clicks next. Ecological-valence prior is a stand-in
   until he names loved colors (asked in the intro prose).
 - The theme program (named 2026-09-02): determine independently the best *editor* theme for
   Titus (best-in-class as the starting field — Selenized, Modus, GitHub accessible, Horizon —
