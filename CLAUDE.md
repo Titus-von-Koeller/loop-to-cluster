@@ -348,7 +348,10 @@ numbered cross-reference breaks every other page as soon as the order changes.
 ## Commits
 
 Straight to `main`, never a branch: more than one agent works here, so a branch only diverges from
-what the other is committing. Stage paths explicitly — `git add <paths>`, never `git add -A`.
+what the other is committing. Stage paths explicitly — `git add <paths>`, never `git add -A` — and
+stage and commit in the *same* command (or `git commit <paths>`): the index is shared with every
+parallel session, and a bare `git commit` sweeps whatever another session left staged (measured:
+one session's in-progress scripts landed in another's commit).
 **Ask before staging anything under `scripts/` or `notebooks/`**; those are Titus's.
 
 **Push every commit or commit batch to origin immediately.** Unpushed local-only commits are a
