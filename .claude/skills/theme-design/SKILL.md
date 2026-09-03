@@ -146,6 +146,14 @@ interact, and choose the best combination — every step from measurement.
 - **Surface is a stimulus factor, not a theme axis.** A theme is one theme seen in several
   arrangements (bare editor, chat panel, notebook). Keep utility defined over the theme and
   log the surface, so an interaction can be tested later instead of assumed away.
+- **Optimize by measurement, and state the crossover.** Three "obvious" speedups on the
+  instrument's hot path: memoizing the fit (a real win — the trial cell and the analysis
+  cell both asked for the same cubic-cost fit), halving the P(best) sample count (145 ms to
+  101 ms, and +/-1% on a probability is far inside what the verdict distinguishes), and
+  vectorizing the Laplace Hessian — which made it 54% SLOWER via np.add.at, and still
+  slower than the Python loop as one BLAS product at today's log length. Kept for its
+  scaling, with the crossover written at the site. A recovery-test suite is what makes this
+  safe: identical numbers prove the rewrite was arithmetic-preserving, not just fast.
 - **A statistical instrument needs recovery tests.** Give the model synthetic observers whose
   truth is known and check it recovers them; keep the tests beside the instrument, load its
   code by AST rather than duplicating it, and record the changes that measured WORSE — a

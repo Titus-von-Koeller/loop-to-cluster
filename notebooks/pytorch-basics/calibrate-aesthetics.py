@@ -647,26 +647,32 @@ agg_item = agg.item()
         _key = (int(seed), width, target_kind, lines)
         if _key in _SNIP_MEMO:
             return _SNIP_MEMO[_key]
-        # The generator cannot promise every length for every seed -- its shapes are
-        # calibrated near fourteen lines and a long page is a taller order -- so the request
-        # walks down in steps before giving up. A control page is the last resort only,
-        # because it is code he has seen and freshness is the whole point.
+        # Width and length are PREFERENCES; freshness is the requirement. The generator
+        # cannot promise every shape for every seed -- a narrow 28-line page is a tall
+        # order, and asking for 64 columns alone lost half the seeds -- so the request
+        # relaxes in a declared order: hold the narrow column and shorten, then widen a
+        # step and shorten again, and only if every combination fails fall back to a
+        # control page, which is code he has already seen and therefore the last resort.
+        _lines_ladder = [int(lines), int(lines) - 4, int(lines) - 8, None] if lines else [None]
+        _width_ladder = [int(width), int(width) + 8, int(width) + 16, None] if width else [None]
         _s = None
-        _wants = [int(lines)] if lines else [None]
-        if lines:
-            _wants += [int(lines) - 4, int(lines) - 8, None]
-        for _want in _wants:
-            try:
-                _kw = {} if width is None else {"max_width": int(width)}
-                if target_kind:
-                    _kw["target_kind"] = target_kind
-                if _want:
-                    _kw["lines"] = _want
-                _s = dict(_codegen.snippet(int(seed), **_kw))
-                _s.setdefault("ident", _s.get("target"))
+        for _w in _width_ladder:
+            for _ln in _lines_ladder:
+                try:
+                    _kw = {}
+                    if _w:
+                        _kw["max_width"] = _w
+                    if _ln:
+                        _kw["lines"] = _ln
+                    if target_kind:
+                        _kw["target_kind"] = target_kind
+                    _s = dict(_codegen.snippet(int(seed), **_kw))
+                    _s.setdefault("ident", _s.get("target"))
+                    break
+                except Exception:
+                    continue
+            if _s is not None:
                 break
-            except Exception:
-                continue
         if _s is None:
             _s = _CONTROL[int(seed) % len(_CONTROL)]
         _SNIP_MEMO[_key] = _s
@@ -935,30 +941,40 @@ def _(DUEL_WIDTH, POOL, np, prior_mean, qmc, random, realize):
         _K = _kmat(X, X, ls) + 1e-6 * np.eye(_n)
         _Ki = np.linalg.inv(_K)
         _f = m.copy()
-        _W = np.zeros((_n, _n))
+        _W = np.zeros((_n, _n))  # replaced each Newton step; kept for the final _cov
         _sd = np.zeros(len(duels)) if sides is None else np.asarray(sides, dtype=float)
         _delta = 0.0
         for _round in range(3):
+            # One BLAS product per Newton step instead of a Python loop over duels. Each
+            # duel contributes q_k (e_win - e_lose)(e_win - e_lose)^T to the Hessian, which
+            # is exactly D^T diag(q) D for the difference matrix D -- so the whole update is
+            # two matrix products. Measured on the live log: the loop cost 108 ms per fit,
+            # an np.add.at scatter cost 166 ms (add.at is unbuffered and slow), and this
+            # costs 128 ms -- SLOWER than the loop at today's 121 duels, because building D
+            # dominates at this size. Kept anyway: the loop pays one interpreter trip per
+            # duel per Newton step, so it degrades linearly in log length where this is one
+            # BLAS call, and 20 ms is noise against a 350 ms trial. Revisit only if a fit
+            # ever dominates again. Identical arithmetic either way -- the recovery tests
+            # reproduce every number.
+            _D = np.zeros((len(duels), _n))
+            for _k, (_w, _l) in enumerate(duels):
+                _D[_k, _w] += 1.0
+                _D[_k, _l] -= 1.0
+            _lm_v = np.asarray(lam, dtype=float)
+            _Dl = _D * _lm_v[:, None]
             for _ in range(60):
-                _g = np.zeros(_n)
-                _W[:] = 0.0
-                for _k, ((_w, _l), _lm) in enumerate(zip(duels, lam, strict=True)):
-                    _z = _lm * (_f[_w] - _f[_l]) + _delta * _sd[_k]
-                    _p = 1.0 / (1.0 + np.exp(-_z))
-                    _g[_w] += _lm * (1 - _p)
-                    _g[_l] -= _lm * (1 - _p)
-                    _q = _lm * _lm * _p * (1 - _p)
-                    _W[_w, _w] += _q
-                    _W[_l, _l] += _q
-                    _W[_w, _l] -= _q
-                    _W[_l, _w] -= _q
+                _z = _Dl @ _f + _delta * _sd
+                _p = 1.0 / (1.0 + np.exp(-_z))
+                _g = _Dl.T @ (1.0 - _p)
+                _q = _lm_v * _lm_v * _p * (1.0 - _p)
+                _W = (_D * _q[:, None]).T @ _D
                 _step = np.linalg.solve(_Ki + _W, _g - _Ki @ (_f - m))
                 _f = _f + _step
                 if np.abs(_step).max() < 1e-8:
                     break
             if sides is None or len(duels) < 12:
                 break
-            _gap = np.array([_lm * (_f[_w] - _f[_l]) for (_w, _l), _lm in zip(duels, lam, strict=True)])
+            _gap = _Dl @ _f
             for _ in range(40):
                 _p = 1.0 / (1.0 + np.exp(-(_gap + _delta * _sd)))
                 _gd = float(_sd @ (1.0 - _p)) - 4.0 * _delta
@@ -1008,14 +1024,22 @@ def _(DUEL_WIDTH, POOL, np, prior_mean, qmc, random, realize):
         _ms = np.array([prior_mean(_t, polarity) for _t in thetas])
         return predict(_X, fit["f"], _m, fit["cov"], fit["Ki"], _Xs, _ms, fit.get("ls"))
 
+    _FIT_MEMO = {}
+
     def fitted(responses):
+        # Keyed by how many duels have been answered: the fit is a pure function of the
+        # log, three cells ask for the same one, and it is the cubic-cost step. Only the
+        # newest entry is kept -- an older fit is never asked for again.
+        _key = sum(1 for _r in responses if _r.get("mode") == "duel" and _r.get("choice") in (0, 1))
+        if _key in _FIT_MEMO:
+            return _FIT_MEMO[_key]
         _d = duels_from(responses)
         if _d is None:
             return None
         _X, _duels, _lam, _m, _sides = _d
         _ls = _ard_scales(_X, _duels, _lam)
         _f, _cov, _Ki, _delta = fit_laplace(_X, _duels, _lam, _m, _sides, _ls)
-        return {
+        _out = {
             "X": _X,
             "duels": _duels,
             "lam": _lam,
@@ -1027,6 +1051,9 @@ def _(DUEL_WIDTH, POOL, np, prior_mean, qmc, random, realize):
             "delta": _delta,
             "sides": _sides,
         }
+        _FIT_MEMO.clear()
+        _FIT_MEMO[_key] = _out
+        return _out
 
     def mu_at(fit, thetas, polarity):
         """Posterior-mean utility at arbitrary thetas — the analysis cell's window in."""
@@ -1140,7 +1167,7 @@ def _(DUEL_WIDTH, POOL, np, prior_mean, qmc, random, realize):
                 _add(np.where(_mask, _elites[_i], _elites[_j]))
         return _out, _n_standing
 
-    def best_set(fit, polarity, thetas, samples=4096, mass=0.5, seed=0, radius=0.9):
+    def best_set(fit, polarity, thetas, samples=2048, mass=0.5, seed=0, radius=0.9):
         """Which theme is best, or which SET is -- as a distribution over argmaxes.
 
         Three things have to be right for this to answer the question honestly.

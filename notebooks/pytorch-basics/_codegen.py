@@ -50,7 +50,11 @@ from math import gcd
 MAX_WIDTH = 100
 # Two duel cards share the band, so each gets roughly 80 columns at 14 px — pass
 # `max_width` to hold pages inside one card rather than trusting the ceiling above.
-DUEL_WIDTH = 80
+DUEL_WIDTH = 64  # a duel's column: short enough that both pages sit near the centre
+# of the screen. Two 80-column pages aligned inward still spanned 58% of a 2560px
+# panel and read as two edge-ward blocks; 64 brings the pair into the middle where an
+# 8K screen is viewed straight on (Titus). It is a ceiling, not a target -- real code
+# lines are shorter than it more often than not.
 # Nesting past this reads as a different task, and a page indented off the left margin is
 # mostly whitespace; both are stimulus changes wearing a theme's clothes.
 MAX_NESTING = 4
