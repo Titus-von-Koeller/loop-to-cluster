@@ -927,18 +927,20 @@ def _(SNIPPETS, get_responses, mo, random, render_card, trial_for):
     import traitlets
 
     class _ThemeTrial(anywidget.AnyWidget):
-        # performance.now is captured at the latest reveal and again at the click; both ride
-        # the synced traits into the record. First click only — later clicks and clicks on an
-        # orphaned stale widget record nothing (the guard double-checks the trial number).
-        # Pausing hides the stimulus (an exposed stimulus lets a decision form off the
-        # clock), swallows clicks, and restarts the clock on resume; the tab losing
-        # visibility auto-pauses. A trial that was ever paused carries paused=true so the
-        # model reads its reaction time as a near-tie, never as evidence.
+        # Every trial starts hidden behind an opaque cover; a reveal button uncovers the
+        # stimulus and sets the clock's baseline at that instant. The click stamps the end;
+        # both ride the synced traits into the record. First click only — later clicks and
+        # clicks on an orphaned stale widget record nothing (the guard double-checks the
+        # trial number). Pausing re-covers the stimulus (an exposed one lets a decision form
+        # off the clock) and swallows clicks; revealing again re-baselines the clock. The
+        # tab losing visibility auto-pauses. A trial paused after its first reveal carries
+        # paused=true so the model reads its time as a near-tie, never as evidence.
         _esm = """
         function render({ model, el }) {
-          let t0 = performance.now();
-          let pauses = 0;
+          let t0 = -1;               // the clock's baseline: the latest reveal
+          let revealed = false;      // every trial starts hidden
           let pausedNow = false;
+          let pauses = 0;            // pauses AFTER the first reveal only
           el.style.cssText = "display:block;width:100%";
           const wrap = document.createElement("div");
           // Full-bleed: marimo's prose column is ~700 px, too narrow for two code pages
@@ -952,45 +954,61 @@ def _(SNIPPETS, get_responses, mo, random, render_card, trial_for):
           const prompt = document.createElement("div");
           prompt.innerHTML = model.get("prompt_html");
           prompt.style.cssText = "flex:1 1 0";
+          const btnStyle = "font-family:'IBM Plex Serif',serif;background:transparent;" +
+            "color:inherit;border:1px solid currentColor;border-radius:8px;cursor:pointer";
           const pauseBtn = document.createElement("button");
           pauseBtn.textContent = "pause";
-          pauseBtn.title = "hide the trial and stop the clock; resuming restarts it";
-          pauseBtn.style.cssText = "font-family:'IBM Plex Serif',serif;font-size:13px;" +
-            "background:transparent;color:inherit;border:1px solid currentColor;" +
-            "opacity:.55;border-radius:6px;padding:2px 10px;cursor:pointer";
+          pauseBtn.title = "hide the trial; the clock re-baselines when you reveal it again";
+          pauseBtn.style.cssText = btnStyle + ";font-size:13px;opacity:.55;padding:2px 10px;" +
+            "visibility:hidden";
           top.appendChild(prompt);
           top.appendChild(pauseBtn);
+          // The stimulus row keeps its box in the layout at all times; the cover is an
+          // opaque overlay on exactly that box, so reveal/pause never move the page.
+          const stage = document.createElement("div");
+          stage.style.cssText = "position:relative";
           const row = document.createElement("div");
           row.style.cssText = "display:flex;gap:16px;justify-content:center;" +
-            "align-items:stretch;width:100%";
+            "align-items:stretch;width:100%;visibility:hidden";
           const cover = document.createElement("div");
-          cover.textContent = "paused — stimulus hidden; click to resume (the clock restarts)";
-          cover.style.cssText = "display:none;align-items:center;justify-content:center;" +
-            "min-height:200px;border:1px dashed currentColor;border-radius:10px;" +
-            "opacity:.7;cursor:pointer;font-family:'IBM Plex Serif',serif;font-size:15px";
-          const doPause = () => {
-            if (pausedNow) return;
-            pausedNow = true;
-            pauses += 1;
-            cover.style.minHeight = row.offsetHeight + "px";
-            row.style.display = "none";
+          cover.style.cssText = `position:absolute;inset:0;display:flex;flex-direction:column;` +
+            `align-items:center;justify-content:center;gap:16px;border-radius:10px;` +
+            `background:${model.get("strip_bg")};border:1px dashed currentColor;` +
+            `font-family:'IBM Plex Serif',serif;font-size:15px;box-sizing:border-box`;
+          const coverText = document.createElement("div");
+          coverText.style.opacity = ".7";
+          const goBtn = document.createElement("button");
+          goBtn.style.cssText = btnStyle + ";font-size:16px;padding:8px 26px;letter-spacing:.02em";
+          cover.appendChild(coverText);
+          cover.appendChild(goBtn);
+          const setCover = (text, label) => {
+            coverText.textContent = text;
+            goBtn.textContent = label;
             cover.style.display = "flex";
+            row.style.visibility = "hidden";
             pauseBtn.style.visibility = "hidden";
           };
-          const doResume = () => {
-            if (!pausedNow) return;
-            pausedNow = false;
-            row.style.display = "flex";
+          const reveal = () => {
             cover.style.display = "none";
-            pauseBtn.style.visibility = "";
-            t0 = performance.now();
+            row.style.visibility = "visible";
+            pauseBtn.style.visibility = "visible";
+            revealed = true;
+            pausedNow = false;
+            t0 = performance.now();   // baseline re-initialized on EVERY reveal
           };
+          const doPause = () => {
+            if (!revealed || pausedNow) return;
+            pausedNow = true;
+            pauses += 1;
+            setCover("paused \u2014 the stimulus is hidden; the clock re-baselines on reveal", "resume");
+          };
+          setCover("the stimulus is hidden; the clock starts when you reveal it", "reveal");
+          goBtn.onclick = reveal;
           pauseBtn.onclick = doPause;
-          cover.onclick = doResume;
           const onVis = () => { if (document.hidden) doPause(); };
           document.addEventListener("visibilitychange", onVis);
           const pick = (tid) => {
-            if (pausedNow) return;
+            if (!revealed || pausedNow) return;
             model.set("clicks", model.get("clicks") + 1);
             model.set("choice", tid);
             model.set("pauses", pauses);
@@ -1014,9 +1032,10 @@ def _(SNIPPETS, get_responses, mo, random, render_card, trial_for):
             }
             row.appendChild(card);
           });
+          stage.appendChild(row);
+          stage.appendChild(cover);
           wrap.appendChild(top);
-          wrap.appendChild(row);
-          wrap.appendChild(cover);
+          wrap.appendChild(stage);
           el.replaceChildren(wrap);
           return () => document.removeEventListener("visibilitychange", onVis);
         }
@@ -1294,12 +1313,15 @@ def _(mo):
     Reaction time is doing quiet work throughout: a fast duel click steepens that duel's
     likelihood (drift-diffusion reading — big utility gaps decide quickly), a slow one
     flattens it toward a tie, so deliberating over a near-tie neither punishes nor rewards
-    either side. Stepping away mid-trial would corrupt that channel, so the strip carries a
-    **pause** button (and the tab losing visibility pauses automatically): pausing hides the
-    stimulus — an exposed one lets a decision form off the clock — resuming restarts the
-    clock, and a trial that was ever paused is flagged in the log; its choice still counts,
-    at the neutral slope, and it is excluded from the comprehension and find-hunt timing
-    statistics. Comprehension probes and find hunts measure time directly; they are the
+    either side. That channel is only as clean as its baseline, so **every trial starts
+    hidden**: a reveal button uncovers the stimulus and the clock starts at that instant —
+    not when the page happened to render. A **pause** button (and the tab losing visibility)
+    re-covers the stimulus — an exposed one lets a decision form off the clock — and
+    revealing again re-baselines the clock; a trial paused after its first reveal is flagged
+    in the log: its choice still counts, at the neutral slope, and it is excluded from the
+    comprehension and find-hunt timing statistics.
+
+    Comprehension probes and find hunts measure time directly; they are the
     glyph-scale ground truth that the 2× threshold safety margin (from the 104-px vision
     fit) is standing in for until this instrument accumulates its own.
 
