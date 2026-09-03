@@ -299,21 +299,28 @@ one-line spark. When a queue item is opened, closed, or founded, mirror the one-
   falling while the set narrows — a real plateau resolving. Night is converging: leader 4→10%,
   set 44→24, naive line ~167 duels to a majority. Night data is the thinner half.
 
+  *Done since (2026-09-03, same day):* recovery tests now cover the RT surface, the grouping
+  and the convergence readout (11 tests, `_model_tests.py`); the duel RT exponent is chosen by
+  held-out log-loss over {0, ¼, ½, ¾} and refit every 25 duels — p = 0.5 won, beating "ignore
+  the clock" by 0.010 nats/duel, so the old heuristic is now earned rather than assumed; and
+  the timed arms select actively (hunts by uncertainty sampling on the legibility surface,
+  probes among plausible pages), worth about a quarter less error per click in simulation.
+
   *Remaining work, ranked by value:*
-  1. Recovery tests for the NEW machinery — the RT/legibility surface, the grouping in
-     best_set, and progress_report have no synthetic-truth tests, while the preference model
-     does. Same standard: plant a truth, check it comes back.
-  2. The duel RT→slope map (`lam`) is a hand-rolled `sqrt(median/rt)` clipped to [0.6, 1.8].
-     It should be fitted: the relationship between decision time and utility gap is estimable
-     from the log now that there are 121 duels.
-  3. Confirm the find-highlight axes (7, 8) are identified — hunts sweep them, but nothing
-     checks whether the data pins them or the prior is still doing the work.
-  4. Surface (editor / panel / notebook) is logged but never tested for interaction with
-     theme. If the optimum differs by surface, one theme is the wrong answer shape.
-  5. Untested assumption worth a probe: duels are judged at 12–13px and probes read at
-     15–16px, so preference measured at one size is being applied to reading at another.
-  6. More night sittings; and applying the winner (the override snippet is emitted in the
-     analysis, pasting it is still manual).
+  1. Surface (editor / panel / notebook) is logged but never tested for interaction with
+     theme. If the optimum differs by surface, one theme is the wrong answer shape — and the
+     panel surface is where he spends most of his day.
+  2. Untested assumption worth a probe: duels are judged at 12–13px and probes read at
+     15–16px, so preference measured at one size is applied to reading at another.
+  3. The find-highlight axes are the live question — ax8 ranks second of nine for preference,
+     but the legibility surface could not resolve its effect on speed at 29 uniform hunts.
+     Active hunting should fix that; check again around 60 hunts.
+  4. More night sittings — night is the thinner half (leader 10%, set 24, ~167 duels to a
+     majority) while day has settled into a plateau of ~12.
+  5. Applying the winner: the override snippet is emitted in the analysis, pasting it is
+     still manual.
+  6. Ecological-valence prior stays generic by his instruction (preferences discovered, never
+     declared) — so hue axes must keep getting explored; worth a coverage check.
 
 - The theme program (named 2026-09-02): determine independently the best *editor* theme for
   Titus (best-in-class as the starting field — Selenized, Modus, GitHub accessible, Horizon —
