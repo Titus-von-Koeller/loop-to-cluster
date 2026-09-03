@@ -2483,6 +2483,7 @@ def _(
     pd,
     progress_report,
     render_card,
+    rt_at,
     rt_exponent,
     rt_fit,
     rt_penalty,
@@ -2538,14 +2539,44 @@ def _(
                 _rt_note = ""
                 if _rf is not None:
                     _excl, _secs = rt_penalty(_rf, _thetas, _pol)
+                    _rvar = rt_at(_rf, _thetas, _pol)[1]
                     _keep_idx = [_i for _i in range(len(_thetas)) if not _excl[_i]]
                     if len(_keep_idx) >= 32:
+                        # Whether his taste is costing him reading speed -- as a DIFFERENCE
+                        # with an interval, never as two point estimates side by side. The
+                        # old wording put "5.6 s" next to "3.4 s for the quickest page the
+                        # model knows" and let the reader draw a conclusion the data does not
+                        # support twice over: the posterior sd on either page is around 0.25
+                        # to 0.38 in log time, so the difference of two is wider still; and
+                        # the minimum over several hundred noisy predictions is an extreme
+                        # order statistic, biased low, so the fast end of that comparison was
+                        # partly a selection effect. Measured on the current log the gap is
+                        # +0.03 [-0.80, +0.85] by day: no measurable cost to liking what he
+                        # likes, which is the reassuring answer and also the honest one.
+                        _lead_i = _keep_idx[0]
+                        _fast_i = int(np.argmin(_secs))
+                        _dmu = float(np.log(_secs[_lead_i]) - np.log(_secs[_fast_i]))
+                        _dsd = float(np.sqrt(_rvar[_lead_i] + _rvar[_fast_i]))
                         _rt_note = (
                             f" {int(_excl.sum())} of {len(_thetas)} candidates were dropped first "
-                            f"as credibly slower to read than the fastest ({_rf['n']} timed trials); "
-                            f"the leader below reads in about {_secs[_keep_idx[0]] / 1000:.1f} s "
-                            f"against {min(_secs) / 1000:.1f} s for the quickest page the model knows."
+                            f"as credibly slower to read than the fastest ({_rf['n']} timed trials). "
+                            f"The leader reads in about {_secs[_lead_i] / 1000:.1f} s"
                         )
+                        if _dmu - 1.96 * _dsd > 0:
+                            _rt_note += (
+                                f", and that is credibly slower than the quickest page the model "
+                                f"knows by {_dmu:+.2f} in log time (95% interval "
+                                f"[{_dmu - 1.96 * _dsd:+.2f}, {_dmu + 1.96 * _dsd:+.2f}]) — taste "
+                                f"and speed are pulling apart here, and the shelf is worth "
+                                f"re-reading with that in mind."
+                            )
+                        else:
+                            _rt_note += (
+                                f", which is not measurably slower than the quickest page the model "
+                                f"knows: the difference is {_dmu:+.2f} in log time with a 95% "
+                                f"interval of [{_dmu - 1.96 * _dsd:+.2f}, {_dmu + 1.96 * _dsd:+.2f}], "
+                                f"so liking these pages is costing you no measurable reading speed."
+                            )
                         _thetas = [_thetas[_i] for _i in _keep_idx]
                         _themes = [_themes[_i] for _i in _keep_idx]
                 _mu = mu_at(_fit, _thetas, _pol)
