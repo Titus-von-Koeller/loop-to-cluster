@@ -1366,12 +1366,19 @@ def _(DUEL_WIDTH, POOL, np, prior_mean, qmc, random, realize):
                 "mode": "comprehension",
                 "surface": "editor",
                 "target_kind": "call",
+                # A page, not a snippet: fourteen lines centred on an 8K screen is an island
+                # spanning a quarter of the field, and a probe needs distractors to reject --
+                # accuracy was saturated at 100% over twenty probes, and a 28-line page
+                # offers ~97 identifiers to reject instead of ~28.
+                "snippet_lines": 28,
                 "kind": "task",
                 "polarity": _pol,
                 "theta_a": [round(float(_v), 6) for _v in _ta],
                 "theme_a": _tha,
                 "snippet": _snip,
-                "code_px": 14 if _rng.random() < 0.5 else 16,
+                # One page on the screen, so it is read at the size his editor actually uses --
+                # a duel halves the screen and takes the smaller end of the same range.
+                "code_px": 15 if _rng.random() < 0.5 else 16,
             }
         else:  # search
             if _fit is not None:
@@ -1392,12 +1399,13 @@ def _(DUEL_WIDTH, POOL, np, prior_mean, qmc, random, realize):
             _trial = {
                 "mode": "search",
                 "surface": "editor",
+                "snippet_lines": 28,
                 "kind": "task",
                 "polarity": _pol,
                 "theta_a": [round(float(_v), 6) for _v in _bt],
                 "theme_a": _tha,
                 "snippet": _snip,
-                "code_px": 14 if _rng.random() < 0.5 else 16,
+                "code_px": 15 if _rng.random() < 0.5 else 16,
             }
         _TRIAL_MEMO[n] = _trial
         return _trial
