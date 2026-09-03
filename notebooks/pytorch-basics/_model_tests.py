@@ -77,6 +77,8 @@ def load_model():
             "prior_mean": lambda th, pol: 0.0,
             "realize": lambda th, pol: {"ok": True},
             "mo": types.SimpleNamespace(),
+            "SURFACES": ("editor", "panel", "notebook"),
+            "DUEL_WIDTH": 64,
         }
         exec(compile(ast.Module(body=body, type_ignores=[]), "<model-cell>", "exec"), ns)
         return ns
@@ -416,6 +418,89 @@ def main() -> int:
         "uncertainty sampling identifies the find axes faster",
         act > uni,
         f"corr(pred, truth) active {act:.3f} vs uniform {uni:.3f} at 40 hunts",
+    )
+
+    print("\nT12 -- surface assignment is balanced and free of run position")
+    ds = [M["duel_surface"](n, 200) for n in range(24 * 12)]
+    ds = [d for n, d in enumerate(ds) if n % 24 < 16]
+    counts = {s: ds.count(s) for s in ("editor", "panel", "notebook")}
+    check(
+        "the three surfaces are sampled equally often",
+        max(counts.values()) - min(counts.values()) <= 1,
+        f"counts over 12 blocks {counts} (n % 3 would lock this at 6/5/5 per block, forever)",
+    )
+    slot0 = {M["duel_surface"](24 * b, 200) for b in range(12)}
+    check(
+        "first-of-run is not always the same surface",
+        len(slot0) == 3,
+        f"surfaces seen in slot 0 across 12 runs: {sorted(slot0)}",
+    )
+
+    print("\nT13 -- the surface-interaction test is calibrated")
+
+    def surf_rows(tilt, n=96, seed=0):
+        r = np.random.default_rng(seed)
+        w = np.zeros(9)
+        w[[0, 4, 6]] = [1.5, 1.0, -1.0]
+        rows = []
+        for i in range(n):
+            a, b = r.random(9), r.random(9)
+            s = ("editor", "panel", "notebook")[i % 3]
+            z = (a - b) @ w + tilt * (1.0 if s == "editor" else -1.0 if s == "panel" else 0.0) * (a - b)[0]
+            rows.append(
+                {
+                    "mode": "duel",
+                    "polarity": "day",
+                    "surface": s,
+                    "paused": False,
+                    "theta_a": list(map(float, a)),
+                    "theta_b": list(map(float, b)),
+                    # 0 = theme_a won, matching duels_from's encoding. This test passed
+                    # vacuously against "a"/"b": the filter dropped every row, the function
+                    # returned its not-enough-data p of 1.0, and "stays quiet" read as a pass.
+                    "choice": 0 if r.random() < 1.0 / (1.0 + np.exp(-z)) else 1,
+                }
+            )
+        return rows
+
+    n_seen = M["surface_effect"](surf_rows(0.0, seed=0), "day", nperm=20)[0]
+    check(
+        "the test actually sees the duels it is given",
+        n_seen == 96,
+        f"{n_seen} of 96 synthetic duels reached the test",
+    )
+    p_null = [M["surface_effect"](surf_rows(0.0, seed=s), "day", nperm=120)[2] for s in range(6)]
+    check(
+        "stays quiet when no surface effect exists",
+        sum(p < 0.10 for p in p_null) <= 1,
+        f"p-values under a true null: {[round(p, 2) for p in p_null]} (a fixed threshold fires ~1 in 5)",
+    )
+    p_real = [M["surface_effect"](surf_rows(2.5, seed=s), "day", nperm=120)[2] for s in range(6)]
+    check(
+        "finds a real surface effect",
+        sum(p < 0.10 for p in p_real) >= 4,
+        f"p-values with a planted 2.5-logit tilt: {[round(p, 2) for p in p_real]}",
+    )
+
+    print("\nT14 -- axis consensus separates settled axes from open ones")
+    rng = np.random.default_rng(5)
+    th = rng.random((240, 9))
+    # ax0 settled near 0.8, ax5 wide open: mass concentrated on one value of ax0 only.
+    w = np.exp(-((th[:, 0] - 0.8) ** 2) / (2 * 0.05**2))
+    w = w / w.sum()
+    cons = M["axis_consensus"]({"p_best": w}, th)
+    r0 = next(c[1] for c in cons if c[0] == 0)
+    r5 = next(c[1] for c in cons if c[0] == 5)
+    check(
+        "a settled axis reads narrow and an untouched one reads wide",
+        r0 < 0.4 < 0.8 < r5,
+        f"spread relative to uniform: settled axis {r0:.2f}, untouched axis {r5:.2f}",
+    )
+    m0 = next(c[2] for c in cons if c[0] == 0)
+    check(
+        "the settled axis reports where it settled",
+        abs(m0 - 0.8) < 0.05,
+        f"posterior-weighted mean of the settled axis {m0:.3f} against a planted 0.80",
     )
 
     print("\n" + ("all recovery tests pass" if not fails else f"FAILED: {fails}"))

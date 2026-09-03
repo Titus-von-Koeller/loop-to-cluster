@@ -832,7 +832,7 @@ def _(LOG, json, mo):
 
 
 @app.cell(hide_code=True)
-def _(DUEL_WIDTH, POOL, math, np, prior_mean, qmc, random, realize):
+def _(DUEL_WIDTH, POOL, SURFACES, math, np, prior_mean, qmc, random, realize):
     # The preference model: a Gaussian process over theme space with a Bradley-Terry
     # likelihood on duels, fit by Laplace approximation — Chu & Ghahramani's preferential
     # GP, QUEST+'s generate-the-most-informative-trial loop on top. Reaction time enters
@@ -1424,6 +1424,28 @@ def _(DUEL_WIDTH, POOL, math, np, prior_mean, qmc, random, realize):
         _BEST_MEMO[_ck] = _res
         return _res
 
+    def axis_consensus(bs, thetas):
+        """Which axes his clicks have SETTLED, and which are still open.
+
+        The plateau readout says how many themes are still in contention; it does not say
+        what they disagree about. Measured on the four leading day themes: their grounds sit
+        within 4 units of one cream, while their keyword hues run violet, dark green, dark
+        red and blue. Reading "four distinct themes" against four pages that look alike at a
+        glance is confusing; reading "the ground is decided, the accent hue is not" says
+        what the remaining duels are for.
+
+        Per axis, the posterior-weighted spread of theta under P(best), against the 0.289 of
+        a uniform axis. Small means the mass has collected on one value; near 1 means the
+        clicks have not distinguished anything along it yet."""
+        _p = np.asarray(bs["p_best"], dtype=float)
+        _T = np.asarray(thetas, dtype=float)
+        if _p.sum() <= 0 or len(_T) == 0:
+            return []
+        _p = _p / _p.sum()
+        _m = _p @ _T
+        _sd = np.sqrt(np.maximum(_p @ (_T - _m) ** 2, 0.0))
+        return [(_a, float(_sd[_a] / 0.2887), float(_m[_a])) for _a in range(_T.shape[1])]
+
     def progress_report(responses, polarity, thetas, back=25):
         """Is another sitting worth clicking? Compare the verdict now with the verdict as
         it stood `back` duels ago, on the SAME candidate set so the comparison is about
@@ -1483,6 +1505,118 @@ def _(DUEL_WIDTH, POOL, math, np, prior_mean, qmc, random, realize):
             _pick.append(int(np.argmax(_d)))
         return [idx[_i] for _i in _pick]
 
+    # LOAD-BEARING placement: above the function that closes over it. marimo mangles a
+    # cell-local underscore name only where it has already seen the assignment, so a memo
+    # declared BELOW its user resolves fine under `marimo edit` and raises NameError under
+    # `marimo run` the moment another cell calls in. Same trap as _CONTROL in the stimulus
+    # cell. Underscore-prefixed names must be defined before the functions that use them.
+    _SURF_MEMO = {}
+
+    def surface_effect(responses, polarity, nperm=200, seed=7):
+        """Does the preferred theme depend on WHICH surface it is seen on?
+
+        A theme is one theme, but it is seen in an editor, in the Claude Code panel, and in
+        a notebook, and those differ in measure, in surrounding chrome and in whether prose
+        sits next to the code. If the optimum moves between them, a single theme is the
+        wrong shape of answer and the instrument should be searching three.
+
+        Asked so a null answer means something. A per-surface tilt on the utility must EARN
+        its extra parameters on HELD-OUT choices -- fit alone always improves. Then the
+        earned amount is compared against its own permutation null: the same thetas, the
+        same clicks, only the surface labels shuffled. That null is exact, and it is
+        necessary, because at these counts adding two parameters clears a fixed threshold
+        by chance in roughly one run in five.
+
+        Returns (n, delta, p, verdict). Verdict is deliberately three-state for the same
+        reason the main one is: "quiet" is not "absent" when the test has little power.
+        """
+        _ds = [
+            _r
+            for _r in responses
+            if _r.get("mode") == "duel"
+            and _r.get("surface")
+            and _r.get("polarity") == polarity
+            and not _r.get("paused")
+            and _r.get("choice") in (0, 1)
+        ]
+        if len(_ds) < 24:
+            return len(_ds), 0.0, 1.0, "not enough surface-labelled duels"
+        # Keyed by the DATA, not just its length: two different logs of equal length must
+        # not share an answer. (They do in the tests, which is how this was caught.)
+        _key = (
+            "surf",
+            polarity,
+            hash(tuple((_r["choice"], _r["surface"], _r["theta_a"][0]) for _r in _ds)),
+        )
+        if _key in _SURF_MEMO:
+            return _SURF_MEMO[_key]
+        _S = np.array([SURFACES.index(_r["surface"]) for _r in _ds])
+        _X = np.array(
+            [
+                # choice 0 = theme_a won, 1 = theme_b won (duels_from's convention; `swap`
+                # governs only which SIDE a card appeared on, not which theme it was).
+                (np.array(_r["theta_a"]) - np.array(_r["theta_b"])) * (1.0 if _r["choice"] == 0 else -1.0)
+                for _r in _ds
+            ]
+        )
+
+        def _cvll(_X, _S, _k, _seed):
+            """Held-out Bradley-Terry log-loss. _k = 0 is one shared utility; _k > 0 adds a
+            sum-to-zero per-surface tilt on the _k axes, which is the cheapest form a
+            surface interaction can take and so the one with the best chance of showing up
+            in this little data."""
+            _r = np.random.default_rng(_seed)
+            _idx = _r.permutation(len(_X))
+            _tot, _n = 0.0, 0
+            for _f in range(5):
+                _te = _idx[_f::5]
+                _tr = np.setdiff1d(_idx, _te)
+                if len(_tr) < 10:
+                    continue
+
+                def _feat(_Xa, _Sa):
+                    if not _k:
+                        return _Xa
+                    _cols = [_Xa]
+                    for _j in range(_k):
+                        for _sv in range(2):
+                            _cols.append(
+                                np.where(_Sa == _sv, _Xa[:, _j], np.where(_Sa == 2, -_Xa[:, _j], 0.0))[:, None]
+                            )
+                    return np.hstack(_cols)
+
+                _F = _feat(_X[_tr], _S[_tr])
+                _th = np.zeros(_F.shape[1])
+                for _ in range(60):
+                    _p = 1.0 / (1.0 + np.exp(-(_F @ _th)))
+                    _g = _F.T @ (1.0 - _p) - _th
+                    _H = (_F * (_p * (1 - _p))[:, None]).T @ _F + np.eye(len(_th))
+                    _th = _th + np.linalg.solve(_H, _g)
+                _z = _feat(_X[_te], _S[_te]) @ _th
+                _tot += float(np.sum(-np.log1p(np.exp(-_z))))
+                _n += len(_te)
+            return _tot / max(_n, 1)
+
+        def _gain(_S, _seeds):
+            return float(
+                np.mean([_cvll(_X, _S, 1, _s) for _s in range(_seeds)])
+                - np.mean([_cvll(_X, _S, 0, _s) for _s in range(_seeds)])
+            )
+
+        _obs = _gain(_S, 6)
+        _rng = np.random.default_rng(seed)
+        _null = np.array([_gain(_rng.permutation(_S), 2) for _ in range(nperm)])
+        _p = float((_null >= _obs).mean())
+        if _p < 0.02:
+            _v = "surface changes the optimum -- one theme is the wrong answer shape"
+        elif _p < 0.10:
+            _v = "suggestive; keep the surfaces balanced and re-read"
+        else:
+            _v = "no surface effect this data can see"
+        _out = (len(_ds), _obs, _p, _v)
+        _SURF_MEMO[_key] = _out
+        return _out
+
     def schedule_mode(n, n_duels):
         """Twenty-four-trial polarity blocks, each a run of sixteen duels, then four
         comprehension probes, then four find hunts — same-kind trials batched so one
@@ -1497,6 +1631,26 @@ def _(DUEL_WIDTH, POOL, math, np, prior_mean, qmc, random, realize):
         if _slot < 20:
             return _pol, "comprehension"
         return _pol, "search"
+
+    def duel_surface(n, n_duels):
+        """Which of the three surfaces duel n is shown on.
+
+        NOT `n % 3`. The schedule's block is 24 trials of which the first 16 are duels, and
+        3 divides 24, so a modular rotation never de-phases: editor takes 6 of every 16
+        duels and the other two 5 each, forever, and slot 0 is editor every single run. The
+        log showed exactly that lock -- 6/5/5 by day, 12/10/10 by night. It is both a
+        standing 20% over-sample of one surface and a hard confound between surface and
+        position within the run, where first-of-run means the freshest eyes and the largest
+        adaptation step from whatever was on screen before.
+
+        Instead: consecutive groups of three duels each get a shuffled permutation of the
+        three surfaces. Balance is exact every three duels rather than asymptotic, and the
+        shuffle decorrelates surface from run position. Deterministic in the duel index, so
+        replaying a log reconstructs the same assignment."""
+        _d = n if n_duels < 6 else (n // 24) * 16 + min(n % 24, 16)
+        _perm = list(SURFACES)
+        random.Random(0xC0FFEE + _d // 3).shuffle(_perm)
+        return _perm[_d % 3]
 
     def run_info(n, n_duels):
         """(polarity, mode, position within the run, run length) for trial n."""
@@ -1589,7 +1743,7 @@ def _(DUEL_WIDTH, POOL, math, np, prior_mean, qmc, random, realize):
                 # editor itself. Both stay logged as stimulus parameters.
                 "snippet_width": DUEL_WIDTH,
                 "snippet_lines": 28,
-                "surface": ("editor", "panel", "notebook")[n % 3],
+                "surface": duel_surface(n, len(responses)),
                 "kind": _kind,
                 "polarity": _pol,
                 "theta_a": [round(float(_v), 6) for _v in _ta],
@@ -1695,6 +1849,7 @@ def _(DUEL_WIDTH, POOL, math, np, prior_mean, qmc, random, realize):
         return _trial
 
     return (
+        axis_consensus,
         best_set,
         candidates,
         fitted,
@@ -1708,6 +1863,7 @@ def _(DUEL_WIDTH, POOL, math, np, prior_mean, qmc, random, realize):
         run_info,
         schedule_mode,
         spread_out,
+        surface_effect,
         trial_for,
     )
 
@@ -2266,6 +2422,7 @@ def _(LOG, datetime, get_responses, json, random, set_responses, snippet_for, ti
 def _(
     AXES,
     DE_MIN,
+    axis_consensus,
     POOL,
     THRESH_DETAIL,
     VISION_N,
@@ -2284,6 +2441,7 @@ def _(
     rt_penalty,
     snippet_for,
     spread_out,
+    surface_effect,
 ):
     # A stable page for the champion preview: the same generated code every time, so
     # what changes between renders is the theme and nothing else.
@@ -2355,6 +2513,13 @@ def _(
                 _bs = best_set(_fit, _pol, _thetas, seed=17)
                 _cred = _bs["credible"]
                 _reps = spread_out(_thetas, _cred, 4, _fit.get("ls"))
+                # Each card carries its GROUP's probability, which is the number the verdict
+                # above quotes. Its own p_best is the mass of one point in a continuum and is
+                # always far smaller -- printing that next to "the leader holds 24%" made the
+                # leader's card read 2%. Ordered by it too, so the leader is the first card
+                # rather than wherever the spread-out walk happened to place it.
+                _gp_of = dict(zip(_cred, _bs["credible_p"], strict=True))
+                _reps = sorted(_reps, key=lambda _i: -_gp_of.get(_i, 0.0))
                 _lead_pct = 100 * _bs["lead"]
                 if _bs["verdict"] == "single":
                     _verdict = (
@@ -2410,35 +2575,101 @@ def _(
                             f"buying little and the shelf above is the answer rather than a "
                             f"waypoint."
                         )
+                # Whether one theme is even the right SHAPE of answer. Cheap to ask and
+                # expensive to get wrong: if the optimum moves between the editor, the chat
+                # panel and a notebook, then converging one theme onto all three averages
+                # over a real difference instead of resolving it.
+                _sn, _sd_gain, _sp, _sv = surface_effect(_log, _pol)
+                if _sn < 24:
+                    _surf_note = (
+                        f" Surface (editor / panel / notebook) is logged but only {_sn} {_pol} duels "
+                        f"carry a label so far, too few to ask whether the optimum moves between them."
+                    )
+                elif _sp < 0.02:
+                    _surf_note = (
+                        f" **Surface matters**: a per-surface tilt earns {_sd_gain:+.3f} nats/duel on "
+                        f"held-out choices against its own permutation null (p = {_sp:.3f}, {_sn} duels). "
+                        f"One theme is the wrong shape of answer here — the editor, the chat panel and "
+                        f"the notebook want different pages."
+                    )
+                elif _sp < 0.10:
+                    _surf_note = (
+                        f" Surface may matter: a per-surface tilt earns {_sd_gain:+.3f} nats/duel "
+                        f"held out (p = {_sp:.3f} over {_sn} duels) — suggestive, not established. "
+                        f"Duels are surface-balanced in groups of three, so this reading sharpens on "
+                        f"its own; worth re-reading around twice this many."
+                    )
+                else:
+                    _surf_note = (
+                        f" No surface effect this data can see (p = {_sp:.2f} over {_sn} duels), so "
+                        f"one theme across editor, panel and notebook remains the right shape of answer."
+                    )
+                # What the plateau actually disagrees about. Without this, four pages that
+                # share a ground and differ only in accent hue read as "four identical
+                # themes" and the word "distinct" looks wrong -- when in fact one question
+                # is answered and another is wide open.
+                _cons = axis_consensus(_bs, _thetas)
+                _settled = sorted([_c for _c in _cons if _c[1] < 0.55], key=lambda _c: _c[1])
+                _open = sorted([_c for _c in _cons if _c[1] > 0.85], key=lambda _c: -_c[1])
+
+                # One sentence per case: joining fragments produced "Your clicks have still
+                # open on accent hue rotation" the first time night had nothing settled.
+                def _names(_g):
+                    return ", ".join(f"**{AXES[_a]}**" for _a, _r, _m in _g[:3])
+
+                if _settled and _open:
+                    _axis_note = (
+                        f" Your clicks have settled {_names(_settled)}, and have not yet separated "
+                        f"{_names(_open)} — so the themes on this shelf mostly differ in the second "
+                        f"group, and that is what further duels decide."
+                    )
+                elif _settled:
+                    _axis_note = (
+                        f" Your clicks have settled {_names(_settled)}, and no axis is still wide "
+                        f"open: what remains is fine separation rather than an open question."
+                    )
+                elif _open:
+                    _verb = "are" if len(_open) > 1 else "is"
+                    _axis_note = (
+                        f" No axis has settled yet, and {_names(_open)} {_verb} still wide open — "
+                        f"the shelf differs there, and that is what further duels decide."
+                    )
+                else:
+                    _axis_note = ""
                 _blocks.append(
                     mo.md(
-                        f"### The {_pol} verdict\n\n{_verdict}.{_rt_note}{_prog_note}"
+                        f"### The {_pol} verdict\n\n{_verdict}.{_rt_note}{_prog_note}{_surf_note}{_axis_note}"
                         f" Shown below: the leader, then the "
                         f"most *different* members of the set holding half the probability mass — "
                         f"near-identical themes are grouped first, so what you see are choices "
                         f"rather than variations of one."
                     )
                 )
+                # Full-bleed, and each card wide enough for the page it holds. The prose
+                # column is 610px because that is a good measure for READING; four theme
+                # cards inside it are 306px each, which clips the page mid-token and leaves
+                # him comparing palettes by the left two-thirds of every line. A page needs
+                # about 520px to render whole at 12px, so the row steps out of the measure
+                # and the cards wrap instead of shrinking -- on a full-screen 8k display all
+                # four sit side by side at full page width, and on a narrow one they become
+                # two rows of whole pages rather than one row of cropped ones.
+                _cards = "".join(
+                    f'<figure style="margin:0;flex:0 0 520px;max-width:100%">'
+                    f'<figcaption style="font:600 13px/1.5 system-ui,sans-serif;margin:0 0 6px 2px">'
+                    f"{100 * _gp_of.get(_i, 0.0):.0f}%"
+                    f"{' · leads' if _i == _reps[0] else ''}"
+                    f'<span style="font-weight:400;opacity:.65"> · utility {_mu[_i]:.2f}</span>'
+                    f"</figcaption>"
+                    f'<div style="background:{_themes[_i]["ground"]};border-radius:8px;'
+                    f'padding:14px;overflow:hidden">'
+                    + render_card(_themes[_i], _preview_snip, 12, prose=False)
+                    + "</div></figure>"
+                    for _i in _reps
+                )
                 _blocks.append(
-                    mo.hstack(
-                        [
-                            mo.vstack(
-                                [
-                                    mo.md(f"**{100 * _bs['p_best'][_i]:.0f}%** · utility {_mu[_i]:.2f}"),
-                                    mo.Html(
-                                        f'<div style="background:{_themes[_i]["ground"]};border-radius:8px;'
-                                        f'padding:12px;width:330px">'
-                                        + render_card(_themes[_i], _preview_snip, 13, prose=False)
-                                        + "</div>"
-                                    ),
-                                ],
-                                gap=0.3,
-                            )
-                            for _i in _reps
-                        ],
-                        justify="start",
-                        gap=1,
-                        wrap=True,
+                    mo.Html(
+                        '<div style="width:94vw;margin-left:calc(-47vw + 50%);display:flex;'
+                        'flex-wrap:wrap;gap:22px;justify-content:center">' + _cards + "</div>"
                     )
                 )
                 _sweep = []
