@@ -1314,11 +1314,14 @@ def _(mo, show, tensor_2):
 
 @app.cell(hide_code=True)
 def _(mo):
-    mo.md(r"""
-    > [!NOTE]
-    > In-place operations save some memory, but can be problematic when computing derivatives
-    > because of an immediate loss of history. Hence, their use is discouraged.
-    """)
+    mo.callout(
+        mo.md(
+            "In-place operations save some memory, but can be problematic when computing "
+            "derivatives because of an immediate loss of history. Hence, their use is "
+            "discouraged."
+        ),
+        kind="warn",
+    )
     return
 
 

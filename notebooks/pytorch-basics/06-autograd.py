@@ -96,11 +96,13 @@ def _(mo):
 
 @app.cell(hide_code=True)
 def _(mo):
-    mo.md(r"""
-    > [!NOTE]
-    > You can set the value of `requires_grad` when creating a tensor, or later by using
-    > `x.requires_grad_(True)` method.
-    """)
+    mo.callout(
+        mo.md(
+            "You can set the value of `requires_grad` when creating a tensor, or later by "
+            "using the `x.requires_grad_(True)` method."
+        ),
+        kind="info",
+    )
     return
 
 
@@ -316,17 +318,19 @@ def _(mo):
 
 @app.cell(hide_code=True)
 def _(mo):
-    mo.md(r"""
-    > [!NOTE]
-    > - We can only obtain the `grad` properties for the leaf nodes of the computational graph,
-    >   which have the `requires_grad` property set to `True`. For all other nodes in our graph,
-    >   gradients will not be available.
-    > - We can only perform gradient calculations using `backward` once on a given graph, for
-    >   performance reasons: the backward pass frees the graph's saved tensors as it consumes
-    >   them, and a second call raises. If we do need several `backward` calls on the same graph,
-    >   we pass `retain_graph=True` to the `backward` call — the optional-reading section at the
-    >   bottom does exactly that.
-    """)
+    mo.callout(
+        mo.md(r"""
+    - We can only obtain the `grad` properties for the leaf nodes of the computational graph,
+      which have the `requires_grad` property set to `True`. For all other nodes in our graph,
+      gradients will not be available.
+    - We can only perform gradient calculations using `backward` once on a given graph, for
+      performance reasons: the backward pass frees the graph's saved tensors as it consumes
+      them, and a second call raises. If we do need several `backward` calls on the same graph,
+      we pass `retain_graph=True` to the `backward` call — the optional-reading section at the
+      bottom does exactly that.
+    """),
+        kind="warn",
+    )
     return
 
 
@@ -463,13 +467,21 @@ def _(mo):
     - computes the gradients from each `.grad_fn`,
     - accumulates them in the respective tensor’s `.grad` attribute
     - using the chain rule, propagates all the way to the leaf tensors.
-
-    > [!NOTE]
-    > **DAGs are dynamic in PyTorch** An important thing to note is that the graph is recreated
-    > from scratch; after each `.backward()` call, autograd starts populating a new graph. This is
-    > exactly what allows you to use control flow statements in your model; you can change the
-    > shape, size and operations at every iteration if needed.
     """)
+    return
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.callout(
+        mo.md(
+            "**DAGs are dynamic in PyTorch.** The graph is recreated from scratch: after "
+            "each `.backward()` call, autograd starts populating a new graph. This is "
+            "exactly what allows you to use control flow statements in your model; you can "
+            "change the shape, size and operations at every iteration if needed."
+        ),
+        kind="info",
+    )
     return
 
 
@@ -534,12 +546,15 @@ def _(mo):
 
 @app.cell(hide_code=True)
 def _(mo):
-    mo.md(r"""
-    > [!NOTE]
-    > Previously we were calling the `backward()` function without parameters. This is essentially
-    > equivalent to calling `backward(torch.tensor(1.0))`, which is a useful way to compute the
-    > gradients in case of a scalar-valued function, such as loss during neural network training.
-    """)
+    mo.callout(
+        mo.md(
+            "Previously we were calling the `backward()` function without parameters. This "
+            "is essentially equivalent to calling `backward(torch.tensor(1.0))`, which is a "
+            "useful way to compute the gradients in case of a scalar-valued function, such "
+            "as loss during neural network training."
+        ),
+        kind="info",
+    )
     return
 
 
