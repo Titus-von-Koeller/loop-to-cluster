@@ -76,6 +76,14 @@ interact, and choose the best combination — every step from measurement.
   threshold — so string and number are one literal family in anything built on these
   measurements, and any per-role color plan is checked pairwise against the thresholds
   before it is searched or shipped.
+- **The whole page takes the ground under test, not just the stimulus card.** He judges in
+  full screen, where the surround is most of the adapting field, and adaptation state is
+  part of the measurement by this program's own rule — a dark candidate read inside a light
+  page is measured in the wrong state. A *duel* keeps the polarity's fixed neutral surround
+  instead, because the two candidates have different grounds and painting the page with
+  either would advantage it; a single-card trial takes the candidate's own ground, which is
+  what a theme owning the screen actually looks like. Log the surround with every response
+  so trials from different conditions are never silently pooled.
 - **A candidate pool is a codebook, and that cuts both ways.** Revisiting the same
   candidate points concentrates information and sharpens the posterior; a fully churning
   candidate set spreads every answer over ground never seen again. Measured on synthetic

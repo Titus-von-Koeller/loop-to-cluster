@@ -116,7 +116,7 @@ trial is its anchor and the clock starts at render. Pause, tab-hide, or 25 s idl
 `mo.md` f-strings (how controls sit on a styled ground); multi-paragraph `mo.md` inside an
 `hstack` lays its paragraphs out horizontally in the VSCode renderer — use explicit stacks.
 Interactive instruments are verified by clicking them in a real browser (`marimo run` +
-`xdg-open`); the embedded surfaces lie (driving-notes in the vscode-keyhole skill).
+`xdg-open`); the embedded surfaces lie (driving-notes in the vscode-keyhole skill). A visual change is verified by rendering the surface and LOOKING at it, then pixel-sampling against the intended values: lint, `marimo check`, a clean script run and HTTP 200 have all passed together while the served page was a glaring white field (2026-09-03). Serve instruments with `--watch` so an edit needs no restart, and remember a widget mounts later than the first cells, so an early probe reports the pre-widget state.
 
 **Never rewrite a notebook on disk while it is open in the editor.** The extension syncs
 cells by id in transactions, and an external rewrite produces

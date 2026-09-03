@@ -1404,6 +1404,10 @@ def _(SESSION_START_N, get_responses, mo, random, render_card, run_info, schedul
     # A duel's surround must not favour either arm, so it stays the polarity's neutral; a
     # single-card trial paints the page with the theme under test.
     _page_bg = _strip if _t["mode"] == "duel" else _t["theme_a"]["ground"]
+    # Whether the page runs marimo's dark theme is decided by the ground it took, not by
+    # the polarity label: a light-ish night candidate should still get light-theme prose.
+    _pg = _page_bg.lstrip("#")
+    _page_dark = sum(int(_pg[_k : _k + 2], 16) for _k in (0, 2, 4)) < 384
     _ptxt = {"day": "#3a3532", "night": "#b8bcc6"}[_t["polarity"]]
 
     import anywidget
@@ -1435,16 +1439,44 @@ def _(SESSION_START_N, get_responses, mo, random, render_card, run_info, schedul
           // candidates have DIFFERENT grounds and painting the page with either would
           // advantage it -- while a single-card trial takes the candidate's own ground,
           // which is what a theme owning the screen actually looks like.
+          // The page joins the polarity under test. Titus judges these in full screen,
+          // where the surround is most of what the eye adapts to, and adaptation state is
+          // part of the measurement by the vision instrument's own rule -- a dark
+          // candidate read inside a light page is measured in the wrong state.
+          //
+          // Two earlier attempts were wrong in instructive ways. Painting body with
+          // guessed container selectors left marimo's own content column white over the
+          // dark field; walking up from this widget and clearing ancestor backgrounds
+          // fixed the field but not the PROSE, which lives in sibling cells and stayed
+          // dark-on-dark. The framework already has the switch: marimo keys its whole
+          // theme off a `dark` class on the root element, so flipping that gets every
+          // container, every piece of prose and every default ink coherently, and only
+          // the exact ground still has to be painted on top.
+          const surround = model.get("page_bg");
+          document.documentElement.classList.toggle("dark", !!model.get("page_dark"));
           let pageStyle = document.getElementById("theme-trial-surround");
           if (!pageStyle) {
             pageStyle = document.createElement("style");
             pageStyle.id = "theme-trial-surround";
             document.head.appendChild(pageStyle);
           }
-          const surround = model.get("page_bg");
+          // The exact ground goes through marimo's OWN custom property rather than over
+          // the top of it: its page container is .bg-background reading
+          // --background: light-dark(#fff, #181c1a), so setting that variable paints the
+          // real field the real colour, and cards keep a step off it. Overriding a
+          // framework with !important on guessed selectors is the smell that its hook has
+          // not been found yet; this is the hook.
+          const step = model.get("page_dark") ? 14 : -12;
+          const hex = surround.replace("#", "");
+          const card = "#" + [0, 2, 4].map((k) => {
+            const v = parseInt(hex.slice(k, k + 2), 16) + step;
+            return Math.max(0, Math.min(255, v)).toString(16).padStart(2, "0");
+          }).join("");
           pageStyle.textContent =
-            "html, body, #root, #App, .marimo, main { background: " + surround +
-            " !important; } body { transition: background 120ms linear; }";
+            ":root, html { --background: " + surround + " !important;" +
+            " --card: " + card + " !important; --popover: " + card + " !important; }" +
+            "html, body { background: " + surround + " !important; }" +
+            "body { transition: background 140ms linear; }";
           const wrap = document.createElement("div");
           // Full-bleed: marimo's prose column is ~700 px, too narrow for two code pages
           // at true editor sizes; the band breaks out to the viewport, capped at 1400 px.
@@ -1578,6 +1610,7 @@ def _(SESSION_START_N, get_responses, mo, random, render_card, run_info, schedul
         mode = traitlets.Unicode("duel").tag(sync=True)
         strip_bg = traitlets.Unicode("#888888").tag(sync=True)
         page_bg = traitlets.Unicode("#888888").tag(sync=True)
+        page_dark = traitlets.Bool(False).tag(sync=True)
         ink = traitlets.Unicode("#808080").tag(sync=True)
         prompt_html = traitlets.Unicode("").tag(sync=True)
         chip = traitlets.Unicode("").tag(sync=True)
@@ -1652,6 +1685,7 @@ def _(SESSION_START_N, get_responses, mo, random, render_card, run_info, schedul
             mode=_t["mode"],
             strip_bg=_strip,
             page_bg=_page_bg,
+            page_dark=bool(_page_dark),
             ink=_ptxt,
             prompt_html=_prompt,
             chip=_chip,
