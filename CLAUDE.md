@@ -299,28 +299,39 @@ one-line spark. When a queue item is opened, closed, or founded, mirror the one-
   falling while the set narrows — a real plateau resolving. Night is converging: leader 4→10%,
   set 44→24, naive line ~167 duels to a majority. Night data is the thinner half.
 
-  *Done since (2026-09-03, same day):* recovery tests now cover the RT surface, the grouping
-  and the convergence readout (11 tests, `_model_tests.py`); the duel RT exponent is chosen by
-  held-out log-loss over {0, ¼, ½, ¾} and refit every 25 duels — p = 0.5 won, beating "ignore
-  the clock" by 0.010 nats/duel, so the old heuristic is now earned rather than assumed; and
-  the timed arms select actively (hunts by uncertainty sampling on the legibility surface,
-  probes among plausible pages), worth about a quarter less error per click in simulation.
+  *Done 2026-09-03/04:* recovery tests now cover the RT surface, the grouping, the
+  convergence readout, the surface test, the axis readout and the size baseline (16 checks,
+  `_model_tests.py`). The duel RT exponent is chosen by held-out log-loss (p = 0.5 won). The
+  timed arms select actively, worth about a quarter less error per click. Surface rotation
+  was locked by `n % 3` against a 24-trial block and is now balanced in shuffled groups of
+  three. `factor_effect` tests any stimulus factor against a permutation null and reports it
+  in the verdict, with the multiplicity said out loud. Duels moved from 12-13px to the sizes
+  he actually reads at (14 editor / panel, 16 notebook), with a per-(arm, size) RT baseline
+  so the change does not land on the theme surface. The verdict reports the speed cost as a
+  difference with an interval (not credible: +0.40 [-0.45, +1.26] by day) and says which axes
+  his clicks have SETTLED. And the champion is published to `measured-theme.json` for
+  `apply-measured-theme`, which rewrites marked regions of settings.jsonc rather than asking
+  anyone to retype twelve hex codes.
 
   *Remaining work, ranked by value:*
-  1. Surface (editor / panel / notebook) is logged but never tested for interaction with
-     theme. If the optimum differs by surface, one theme is the wrong answer shape — and the
-     panel surface is where he spends most of his day.
-  2. Untested assumption worth a probe: duels are judged at 12–13px and probes read at
-     15–16px, so preference measured at one size is applied to reading at another.
-  3. The find-highlight axes are the live question — ax8 ranks second of nine for preference,
-     but the legibility surface could not resolve its effect on speed at 29 uniform hunts.
-     Active hunting should fix that; check again around 60 hunts.
-  4. More night sittings — night is the thinner half (leader 10%, set 24, ~167 duels to a
-     majority) while day has settled into a plateau of ~12.
-  5. Applying the winner: the override snippet is emitted in the analysis, pasting it is
-     still manual.
-  6. Ecological-valence prior stays generic by his instruction (preferences discovered, never
+  1. His eyes on the two comparison renders (current settings against measured champion, sent
+     2026-09-04). Both verdicts are plateaus at 16-18%, so the model has no strong opinion
+     between the shelf's members and his does — the intended division of labour. Applying is
+     one command whenever he wants it.
+  2. More night sittings. Night is the thinner half and its surface reading (p = 0.09) is the
+     one live hint that a single theme might be the wrong shape of answer; it needs roughly
+     twice the duels to settle either way.
+  3. The find-highlight axes: ax8 ranks high for preference but the legibility surface could
+     not resolve its effect on speed at 29 uniform hunts. Active hunting should fix that —
+     re-read around 60.
+  4. Watch the preference-versus-speed gap. The point estimate says the leader is about 1.5x
+     slower than the quickest page the model knows; the interval is far too wide to act on,
+     but active hunting sharpens exactly that surface, and the verdict flips to a warning on
+     its own if it ever clears zero.
+  5. Ecological-valence prior stays generic by his instruction (preferences discovered, never
      declared) — so hue axes must keep getting explored; worth a coverage check.
+  6. Screen ICC calibration, still parked: it bounds absolute colour claims, not the relative
+     structure the instrument learns.
 
 - The theme program (named 2026-09-02): determine independently the best *editor* theme for
   Titus (best-in-class as the starting field — Selenized, Modus, GitHub accessible, Horizon —
