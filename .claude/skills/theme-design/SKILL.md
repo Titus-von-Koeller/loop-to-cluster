@@ -76,6 +76,15 @@ interact, and choose the best combination — every step from measurement.
   threshold — so string and number are one literal family in anything built on these
   measurements, and any per-role color plan is checked pairwise against the thresholds
   before it is searched or shipped.
+- **The stimulus must sit where the panel is viewed straight on.** On his 8K screen the
+  outer edges are seen at an angle steep enough to skew a judgement, and code being
+  left-bound parked the left candidate out there. Grounds stay full-bleed (adaptation is
+  measured), but CONTENT hugs the centre seam — left half right-aligned, right half
+  left-aligned — so the pair occupies the middle ~55% of the screen, symmetric about the
+  centre so neither candidate gains. Screen geometry is a stimulus parameter like any other.
+- **Show a page, not a snippet.** A fourteen-line block adrift in half a screen tells him
+  nothing about how a screen of that theme reads: duel samples are page-length (~28 lines)
+  at the smaller end of the true editor sizes, filling the field the way an editor does.
 - **A comparison splits the viewport; it does not lay cards on a shared page.** Painting a
   duel's shared page with either candidate's ground advantages that one, and a neutral
   surround puts BOTH candidates on a mismatched field — the very adaptation error the rule

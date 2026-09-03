@@ -610,35 +610,10 @@ agg_item = agg.item()
     # is the reference against which a fresh page's reaction time is read -- but they are
     # no longer the corpus. Memoized per seed so the widget, the recorder and the analysis
     # cell all resolve the same page without regenerating it.
-    _SNIP_MEMO = {}
-
-    def snippet_for(seed, width=None, target_kind=None):
-        """The page for this trial seed: fresh procedural or obscure-stdlib code.
-
-        width is the column ceiling: two duel cards side by side hold about eighty columns
-        at 14px, and the stimulus <pre> is overflow:hidden, so a wider line would be
-        silently clipped -- a clipped stimulus is a different stimulus. Line count and role
-        mix stay at the generator's calibrated default: freshness alone makes the
-        comprehension probe hard now that no page is ever shown twice, and a longer page
-        would trade away the identical-role-statistics property that lets two reaction
-        times be compared at all.
-        """
-        _key = (int(seed), width, target_kind)
-        if _key in _SNIP_MEMO:
-            return _SNIP_MEMO[_key]
-        try:
-            _kw = {} if width is None else {"max_width": int(width)}
-            if target_kind:
-                _kw["target_kind"] = target_kind
-            _s = _codegen.snippet(int(seed), **_kw)
-            _s = dict(_s)
-            _s.setdefault("ident", _s.get("target"))
-        except Exception:
-            # A generator failure must never cost a sitting: fall back to a control page.
-            _s = _CONTROL[int(seed) % len(_CONTROL)]
-        _SNIP_MEMO[_key] = _s
-        return _s
-
+    # _CONTROL is built BEFORE snippet_for on purpose: a cell-local name referenced
+    # inside an exported function resolves only if it is defined above that function,
+    # and only under `marimo run`/`edit` -- a script run shares one namespace and
+    # never mangles, so the wrong order passes every check and fails only when served.
     _CONTROL = []
     for _sid, (_prov, _code, _ident) in _SOURCES.items():
         _sp = _tokenize_roles(_code)
@@ -655,6 +630,47 @@ agg_item = agg.item()
                 "kind": "control",
             }
         )
+
+    _SNIP_MEMO = {}
+
+    def snippet_for(seed, width=None, target_kind=None, lines=None):
+        """The page for this trial seed: fresh procedural or obscure-stdlib code.
+
+        width is the column ceiling: two duel cards side by side hold about eighty columns
+        at 14px, and the stimulus <pre> is overflow:hidden, so a wider line would be
+        silently clipped -- a clipped stimulus is a different stimulus. Line count and role
+        mix stay at the generator's calibrated default: freshness alone makes the
+        comprehension probe hard now that no page is ever shown twice, and a longer page
+        would trade away the identical-role-statistics property that lets two reaction
+        times be compared at all.
+        """
+        _key = (int(seed), width, target_kind, lines)
+        if _key in _SNIP_MEMO:
+            return _SNIP_MEMO[_key]
+        # The generator cannot promise every length for every seed -- its shapes are
+        # calibrated near fourteen lines and a long page is a taller order -- so the request
+        # walks down in steps before giving up. A control page is the last resort only,
+        # because it is code he has seen and freshness is the whole point.
+        _s = None
+        _wants = [int(lines)] if lines else [None]
+        if lines:
+            _wants += [int(lines) - 4, int(lines) - 8, None]
+        for _want in _wants:
+            try:
+                _kw = {} if width is None else {"max_width": int(width)}
+                if target_kind:
+                    _kw["target_kind"] = target_kind
+                if _want:
+                    _kw["lines"] = _want
+                _s = dict(_codegen.snippet(int(seed), **_kw))
+                _s.setdefault("ident", _s.get("target"))
+                break
+            except Exception:
+                continue
+        if _s is None:
+            _s = _CONTROL[int(seed) % len(_CONTROL)]
+        _SNIP_MEMO[_key] = _s
+        return _s
 
     _PROSE_TAIL = (
         "The consumer holds the lock only while it copies out, so a slow reader delays the "
@@ -1312,7 +1328,13 @@ def _(DUEL_WIDTH, POOL, np, prior_mean, qmc, random, realize):
             _trial = {
                 "mode": "duel",
                 # Both arms share surface and page: a duel varies the theme, nothing else.
+                # A duel is judged full screen, so the sample must BE a page -- a fourteen
+                # line block adrift in half a screen tells him nothing about how a screen
+                # of this theme reads. Long enough to fill the half, and smaller type,
+                # which is also what a full screen at this pixel density looks like in the
+                # editor itself. Both stay logged as stimulus parameters.
                 "snippet_width": DUEL_WIDTH,
+                "snippet_lines": 28,
                 "surface": ("editor", "panel", "notebook")[n % 3],
                 "kind": _kind,
                 "polarity": _pol,
@@ -1321,7 +1343,7 @@ def _(DUEL_WIDTH, POOL, np, prior_mean, qmc, random, realize):
                 "theme_a": _tha,
                 "theme_b": _thb,
                 "snippet": _snip,
-                "code_px": 14 if _rng.random() < 0.5 else 16,
+                "code_px": 12 if _rng.random() < 0.5 else 13,
                 "swap": _rng.random() < 0.5,
                 "find_current": None,  # filled by the widget cell from the snippet
             }
@@ -1405,11 +1427,16 @@ def _(SESSION_START_N, get_responses, mo, random, render_card, run_info, schedul
     _nd_prev = _nd - (1 if _n > 0 and get_responses()[-1].get("mode") == "duel" else 0)
     _gate = _n == SESSION_START_N or (_n > 0 and schedule_mode(_n - 1, _nd_prev) != (_pol, _mode))
     _rng = random.Random(_n * 48271 % (2**31))
-    _snip = snippet_for(_t["snippet"], _t.get("snippet_width"), _t.get("target_kind"))
-    _strip = {"day": "#d8d2cf", "night": "#14161c"}[_t["polarity"]]
+    _snip = snippet_for(_t["snippet"], _t.get("snippet_width"), _t.get("target_kind"), _t.get("snippet_lines"))
+    _neutral = {"day": "#d8d2cf", "night": "#14161c"}[_t["polarity"]]
+    # A single-card trial has ONE ground, so band, page and card are one continuous field:
+    # a neutral band around the card would put a third colour between the sample and the
+    # page that was just painted to match it. A duel keeps the neutral, since its band
+    # surrounds two different grounds and must favour neither.
+    _strip = _neutral if _t["mode"] == "duel" else _t["theme_a"]["ground"]
     # A duel's surround must not favour either arm, so it stays the polarity's neutral; a
     # single-card trial paints the page with the theme under test.
-    _page_bg = _strip if _t["mode"] == "duel" else _t["theme_a"]["ground"]
+    _page_bg = _neutral if _t["mode"] == "duel" else _t["theme_a"]["ground"]
     # Whether the page runs marimo's dark theme is decided by the ground it took, not by
     # the polarity label: a light-ish night candidate should still get light-theme prose.
     _pg = _page_bg.lstrip("#")
@@ -1494,14 +1521,34 @@ def _(SESSION_START_N, get_responses, mo, random, render_card, run_info, schedul
             `border-radius:10px;display:flex;flex-direction:column;gap:14px;` +
             `position:relative;left:50%;transform:translateX(-50%);` +
             `width:min(96vw, 1400px);box-sizing:border-box;color:${model.get("ink")}`;
+          // EVERY trial takes the screen once revealed, not only duels: he judges in full
+          // screen, and a comparison that owns the field while a probe shares it with the
+          // page would be measured in two different conditions.
           const fullCss =
             `background:${model.get("strip_bg")};padding:0;display:flex;` +
-            `flex-direction:column;gap:0;position:fixed;inset:0;z-index:60;` +
+            // Above every piece of marimo's own chrome: its logo sat over the instruction
+            // chip and its scrollbar showed at the edge. A trial that takes the screen
+            // takes all of it -- stacking below the host's furniture and then padding
+            // around it would be a hack that breaks whenever the host moves something.
+            `flex-direction:column;gap:0;position:fixed;inset:0;z-index:2147483000;` +
             `box-sizing:border-box;color:${model.get("ink")}`;
           wrap.style.cssText = inlineCss;
           const setFrame = (full) => {
+            // Reparented to <body> rather than trusting a big z-index: marimo's logo sat
+            // over the instruction bar even at z-index 2147483000, because z-index only
+            // orders siblings within a stacking context and the widget's container is
+            // inside one of marimo's. Moving the frame to the root context is the fix that
+            // holds however the host rearranges its own furniture; it returns to its slot
+            // when the frame goes inline, so nothing leaks.
+            if (full && wrap.parentElement !== document.body) {
+              document.body.appendChild(wrap);
+            } else if (!full && wrap.parentElement !== el) {
+              el.appendChild(wrap);
+            }
             wrap.style.cssText = full ? fullCss : inlineCss;
             top.style.padding = full ? "14px 20px 10px 20px" : "0";
+            stage.style.flex = full ? "1 1 auto" : "0 0 auto";
+            stage.style.minHeight = full ? "0" : "";
           };
           // The instruction bar: what kind of run (chip), what to do (question, large),
           // where you are in the run (progress). One glance, then act.
@@ -1534,7 +1581,9 @@ def _(SESSION_START_N, get_responses, mo, random, render_card, run_info, schedul
           // The stimulus row keeps its box in the layout at all times; the cover is an
           // opaque overlay on exactly that box, so reveal/pause never move the page.
           const stage = document.createElement("div");
-          stage.style.cssText = "position:relative";
+          // Grows in the full-screen frame so the halves reach the bottom of the viewport;
+          // inline it keeps its content height.
+          stage.style.cssText = "position:relative;display:flex;flex-direction:column";
           // A duel splits the VIEWPORT rather than laying two cards on a shared page.
           // Each half is full-bleed in its own ground, so each candidate is judged in its
           // own adaptation state -- the same reason the page takes the ground on a
@@ -1545,10 +1594,13 @@ def _(SESSION_START_N, get_responses, mo, random, render_card, run_info, schedul
           // a third colour between the two things being compared.
           const isDuel = model.get("mode") === "duel";
           const row = document.createElement("div");
+          // Edge to edge, because he judges in full screen and a centred pair gave back
+          // adaptation area to a neutral surround for no gain. Each half owns its ground
+          // with no gutter between them -- the point of splitting.
           row.style.cssText = isDuel
             ? "display:flex;gap:0;align-items:stretch;width:100%;visibility:hidden;flex:1 1 auto"
-            : "display:flex;gap:16px;justify-content:center;align-items:stretch;" +
-              "width:100%;visibility:hidden";
+            : "display:flex;gap:16px;justify-content:center;align-items:center;" +
+              "width:100%;visibility:hidden;flex:1 1 auto";
           const cover = document.createElement("div");
           cover.style.cssText = `position:absolute;inset:0;display:flex;flex-direction:column;` +
             `align-items:center;justify-content:center;gap:16px;border-radius:10px;` +
@@ -1567,7 +1619,7 @@ def _(SESSION_START_N, get_responses, mo, random, render_card, run_info, schedul
             cover.style.display = "flex";
             row.style.visibility = "hidden";
             pauseBtn.style.visibility = "hidden";
-            if (isDuel) setFrame(false);
+            setFrame(false);
           };
           let idleTimer = null;
           const armIdle = () => {
@@ -1575,7 +1627,7 @@ def _(SESSION_START_N, get_responses, mo, random, render_card, run_info, schedul
             idleTimer = setTimeout(() => doPause("paused after 25 s without a click"), 25000);
           };
           const reveal = () => {
-            if (isDuel) setFrame(true);
+            setFrame(true);
             cover.style.display = "none";
             row.style.visibility = "visible";
             pauseBtn.style.visibility = "visible";
@@ -1613,15 +1665,34 @@ def _(SESSION_START_N, get_responses, mo, random, render_card, run_info, schedul
           };
           model.get("cards").forEach((c, i) => {
             const card = document.createElement("div");
-            card.innerHTML = c.html;
+            // The surface's own blocks (prose, code card, output) are SIBLINGS, so they go
+            // inside one block-level child: a flex parent would otherwise lay them out as
+            // a row and clip the code mid-line (measured -- it looked exactly as broken as
+            // it sounds).
+            const inner = document.createElement("div");
+            // Capped so the pair straddles the centre rather than each block sprawling to
+            // its own outer edge.
+            inner.style.cssText = isDuel
+              ? "width:100%;max-width:min(720px, 44vw);min-width:0"
+              : "width:100%;max-width:100%;min-width:0";
+            inner.innerHTML = c.html;
+            card.appendChild(inner);
             card.style.cssText = isDuel
-              // Content at the top-left of its half, not centred: an editor page starts
-              // there, and a block floating mid-field is a picture of a card rather than
-              // of the surface being judged (the standalone render made it obvious).
-              ? `background:${c.ground};padding:34px 40px;flex:1 1 0;min-width:0;` +
-                `overflow:hidden;display:flex;align-items:flex-start;justify-content:flex-start`
-              : `background:${c.ground};border-radius:10px;padding:20px;` +
-                `flex:1 1 0;min-width:0;overflow:hidden`;
+              // Grounds stay full-bleed (adaptation), but the CONTENT of each half hugs the
+              // seam: left half right-aligned, right half left-aligned, so both code blocks
+              // sit inside the middle half of the screen. On an 8K panel the outer edges
+              // are viewed at an angle steep enough to skew the judgement, and code being
+              // left-bound put the left candidate out there (Titus). Symmetric about the
+              // centre, so neither candidate gains — the fairness property is preserved
+              // while the optics stop biasing the answer.
+              ? `background:${c.ground};padding:26px 34px;flex:1 1 0;min-width:0;` +
+                `overflow:hidden;display:flex;align-items:center;` +
+                `justify-content:${i === 0 ? "flex-end" : "flex-start"}`
+              // A single-card trial centres on the screen, on the same ground the page
+              // took, with no radius: card, band and page are one continuous field.
+              : `background:${c.ground};padding:28px 32px;max-width:min(1100px, 92vw);` +
+                `min-width:0;overflow:hidden;display:flex;align-items:center;` +
+                `justify-content:center`;
             if (isDuel) {
               card.style.cursor = "pointer";
               card.onclick = () => pick(i);
@@ -1749,7 +1820,7 @@ def _(LOG, datetime, get_responses, json, random, set_responses, snippet_for, ti
             return
         _t = trial_for(n, get_responses())
         _rng = random.Random(n * 48271 % (2**31))
-        _snip = snippet_for(_t["snippet"], _t.get("snippet_width"), _t.get("target_kind"))
+        _snip = snippet_for(_t["snippet"], _t.get("snippet_width"), _t.get("target_kind"), _t.get("snippet_lines"))
         _entry = {
             "ts": datetime.now(timezone.utc).isoformat(timespec="seconds"),
             "n": n,
@@ -1762,6 +1833,8 @@ def _(LOG, datetime, get_responses, json, random, set_responses, snippet_for, ti
             "snippet_fresh": bool(_snip.get("fresh", True)),
             "target_kind": _snip.get("target_kind"),
             "surface": _t.get("surface", "editor"),
+            # Recomputed rather than shared: this is a different cell, and the widget
+            # cell's underscore names are local to it.
             "page_bg": (
                 {"day": "#d8d2cf", "night": "#14161c"}[_t["polarity"]]
                 if _t["mode"] == "duel"
