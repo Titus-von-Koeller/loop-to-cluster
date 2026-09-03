@@ -313,6 +313,30 @@ one-line spark. When a queue item is opened, closed, or founded, mirror the one-
   `apply-measured-theme`, which rewrites marked regions of settings.jsonc rather than asking
   anyone to retype twelve hex codes.
 
+  *IN FLIGHT (started 2026-09-04 overnight): moving the trial UI out of the notebook.*
+  The blank-screen failure Titus hit is not a styling bug and not new: reproduced
+  identically on the notebook BEFORE and AFTER that evening's layout change — trial 1
+  renders, trial 2 leaves an empty full-screen `#theme-trial-stage` over the page. Cause is
+  structural. marimo tears down and rebuilds the anywidget on every answer, so the trial UI
+  has no stable DOM: the notebook version already needed reparenting to `<body>` to escape
+  marimo's stacking context, a page-owned persistent stage to stop loading placeholders
+  flashing between trials, and then a render-generation guard on top — three workarounds for
+  not owning the mount. A timed psychophysics task must own its DOM.
+
+  Target: `notebooks/pytorch-basics/theme/` as a plain package (color, space, stimulus,
+  model, schedule, log), `server.py` as a FastAPI app serving `GET /api/trial/{n}` and
+  `POST /api/response` plus one static page that owns the DOM permanently and prefetches
+  trial n+1 while he answers n (so no stall is ever inside the timed window — the analysis
+  was costing 8.3 s per click before the factor tests were bucketed). The notebook keeps
+  what a notebook is good at: reading the log and reporting what the model believes.
+  `_model_tests.py` imports `theme.model` directly instead of AST-loading a notebook cell.
+
+  Also learned and worth acting on: marimo's run-mode skew token is `hash(source)`, and
+  Python salts `hash` per process, so every restart mints a new token and silently kills
+  open tabs (marimo's client never checks for this — a stale tab shows at most an
+  "Unauthorized" toast). Pinning `PYTHONHASHSEED` makes run-mode tokens stable across
+  restarts, which is what marimo's own code comment already intends.
+
   *Remaining work, ranked by value:*
   1. His eyes on the two comparison renders (current settings against measured champion, sent
      2026-09-04). Both verdicts are plateaus at 16-18%, so the model has no strong opinion
