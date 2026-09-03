@@ -248,10 +248,19 @@ one-line spark. When a queue item is opened, closed, or founded, mirror the one-
   remains sanctioned when the grid needs to grow past a few thousand trials.
 - The theme gallery's sequential prose still describes the retired blue RAMP; update it to
   the cividis house ramp once the swap survives Titus's reading.
-- Confusion-axis re-rank of the theme gallery's dropdown: the axis is now a fitted quantity
-  (φ in _observer.py, currently unconstrained at 1° ± 20°) and `_observer.discriminability`
-  predicts p(tell apart) for any pair on any ground — remaining work is wiring the gallery
-  dropdown's order to it (measured rather than simulated discriminability).
+- Confusion-axis re-rank of the theme gallery's dropdown: **DONE 2026-09-03** — ordered by
+  worst adjacent-pair discriminability under the fitted observer, rainbows pinned last by
+  the monotonicity rule. Finding for Titus: measured order puts magma/inferno first and
+  cividis eighth — the house ramp's CVD-safety rationale is not binding for his eyes; the
+  applied cividis choice stays his to revisit (see the gallery-prose item above).
+- Interlock session resume point (2026-09-03, all pushed through this line): preference
+  instrument serving on :2919 (pane `calibrate-aesthetics`, lock `port-2919`) awaiting his
+  duels; vision v2 awaits his clicks at the new grounds/sizes (open tab needs ctrl+alt+m
+  first — residual above). Next when data or he arrives: γ (glyph) and gL-at-new-grounds
+  verdicts from his trials; add ground *warmth* to _observer once the ground family
+  decouples it; fold his loved colors into the aesthetics prior (still unanswered); GPU
+  posterior only if the grid must grow (sanctioned, not yet needed); the cividis-prose
+  queue item remains untaken.
 - The aesthetics-preference instrument: **BUILT 2026-09-03** —
   `notebooks/pytorch-basics/calibrate-aesthetics.py` (torch-free, serves under `marimo run`),
   exactly the kicked-off design: preferential Bayesian optimization (Bradley–Terry duels
