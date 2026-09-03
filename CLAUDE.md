@@ -218,6 +218,12 @@ one-line spark. When a queue item is opened, closed, or founded, mirror the one-
   the calibration data as it accumulates. Named 2026-09-02.
 - Screen calibration (hardware/ICC) — named 2026-09-02 as "another day"; until then the
   vision-calibration data is relative-to-this-screen, which its prose says.
+- **Ownership note (2026-09-03): the four measurement items below — ground optimization,
+  observer-model refinements, confusion-axis re-rank, and the glyph-scale stage — are
+  absorbed into the aesthetics-instrument session's brief** (Titus's expansion order): one
+  session owns the measurement↔preference interlock, so sharpened measurements regenerate
+  the constraint set its optimizer searches. They stay listed for their content; resume
+  points now live with that session's instrument.
 - Ground optimization (named 2026-09-02): the background is currently a fixed condition,
   not a searched variable. Promote it: a family of candidate page colors (the two Horizon
   pages plus the best-in-class candidates' grounds — Selenized, Modus, GitHub — spanning
