@@ -1595,6 +1595,12 @@ def _(SESSION_START_N, get_responses, mo, random, render_card, run_info, schedul
         # evidence.
         _esm = """
         function render({ model, el }) {
+          // Declared FIRST because several builders below read it. It used to sit beside
+          // the stimulus row, one hundred lines after the instruction bar that reads it,
+          // which put the bar inside its temporal dead zone: render threw a ReferenceError,
+          // and because el.replaceChildren runs last the previous trial's markup stayed on
+          // screen with a dead button -- indistinguishable from the instrument hanging.
+          const isDuel = model.get("mode") === "duel";
           let t0 = -1;               // the clock's baseline: the latest reveal
           let revealed = false;      // every trial starts hidden
           let pausedNow = false;
@@ -1699,6 +1705,10 @@ def _(SESSION_START_N, get_responses, mo, random, render_card, run_info, schedul
           prompt.innerHTML = model.get("prompt_html");
           prompt.style.cssText = "flex:1 1 0;font-family:'IBM Plex Serif',serif;" +
             "font-size:19px;line-height:1.3";
+          const keys = document.createElement("div");
+          keys.textContent = isDuel ? "← →  or click" : "space pauses";
+          keys.style.cssText = "font-family:'IBM Plex Serif',serif;font-size:12px;" +
+            "opacity:.45;white-space:nowrap;letter-spacing:.04em";
           const progress = document.createElement("div");
           progress.textContent = model.get("progress");
           progress.style.cssText = "font-family:'IBM Plex Serif',serif;font-size:13px;" +
@@ -1712,6 +1722,7 @@ def _(SESSION_START_N, get_responses, mo, random, render_card, run_info, schedul
           pauseBtn.style.cssText = btnStyle + ";font-size:13px;opacity:.55;padding:2px 10px;" +
             "visibility:hidden";
           top.appendChild(prompt);
+          top.appendChild(keys);
           top.appendChild(progress);
           top.appendChild(pauseBtn);
           // The stimulus row keeps its box in the layout at all times; the cover is an
@@ -1728,7 +1739,6 @@ def _(SESSION_START_N, get_responses, mo, random, render_card, run_info, schedul
           // advantage that one; splitting is the only arrangement that is both matched and
           // symmetric. No gap and no radius between the halves: a gutter would reintroduce
           // a third colour between the two things being compared.
-          const isDuel = model.get("mode") === "duel";
           const row = document.createElement("div");
           // Edge to edge, because he judges in full screen and a centred pair gave back
           // adaptation area to a neutral surround for no gain. Each half owns its ground
@@ -1789,6 +1799,7 @@ def _(SESSION_START_N, get_responses, mo, random, render_card, run_info, schedul
           pauseBtn.onclick = () => doPause("paused");
           const onVis = () => { if (document.hidden) doPause("paused while the tab was hidden"); };
           document.addEventListener("visibilitychange", onVis);
+          let inputMethod = "mouse";
           const pick = (tid) => {
             if (!revealed || pausedNow) return;
             if (idleTimer) clearTimeout(idleTimer);
@@ -1797,8 +1808,33 @@ def _(SESSION_START_N, get_responses, mo, random, render_card, run_info, schedul
             model.set("pauses", pauses);
             model.set("t_render", t0);
             model.set("t_click", performance.now());
+            model.set("input_method", inputMethod);
             model.save_changes();
           };
+          // Arrow keys answer a duel, and that is a MEASUREMENT fix as much as a comfort:
+          // clicking the left card on a 2560-or-wider screen is a different distance of
+          // mouse travel than clicking the right one, so the reaction time the likelihood
+          // reads as evidence of preference strength carried a systematic side component --
+          // on top of the side bias already fitted. Two keys equidistant from the hand
+          // remove it. Space reveals or pauses, so a whole sitting needs no mouse at all.
+          // The method is recorded per response, so mouse and key trials stay separable.
+          const onKey = (ev) => {
+            if (ev.metaKey || ev.ctrlKey || ev.altKey) return;
+            const k = ev.key;
+            if (isDuel && revealed && !pausedNow && (k === "ArrowLeft" || k === "ArrowRight")) {
+              ev.preventDefault();
+              inputMethod = "key";
+              pick(k === "ArrowLeft" ? 0 : 1);
+            } else if (k === " " || k === "Spacebar") {
+              ev.preventDefault();
+              if (!revealed || pausedNow) {
+                reveal();
+              } else {
+                doPause("paused with the spacebar");
+              }
+            }
+          };
+          document.addEventListener("keydown", onKey);
           model.get("cards").forEach((c, i) => {
             const card = document.createElement("div");
             // The surface's own blocks (prose, code card, output) are SIBLINGS, so they go
@@ -1848,6 +1884,14 @@ def _(SESSION_START_N, get_responses, mo, random, render_card, run_info, schedul
           return () => {
             if (idleTimer) clearTimeout(idleTimer);
             document.removeEventListener("visibilitychange", onVis);
+            // Both of these matter per trial, not just at teardown: render() runs again for
+            // every trial, so a listener left behind would fire once per past trial (one
+            // keypress answering several) and a frame left parented to <body> would sit
+            // over the next trial as an orphan.
+            document.removeEventListener("keydown", onKey);
+            if (wrap.parentElement === document.body) {
+              wrap.remove();
+            }
           };
         }
         export default { render };
@@ -1865,6 +1909,7 @@ def _(SESSION_START_N, get_responses, mo, random, render_card, run_info, schedul
         cards = traitlets.List([]).tag(sync=True)
         choice = traitlets.Int(-1).tag(sync=True)
         clicks = traitlets.Int(0).tag(sync=True)
+        input_method = traitlets.Unicode("mouse").tag(sync=True)
         pauses = traitlets.Int(0).tag(sync=True)
         t_render = traitlets.Float(-1.0).tag(sync=True)
         t_click = traitlets.Float(-1.0).tag(sync=True)
@@ -1969,6 +2014,7 @@ def _(LOG, datetime, get_responses, json, random, set_responses, snippet_for, ti
             "snippet_fresh": bool(_snip.get("fresh", True)),
             "target_kind": _snip.get("target_kind"),
             "surface": _t.get("surface", "editor"),
+            "input_method": _v.get("input_method", "mouse"),
             # Recomputed rather than shared: this is a different cell, and the widget
             # cell's underscore names are local to it.
             "page_bg": (
