@@ -1189,7 +1189,7 @@ def _(DUEL_WIDTH, POOL, math, np, prior_mean, qmc, random, realize):
     # one level deeper: the contrast floors keep a page readable in principle, and this
     # keeps it readable in fact.
     def rt_fit(responses, polarity, ls=None, noise_share=0.45):
-        _X, _y = [], []
+        _X, _y, _mode = [], [], []
         for _r in responses:
             if _r.get("mode") not in ("comprehension", "search"):
                 continue
@@ -1200,18 +1200,32 @@ def _(DUEL_WIDTH, POOL, math, np, prior_mean, qmc, random, realize):
                 continue
             _X.append(_coords(_r["theta_a"], polarity))
             _y.append(np.log(_rt))
+            _mode.append(1.0 if _r["mode"] == "search" else 0.0)
         if len(_X) < 8:
             return None
         _X = np.array(_X)
         _y = np.array(_y)
-        _mu0 = float(_y.mean())
+        _mode = np.array(_mode)
+        # A PER-ARM baseline, not one global mean. A find hunt highlights every match and
+        # asks which is current; a comprehension probe gives a bare page and a name. The
+        # second is systematically slower, and folding both into one mean would push that
+        # constant difference into the theme surface as if some regions of theme space were
+        # slow -- when what was slow was the task. Each arm's own mean is removed, and the
+        # surface then models only what the THEME does to the clock. Needs both arms
+        # present to be worth doing; with one arm this collapses to the global mean.
+        _has_both = 0 < float(_mode.mean()) < 1
+        _m_probe = float(_y[_mode == 0].mean()) if (_mode == 0).any() else float(_y.mean())
+        _m_hunt = float(_y[_mode == 1].mean()) if (_mode == 1).any() else float(_y.mean())
+        _base = np.where(_mode > 0.5, _m_hunt, _m_probe) if _has_both else np.full(len(_y), _y.mean())
+        _mu0 = _m_probe if _has_both else float(_y.mean())
         # Signal and noise variance estimated from the data rather than borrowed from the
         # preference kernel: the preference GP's prior sd of 2 means a factor of seven in
         # log time, which produced a predicted span of 1.4 to 14 seconds -- nonsense on a
         # task he completes in two to four. Total variance is what log-RT actually shows,
         # and reaction time is famously noisy, so a large share of it is called noise
         # (0.45): the surface then claims a real difference only where the data insists.
-        _total = max(float(_y.var()), 1e-4)
+        _resid = _y - _base
+        _total = max(float(_resid.var()), 1e-4)
         _sf2 = max((1.0 - noise_share) * _total, 1e-4)
         _noise = max(noise_share * _total, 1e-4)
         _K = (_sf2 / _SF2) * _kmat(_X, _X, ls) + _noise * np.eye(len(_X))
@@ -1221,8 +1235,12 @@ def _(DUEL_WIDTH, POOL, math, np, prior_mean, qmc, random, realize):
             return None
         return {
             "X": _X,
-            "y": _y,
+            "y": _base + _resid,
+            "resid": _resid,
+            "base": _base,
             "mu0": _mu0,
+            "m_probe": _m_probe,
+            "m_hunt": _m_hunt,
             "Ki": _Ki,
             "ls": ls,
             "n": len(_X),
@@ -1235,7 +1253,7 @@ def _(DUEL_WIDTH, POOL, math, np, prior_mean, qmc, random, realize):
         _Xs = np.array([_coords(_t, polarity) for _t in thetas])
         _scale = rf["sf2"] / _SF2
         _ks = _scale * _kmat(_Xs, rf["X"], rf.get("ls"))
-        _mu = rf["mu0"] + _ks @ (rf["Ki"] @ (rf["y"] - rf["mu0"]))
+        _mu = rf["mu0"] + _ks @ (rf["Ki"] @ rf["resid"])
         _var = np.maximum(rf["sf2"] - np.einsum("ij,jk,ik->i", _ks, rf["Ki"], _ks), 1e-9)
         return _mu, _var
 
@@ -1258,6 +1276,8 @@ def _(DUEL_WIDTH, POOL, math, np, prior_mean, qmc, random, realize):
         _p_worse = 0.5 * (1.0 + np.vectorize(math.erf)(_z / np.sqrt(2.0)))
         return _p_worse > confidence, np.exp(_mu)
 
+    _BEST_MEMO = {}
+
     def best_set(fit, polarity, thetas, samples=2048, mass=0.5, seed=0, radius=0.9):
         """Which theme is best, or which SET is -- as a distribution over argmaxes.
 
@@ -1279,6 +1299,13 @@ def _(DUEL_WIDTH, POOL, math, np, prior_mean, qmc, random, realize):
         the top group is thin, the honest answer is that the log cannot yet tell -- which
         is a state this reports rather than dressing up as a plateau.
         """
+        # Memoized on the fit's identity, the polarity and the candidate set: the analysis
+        # asks for the same verdict three times per polarity (the shelf, and the two
+        # historical fits behind the progress readout), and each call is a Cholesky over
+        # eight hundred candidates.
+        _ck = (id(fit), polarity, len(thetas), samples, mass, seed, radius, float(np.sum(thetas[0])))
+        if _ck in _BEST_MEMO:
+            return _BEST_MEMO[_ck]
         _mu, _cov = posterior_joint(fit, thetas, polarity)
         try:
             _L = np.linalg.cholesky(_cov)
@@ -1317,7 +1344,7 @@ def _(DUEL_WIDTH, POOL, math, np, prior_mean, qmc, random, realize):
                 break
         _lead = float(_gp[_gorder[0]])
         _verdict = "single" if _lead > 0.5 else ("plateau" if _lead > 0.12 else "undecided")
-        return {
+        _res = {
             "p_best": _p,
             "order": _order,
             "groups": _reps,
@@ -1329,6 +1356,10 @@ def _(DUEL_WIDTH, POOL, math, np, prior_mean, qmc, random, realize):
             "mu": _mu,
             "verdict": _verdict,
         }
+        if len(_BEST_MEMO) > 8:
+            _BEST_MEMO.pop(next(iter(_BEST_MEMO)))
+        _BEST_MEMO[_ck] = _res
+        return _res
 
     def progress_report(responses, polarity, thetas, back=25):
         """Is another sitting worth clicking? Compare the verdict now with the verdict as
