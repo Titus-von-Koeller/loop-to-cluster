@@ -186,6 +186,46 @@ interact, and choose the best combination — every step from measurement.
   code by AST rather than duplicating it, and record the changes that measured WORSE — a
   plausible-sounding change that degrades an instrument is the expensive kind of mistake.
   loop-to-cluster: `notebooks/pytorch-basics/_model_tests.py`.
+- **Spend timed trials where the surface is least certain, not uniformly.** The legibility
+  GP is a regression, so its own posterior variance says where a click buys the most; a
+  uniform sweep spends most of them re-measuring what is already known. Measured against a
+  planted truth over 40 hunts and 5 seeds: correlation with truth 0.873 against 0.791
+  uniform, centred RMSE 0.060 against 0.079 — about a quarter less error for the same
+  number of his clicks. Keep a quarter of them uniform anyway: an acquisition that chases
+  only its own uncertainty never revisits a region it is confidently wrong about. The same
+  logic picks comprehension probes among the pages he might PLAUSIBLY end up with — probing
+  a page he would never choose measures legibility nobody will use, and probing the
+  champion again measures what is known. loop-to-cluster: `rt_fit`, `rt_at`; test T11.
+- **Measure a test's false-positive rate before reading its p-value.** Letting extra
+  parameters "earn their keep" on held-out data sounds self-policing and is not: at 48
+  duels, two extra parameters cleared a fixed cross-validation threshold by chance in 3 to
+  7 runs of 24 under a TRUE null. Read a gain against its own permutation null instead —
+  same design, same responses, only the label under test shuffled — which needs no assumed
+  noise model and uses the real covariate structure. loop-to-cluster: `surface_effect`.
+- **A null result is only a result if it comes with its power.** Before believing "no
+  effect", plant effects of known size and see which ones the test could have found. At 48
+  surface-labelled duels a tilt of 1 logit was detected 1 run in 12 and 2 logits about half
+  the time, so anything short of huge would have looked like nothing. Report the quiet
+  answer as "no effect this data can see", never as "no effect", and say what n would
+  change the reading.
+- **Check that a rotating factor's period is coprime with the schedule's.** Surface rotated
+  as `n % 3` inside a 24-trial block whose first 16 are duels. 3 divides 24, so the phase
+  never moved: one surface took 6 of every 16 duels and the others 5, forever, and the
+  first duel of every run was the same surface — a permanent 20% over-sample plus a hard
+  confound with position in the run. Modular rotation over a periodic schedule is the trap;
+  a shuffled permutation per group of k gives exact balance AND decorrelates position.
+- **Report what the search has SETTLED, not only how much is left.** "A plateau of four
+  distinct themes" against four pages that look alike reads as a broken instrument. They
+  differed: keyword hues of violet, dark green, dark red and blue over grounds within 4 RGB
+  units of one cream. The useful statement is which axes his clicks have decided and which
+  the remaining duels are actually deciding — the posterior-weighted spread per axis,
+  against the 0.289 of a uniform one. loop-to-cluster: `axis_consensus`; test T14.
+- **A comparison grid needs the width its stimulus needs, not the prose measure.** The
+  reading column is ~610px because that is a good measure for TEXT; four theme cards inside
+  it are 306px each and a page needs ~520px, so every card was clipped 72px mid-token and
+  he was judging palettes by the left two-thirds of each line. Let a comparison row step
+  out of the measure and let cards WRAP rather than shrink: two rows of whole pages beat
+  one row of cropped ones. Confirm with scrollWidth minus clientWidth, not by eye.
 - A surface's beauty is allowed to vote and never to overrule the instruments; Titus's eyes
   outrank both — his comparison across a gallery row is the final measurement.
 - Verify a theme change by **pixel-sampling a screenshot against the expected hexes**, never by
