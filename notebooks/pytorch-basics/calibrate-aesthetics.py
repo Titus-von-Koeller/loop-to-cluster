@@ -47,6 +47,12 @@ def _(mo):
     drift-diffusion models read decision time), and each duel *generated* to be maximally
     informative — the model's best guess against the challenger that would teach it most,
     with a small share of uniform probes as insurance against the model fooling itself.
+    The candidates it chooses between are **bred fresh every trial**, not drawn from a fixed
+    list: the themes it already rates highly, their mutated and recombined children, and a
+    steady trickle of low-discrepancy newcomers, so the search can sit between any two
+    themes it has shown you and can always still reach ground it has never visited.
+    Every page is **code you have never seen** — generated, or lifted from a corner of the
+    standard library — because a reused page turns time-to-find into a memory test.
     Your measured discrimination thresholds (from `calibration-responses.jsonl`, re-expressed
     in CAM16-UCS) and APCA/WCAG contrast floors are **hard constraints, never objectives**:
     every candidate you see is already legible; you are only ever asked which is *better*.
@@ -469,6 +475,8 @@ def _():
     import keyword as _kw
     import tokenize as _tokenize
 
+    import _codegen
+
     # Stimuli are real code, embedded verbatim from this repo's own notebooks (07's
     # training loop, 05's model, _palette's tint) — the code Titus actually reads, not
     # lorem ipsum. Embedded rather than read at render time so the stimulus set is stable
@@ -588,10 +596,42 @@ agg_item = agg.item()
                 _prev_sig = _txt
         return _spans
 
-    SNIPPETS = []
+    # One page per trial, never the same twice: _codegen writes it. The four embedded
+    # sources above stay as the cold-start and as a familiarity CONTROL -- a page he knows
+    # is the reference against which a fresh page's reaction time is read -- but they are
+    # no longer the corpus. Memoized per seed so the widget, the recorder and the analysis
+    # cell all resolve the same page without regenerating it.
+    _SNIP_MEMO = {}
+
+    def snippet_for(seed, width=None):
+        """The page for this trial seed: fresh procedural or obscure-stdlib code.
+
+        width is the column ceiling: two duel cards side by side hold about eighty columns
+        at 14px, and the stimulus <pre> is overflow:hidden, so a wider line would be
+        silently clipped -- a clipped stimulus is a different stimulus. Line count and role
+        mix stay at the generator's calibrated default: freshness alone makes the
+        comprehension probe hard now that no page is ever shown twice, and a longer page
+        would trade away the identical-role-statistics property that lets two reaction
+        times be compared at all.
+        """
+        _key = (int(seed), width)
+        if _key in _SNIP_MEMO:
+            return _SNIP_MEMO[_key]
+        try:
+            _kw = {} if width is None else {"max_width": int(width)}
+            _s = _codegen.snippet(int(seed), **_kw)
+            _s = dict(_s)
+            _s.setdefault("ident", _s.get("target"))
+        except Exception:
+            # A generator failure must never cost a sitting: fall back to a control page.
+            _s = _CONTROL[int(seed) % len(_CONTROL)]
+        _SNIP_MEMO[_key] = _s
+        return _s
+
+    _CONTROL = []
     for _sid, (_prov, _code, _ident) in _SOURCES.items():
         _sp = _tokenize_roles(_code)
-        SNIPPETS.append(
+        _CONTROL.append(
             {
                 "id": _sid,
                 "provenance": _prov,
@@ -600,31 +640,68 @@ agg_item = agg.item()
                 "fn_ids": [_i for _i, _s in enumerate(_sp) if _s["role"] == "function"],
                 "ident": _ident,
                 "ident_ids": [_i for _i, _s in enumerate(_sp) if _s["text"] == _ident],
+                "hash": f"control-{_sid}",
+                "kind": "control",
             }
         )
 
-    # Filler prose so the page is judged as a page (serif reading text above code) —
-    # deliberately plain and unrelated to the instrument, since a sentence about theming
-    # invites judging the claim instead of the type. Should become fresh-per-trial text
-    # from the same corpus as the code, for the same reason the snippets must be fresh.
+    _PROSE_TAIL = (
+        "The consumer holds the lock only while it copies out, so a slow reader delays the "
+        "next fill rather than corrupting the one in flight."
+    )
+    _OUTPUT_TAIL = "queue depth 3  drained 1284  blocked 0.4%  last fill 2.1 ms"
     _PROSE = (
         "A buffer is filled once per frame and drained by the consumer thread; the queue "
         "length bounds how far the two can drift apart before a reader blocks."
     )
 
-    def render_card(theme, snippet, code_px, find_current=None, task=False, prose=True):
+    # The three surfaces Titus actually reads. A theme is one theme, but it is *seen* in
+    # three arrangements, and the one that wins on a bare code page need not win where
+    # prose and code interleave. Surface is a stimulus factor, not a theme axis: utility
+    # stays defined over the theme, and the surface is logged so a later analysis can test
+    # for a surface-by-theme interaction rather than assuming there is none.
+    #
+    #   editor    a page of code with a line of prose above it -- the plain editor
+    #   panel     the Claude Code chat surface: serif turns, a raised code card between
+    #             them, the proportions of an assistant answer
+    #   notebook  the marimo/VSCode notebook: a centred prose column at the measured 42rem
+    #             reading measure, then a raised code card, then an output block
+    SURFACES = ("editor", "panel", "notebook")
+
+    def render_card(theme, snippet, code_px, find_current=None, task=False, prose=True, surface="editor"):
         """One candidate page as HTML: prose in IBM Plex Serif 17px, code in Iosevka at the
         true editor pixel size, on the candidate ground. find_current=None hides the find
         layer; an int marks that occurrence as the current match, the rest as plain
-        highlights. task=True makes every span a click target (data-tid), visually inert."""
+        highlights. task=True makes every span a click target (data-tid), visually inert.
+        surface selects the arrangement (see SURFACES above)."""
         _lines = snippet["code"].split("\n")
         _cursor = {}
         _out = []
+        _card_open, _card_close = "", ""
+        if surface in ("panel", "notebook"):
+            # Machine text sits on a raised card a step off the page, the grammar the
+            # applied theme uses: flat tinted panel means aside, raised card means
+            # artifact. The step is taken in the ground's own hue, never toward grey.
+            _g = theme["ground"].lstrip("#")
+            _rgb = [int(_g[_k : _k + 2], 16) for _k in (0, 2, 4)]
+            _dark = sum(_rgb) < 384
+            _step = 12 if _dark else -10
+            _card_bg = "#" + "".join(f"{max(0, min(255, _v + _step)):02x}" for _v in _rgb)
+            _edge = "#" + "".join(f"{max(0, min(255, _v + (26 if _dark else -22))):02x}" for _v in _rgb)
+            _shadow = "0 1px 3px -1px rgba(0,0,0,.35), 0 5px 14px -6px rgba(0,0,0,.28)"
+            _card_open = (
+                f'<div style="background:{_card_bg};border:1px solid {_edge};border-radius:4px;'
+                f'padding:12px 14px;box-shadow:{_shadow};overflow:hidden">'
+            )
+            _card_close = "</div>"
         if prose:
+            _measure = "42rem" if surface == "notebook" else "34em"
+            _centre = "margin:0 auto 14px auto" if surface == "notebook" else "margin:0 0 14px 0"
             _out.append(
                 f"<div style=\"font-family:'IBM Plex Serif',serif;font-size:17px;line-height:1.6;"
-                f'color:{theme["ink"]};max-width:34em;margin:0 0 14px 0">{_html.escape(_PROSE)}</div>'
+                f'color:{theme["ink"]};max-width:{_measure};{_centre}">{_html.escape(_PROSE)}</div>'
             )
+        _out.append(_card_open)
         _out.append(
             f"<pre style=\"font-family:'IosevkaLigated Nerd Font Mono',monospace;font-size:{code_px}px;"
             f'line-height:1.5;margin:0;white-space:pre;overflow:hidden;color:{theme["punct"]}">'
@@ -648,9 +725,28 @@ agg_item = agg.item()
             _out.append(f'<span style="{_style}"{_tid}>{_html.escape(_s["text"])}</span>')
             _cursor = {"r": _s["er"] - 1, "c": _s["ec"]}
         _out.append("</pre>")
+        _out.append(_card_close)
+        if surface == "panel" and prose:
+            # An assistant turn continues after the code: the second serif block is what
+            # makes this the chat surface rather than a card on a page.
+            _out.append(
+                f"<div style=\"font-family:'IBM Plex Serif',serif;font-size:17px;line-height:1.6;"
+                f'color:{theme["ink"]};max-width:34em;margin:12px 0 0 0">'
+                f"{_html.escape(_PROSE_TAIL)}</div>"
+            )
+        if surface == "notebook":
+            # A notebook cell is code plus its output, so the output block is part of the
+            # stimulus: mono, one step of ink below the code, on the page rather than the card.
+            _out.append(
+                f"<pre style=\"font-family:'IosevkaLigated Nerd Font Mono',monospace;"
+                f"font-size:{code_px}px;line-height:1.5;margin:8px 0 0 0;"
+                f'color:{theme["comment"]};white-space:pre;overflow:hidden">'
+                f"{_html.escape(_OUTPUT_TAIL)}</pre>"
+            )
         return "".join(_out)
 
-    return SNIPPETS, render_card
+    DUEL_WIDTH = _codegen.DUEL_WIDTH
+    return DUEL_WIDTH, SURFACES, render_card, snippet_for
 
 
 @app.cell(hide_code=True)
@@ -664,7 +760,7 @@ def _(LOG, json, mo):
 
 
 @app.cell(hide_code=True)
-def _(POOL, np, prior_mean, qmc, random, realize):
+def _(DUEL_WIDTH, POOL, np, prior_mean, qmc, random, realize):
     # The preference model: a Gaussian process over theme space with a Bradley-Terry
     # likelihood on duels, fit by Laplace approximation — Chu & Ghahramani's preferential
     # GP, QUEST+'s generate-the-most-informative-trial loop on top. Reaction time enters
@@ -1123,9 +1219,12 @@ def _(POOL, np, prior_mean, qmc, random, realize):
                     _i2 = int(np.argmax(_eig))
                 _ta, _tha = _cand[_i1], _cthemes[_i1]
                 _tb, _thb = _cand[_i2], _cthemes[_i2]
-            _snip = _rng.randrange(4)
+            _snip = n * 7919 + 17
             _trial = {
                 "mode": "duel",
+                # Both arms share surface and page: a duel varies the theme, nothing else.
+                "snippet_width": DUEL_WIDTH,
+                "surface": ("editor", "panel", "notebook")[n % 3],
                 "kind": _kind,
                 "polarity": _pol,
                 "theta_a": [round(float(_v), 6) for _v in _ta],
@@ -1145,9 +1244,13 @@ def _(POOL, np, prior_mean, qmc, random, realize):
                 _ta, _tha = _bred[int(np.argmax(_samp))]
             else:
                 _ta, _tha = _pool[_rng.randrange(len(_pool))]
-            _snip = _rng.randrange(4)
+            # Comprehension probes carry the difficulty: 100% accuracy over 20 probes means
+            # the task was saturated and only reaction time carried information. A denser
+            # page has more identifiers to reject before the target is found.
+            _snip = n * 7919 + 17
             _trial = {
                 "mode": "comprehension",
+                "surface": "editor",
                 "kind": "task",
                 "polarity": _pol,
                 "theta_a": [round(float(_v), 6) for _v in _ta],
@@ -1170,9 +1273,10 @@ def _(POOL, np, prior_mean, qmc, random, realize):
             if _tha is None:
                 _idx = _rng.randrange(len(_pool))
                 _bt, _tha = np.array(_pool[_idx][0]), _pool[_idx][1]
-            _snip = _rng.randrange(4)
+            _snip = n * 7919 + 17
             _trial = {
                 "mode": "search",
+                "surface": "editor",
                 "kind": "task",
                 "polarity": _pol,
                 "theta_a": [round(float(_v), 6) for _v in _bt],
@@ -1197,7 +1301,7 @@ def _(get_responses, mo):
 
 
 @app.cell(hide_code=True)
-def _(SESSION_START_N, SNIPPETS, get_responses, mo, random, render_card, run_info, schedule_mode, trial_for):
+def _(SESSION_START_N, get_responses, mo, random, render_card, run_info, schedule_mode, snippet_for, trial_for):
     _n = len(get_responses())
     _t = trial_for(_n, get_responses())
     _nd = sum(1 for _r in get_responses() if _r.get("mode") == "duel")
@@ -1208,7 +1312,7 @@ def _(SESSION_START_N, SNIPPETS, get_responses, mo, random, render_card, run_inf
     _nd_prev = _nd - (1 if _n > 0 and get_responses()[-1].get("mode") == "duel" else 0)
     _gate = _n == SESSION_START_N or (_n > 0 and schedule_mode(_n - 1, _nd_prev) != (_pol, _mode))
     _rng = random.Random(_n * 48271 % (2**31))
-    _snip = SNIPPETS[_t["snippet"]]
+    _snip = snippet_for(_t["snippet"], _t.get("snippet_width"))
     _strip = {"day": "#d8d2cf", "night": "#14161c"}[_t["polarity"]]
     _ptxt = {"day": "#3a3532", "night": "#b8bcc6"}[_t["polarity"]]
 
@@ -1397,13 +1501,14 @@ def _(SESSION_START_N, SNIPPETS, get_responses, mo, random, render_card, run_inf
     }[_t["mode"]]
     if _t["mode"] == "duel":
         _cur = _rng.choice(_snip["ident_ids"]) if _snip["ident_ids"] else None
+        _surface = _t.get("surface", "editor")
         _cards = [
             {
-                "html": render_card(_t["theme_a"], _snip, _t["code_px"], find_current=_cur),
+                "html": render_card(_t["theme_a"], _snip, _t["code_px"], find_current=_cur, surface=_surface),
                 "ground": _t["theme_a"]["ground"],
             },
             {
-                "html": render_card(_t["theme_b"], _snip, _t["code_px"], find_current=_cur),
+                "html": render_card(_t["theme_b"], _snip, _t["code_px"], find_current=_cur, surface=_surface),
                 "ground": _t["theme_b"]["ground"],
             },
         ]
@@ -1413,6 +1518,7 @@ def _(SESSION_START_N, SNIPPETS, get_responses, mo, random, render_card, run_inf
     elif _t["mode"] == "comprehension":
         _target = _rng.choice(_snip["fn_ids"])
         _name = _snip["spans"][_target]["text"]
+        _surface = _t.get("surface", "editor")
         _cards = [
             {
                 "html": render_card(_t["theme_a"], _snip, _t["code_px"], task=True, prose=False),
@@ -1423,6 +1529,7 @@ def _(SESSION_START_N, SNIPPETS, get_responses, mo, random, render_card, run_inf
 
     else:
         _cur = _rng.choice(_snip["ident_ids"])
+        _surface = _t.get("surface", "editor")
         _cards = [
             {
                 "html": render_card(_t["theme_a"], _snip, _t["code_px"], find_current=_cur, task=True, prose=False),
@@ -1449,7 +1556,7 @@ def _(SESSION_START_N, SNIPPETS, get_responses, mo, random, render_card, run_inf
 
 
 @app.cell(hide_code=True)
-def _(LOG, SNIPPETS, datetime, get_responses, json, random, set_responses, timezone, trial_for, trial_widget):
+def _(LOG, datetime, get_responses, json, random, set_responses, snippet_for, timezone, trial_for, trial_widget):
     # Recording watches the widget's synced traits; the guard converts a stale surface's
     # click into a dropped click instead of a mis-record, and the trial is recomputed from
     # the log at event time — never read from a rendering's closure.
@@ -1460,7 +1567,7 @@ def _(LOG, SNIPPETS, datetime, get_responses, json, random, set_responses, timez
             return
         _t = trial_for(n, get_responses())
         _rng = random.Random(n * 48271 % (2**31))
-        _snip = SNIPPETS[_t["snippet"]]
+        _snip = snippet_for(_t["snippet"], _t.get("snippet_width"))
         _entry = {
             "ts": datetime.now(timezone.utc).isoformat(timespec="seconds"),
             "n": n,
@@ -1468,6 +1575,10 @@ def _(LOG, SNIPPETS, datetime, get_responses, json, random, set_responses, timez
             "kind": _t["kind"],
             "polarity": _t["polarity"],
             "snippet": _snip["id"],
+            "snippet_hash": _snip.get("hash"),
+            "snippet_kind": _snip.get("kind"),
+            "snippet_fresh": bool(_snip.get("fresh", True)),
+            "surface": _t.get("surface", "editor"),
             "code_px": _t["code_px"],
             "theta_a": _t["theta_a"],
             "theme_a": _t["theme_a"],
@@ -1515,7 +1626,27 @@ def _(LOG, SNIPPETS, datetime, get_responses, json, random, set_responses, timez
 
 
 @app.cell(hide_code=True)
-def _(AXES, DE_MIN, POOL, SNIPPETS, THRESH_DETAIL, VISION_N, fitted, get_responses, mo, mu_at, np, pd, render_card):
+def _(
+    AXES,
+    DE_MIN,
+    POOL,
+    THRESH_DETAIL,
+    VISION_N,
+    best_set,
+    candidates,
+    fitted,
+    get_responses,
+    mo,
+    mu_at,
+    np,
+    pd,
+    render_card,
+    snippet_for,
+    spread_out,
+):
+    # A stable page for the champion preview: the same generated code every time, so
+    # what changes between renders is the theme and nothing else.
+    _preview_snip = snippet_for(0)
     _log = get_responses()
     if not _log:
         _out = mo.md("*No responses yet — the analysis fills in as you answer.*")
@@ -1546,12 +1677,61 @@ def _(AXES, DE_MIN, POOL, SNIPPETS, THRESH_DETAIL, VISION_N, fitted, get_respons
         ]
         if _fit is not None:
             for _pol in ("day", "night"):
-                _thetas = [_p[0] for _p in POOL[_pol]]
-                _themes = [_p[1] for _p in POOL[_pol]]
+                # The verdict is computed over BRED candidates, not the frozen pool: the
+                # answer should be the best theme the search can reach, not the best of 512
+                # points fixed before the first click.
+                _bred = candidates(_fit, _pol, np.random.default_rng(4242), n_trial=0)[0]
+                _thetas = [_b[0] for _b in _bred]
+                _themes = [_b[1] for _b in _bred]
                 _mu = mu_at(_fit, _thetas, _pol)
                 _ci = int(np.argmax(_mu))
                 _champ_theta, _champ = _thetas[_ci], _themes[_ci]
                 _beats = float(np.mean(1.0 / (1.0 + np.exp(-(_mu[_ci] - _mu)))))
+                # Is there ONE best theme or a plateau of equals? P(best) over the joint
+                # posterior answers it as a distribution rather than a ranking: mass
+                # concentrated on one page means a winner, mass spread means any member of
+                # the credible set is a defensible choice -- and the ones shown are picked
+                # for spread, since a plateau is only useful if its members look different.
+                _bs = best_set(_fit, _pol, _thetas, seed=17)
+                _cred = _bs["credible"]
+                _reps = spread_out(_thetas, _cred, 4, _fit.get("ls"))
+                _verdict = (
+                    f"**one theme leads**: it holds "
+                    f"{100 * _bs['p_best'][_bs['order'][0]]:.0f}% of the probability of being best"
+                    if _bs["verdict"] == "single"
+                    else f"**a plateau of {len(_cred)} themes**, none a clear winner — the leader "
+                    f"holds only {100 * _bs['p_best'][_bs['order'][0]]:.0f}% of the probability of "
+                    f"being best, so any of these is a defensible pick"
+                )
+                _blocks.append(
+                    mo.md(
+                        f"### The {_pol} verdict\n\n{_verdict}. Shown below: the leader, then the "
+                        f"most *different* members of the credible set (P(best) ≥ 2%), so a plateau "
+                        f"is legible as choices rather than as near-identical variants."
+                    )
+                )
+                _blocks.append(
+                    mo.hstack(
+                        [
+                            mo.vstack(
+                                [
+                                    mo.md(f"**{100 * _bs['p_best'][_i]:.0f}%** · utility {_mu[_i]:.2f}"),
+                                    mo.Html(
+                                        f'<div style="background:{_themes[_i]["ground"]};border-radius:8px;'
+                                        f'padding:12px;width:330px">'
+                                        + render_card(_themes[_i], _preview_snip, 13, prose=False)
+                                        + "</div>"
+                                    ),
+                                ],
+                                gap=0.3,
+                            )
+                            for _i in _reps
+                        ],
+                        justify="start",
+                        gap=1,
+                        wrap=True,
+                    )
+                )
                 _sweep = []
                 for _ax in range(9):
                     _lo_t = np.array(_champ_theta, dtype=float)
@@ -1576,9 +1756,9 @@ def _(AXES, DE_MIN, POOL, SNIPPETS, THRESH_DETAIL, VISION_N, fitted, get_respons
                         f'<div style="background:{_champ["ground"]};border-radius:10px;padding:20px;max-width:620px">'
                         + render_card(
                             _champ,
-                            SNIPPETS[0],
+                            _preview_snip,
                             16,
-                            find_current=SNIPPETS[0]["ident_ids"][0] if SNIPPETS[0]["ident_ids"] else None,
+                            find_current=(_preview_snip["ident_ids"] or [None])[0],
                         )
                         + "</div>"
                     ),
@@ -1659,6 +1839,23 @@ def _(mo):
     a preferential GP needs roughly forty duels before the Thompson arm stops wandering,
     and the 7% uniform probes *should* occasionally look strange: they are the insurance
     premium against a model that only ever asks questions it already believes.
+
+    **One theme or several?** The verdict above is a distribution, not a ranking: sampling
+    the joint posterior gives each candidate its probability of being *the* best, and the
+    answer is read from how that mass sits. Concentrated on one page, there is a winner.
+    Spread across many, the honest report is a plateau — and the members shown are chosen
+    to be as *different* from each other as the set allows, because a plateau is only worth
+    knowing about if its members are visibly distinct choices rather than variations of one.
+    Either way nothing on that shelf is a compromise: every candidate has already cleared
+    the legibility floors, so a plateau means genuinely equal, not merely acceptable.
+
+    Two properties of the machinery were measured rather than assumed, and the tests live in
+    `_model_tests.py` beside this file. The position of a card matters to you — over the
+    first 79 duels the right-hand card won 61% of the time — so a side-advantage term is
+    fitted and subtracted out instead of being left to land on the themes as noise. And the
+    nine axes are not equally alive: their length-scales are learned, which shrinks the
+    effective dimension the search has to cover, with the estimate held near isotropic until
+    enough duels exist to identify relevance at all.
 
     Reaction time is doing quiet work throughout: a fast duel click steepens that duel's
     likelihood (drift-diffusion reading — big utility gaps decide quickly), a slow one
