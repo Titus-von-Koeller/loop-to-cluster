@@ -972,7 +972,7 @@ def _weak_target_ids(spans):
     return out
 
 
-def _finish(code, kind, seed, provenance, plan, generated, max_width=MAX_WIDTH):
+def _finish(code, kind, seed, provenance, plan, generated, max_width=MAX_WIDTH, target_kind=None):
     """Validate a candidate page and derive its two click targets, or return None.
 
     The comprehension answer is a call name from the body, and the find-hunt identifier is
@@ -1008,8 +1008,29 @@ def _finish(code, kind, seed, provenance, plan, generated, max_width=MAX_WIDTH):
     candidates = [i for i in once if i not in weak] or once
     if not candidates:
         return None
-    target_id = candidates[(seed // 3) % len(candidates)]
+
+    # A def-site target is a much easier find than a call-site one -- it sits at a line
+    # start, at a predictable indent, and a page holds only one or two of them -- so
+    # mixing the two kinds puts a large step in the task's difficulty and reaction time
+    # measures which kind was drawn rather than how the theme reads (measured: 12 of 60
+    # probe pages handed out a def-site target). Call sites are preferred, and the kind is
+    # reported either way so a caller can require one and an analysis can check.
+    def _is_def_site(_i):
+        _line = code.split("\n")[spans[_i]["sr"] - 1]
+        return _line.lstrip().startswith("def ") and f"def {spans[_i]['text']}" in _line
+
+    _calls = [i for i in candidates if not _is_def_site(i)]
+    _pool = _calls or candidates
+    if target_kind == "call" and not _calls:
+        return None
+    if target_kind == "def":
+        _defs = [i for i in candidates if _is_def_site(i)]
+        if not _defs:
+            return None
+        _pool = _defs
+    target_id = _pool[(seed // 3) % len(_pool)]
     target = spans[target_id]["text"]
+    target_is_def = _is_def_site(target_id)
 
     # Longer wins a tie in occurrence count: the find hunt highlights every match and asks
     # which is current, so the useful stimulus is a name read rather than recognized.
@@ -1039,6 +1060,7 @@ def _finish(code, kind, seed, provenance, plan, generated, max_width=MAX_WIDTH):
         "ident_ids": [i for i, s in enumerate(spans) if s["text"] == ident],
         "target": target,
         "target_id": target_id,
+        "target_kind": "def" if target_is_def else "call",
         "kind": kind,
         "seed": seed,
         "hash": digest,
@@ -1059,6 +1081,7 @@ def snippet(
     roles: dict | None = None,
     *,
     max_width: int = MAX_WIDTH,
+    target_kind: str | None = None,
 ) -> dict:
     """One code page for one trial, determined entirely by `seed`.
 
@@ -1066,6 +1089,11 @@ def snippet(
     every third trial. `lines` is exact for procedural pages and within two of the request
     for stdlib ones, whose blocks are real code. `roles` overrides DEFAULT_ROLES:
     procedural pages are built to it, stdlib pages filtered toward it. `max_width` is the
+    `target_kind` may require "call" or "def" for the comprehension target: a def-site
+    target is found far faster than a call-site one, so a probe that wants to measure the
+    theme rather than the draw asks for "call". Leaving it None still prefers call sites
+    whenever the page offers a choice.
+
     column ceiling no line may cross; DUEL_WIDTH is the number to pass when two cards
     share the band, since the ceiling above is what one card can hold, not two.
 
@@ -1104,7 +1132,7 @@ def snippet(
 
         for attempt in range(len(_SHAPES)):
             code, provenance = _generate(seed, lines, plan, attempt, max_width)
-            page = _finish(code, kind, seed, provenance, plan, True, max_width)
+            page = _finish(code, kind, seed, provenance, plan, True, max_width, target_kind)
             if page is not None and (out is None or rank(page) < rank(out)):
                 out = page
             if out is not None and rank(out) == (0, 0):
@@ -1116,7 +1144,20 @@ def snippet(
         name, start, code = pool[(seed * _stride(len(pool))) % len(pool)]
         end = start + len(code.rstrip("\n").split("\n")) - 1
         where = f"{name} L{start}-{end} (CPython stdlib)"
-        out = _finish(code, kind, seed, where, plan, False, max_width)
+        out = _finish(code, kind, seed, where, plan, False, max_width, target_kind)
+    if out is None and target_kind and kind == "stdlib":
+        # A required target kind can rule out the one stdlib block a seed maps to, and a
+        # raise would cost a trial. Fall back to the procedural generator for this seed:
+        # the constraint is kept, the page is still unique, and only the mix between the
+        # two generators shifts -- which the record's `kind` field already reports.
+        return snippet(
+            seed,
+            kind="procedural",
+            lines=lines,
+            roles=roles,
+            max_width=max_width,
+            target_kind=target_kind,
+        )
     if out is None:
         raise RuntimeError(f"no valid {kind} page for seed {seed} at {lines} lines")
 

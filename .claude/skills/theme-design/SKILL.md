@@ -105,6 +105,15 @@ interact, and choose the best combination — every step from measurement.
   (z = -1.91 over 79 duels). Randomization alone leaves that on the estimate as noise; a
   fitted side-advantage term subtracts it, and it is reconstructible from a logged swap flag
   so no past duel is wasted.
+- **Equalize the task's difficulty, or reaction time measures the draw.** A search target
+  at its `def` site sits at a line start, at a predictable indent, one or two to a page: it
+  is found far faster than the same name inside an expression, and mixing the two kinds
+  puts a step into the task that swamps any theme effect (Titus spotted it; 12 of 60 probe
+  pages were handing out the easy kind). Fix it in the stimulus generator, which knows its
+  own targets, rather than at the call site — and log the kind so the property is
+  auditable instead of assumed. The general rule: every non-theme property of a
+  reaction-time stimulus is either held constant or logged as a covariate; there is no
+  third option that keeps the measurement.
 - **A stimulus shown twice measures memory.** Four snippets over 116 trials turned
   time-to-find into a practice curve (find-hunt RT vs trial index r = -0.47). Reaction-time
   stimuli are generated fresh per trial, with the page's hash and a freshness flag logged so

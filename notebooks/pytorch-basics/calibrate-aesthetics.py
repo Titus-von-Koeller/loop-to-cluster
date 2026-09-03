@@ -612,7 +612,7 @@ agg_item = agg.item()
     # cell all resolve the same page without regenerating it.
     _SNIP_MEMO = {}
 
-    def snippet_for(seed, width=None):
+    def snippet_for(seed, width=None, target_kind=None):
         """The page for this trial seed: fresh procedural or obscure-stdlib code.
 
         width is the column ceiling: two duel cards side by side hold about eighty columns
@@ -623,11 +623,13 @@ agg_item = agg.item()
         would trade away the identical-role-statistics property that lets two reaction
         times be compared at all.
         """
-        _key = (int(seed), width)
+        _key = (int(seed), width, target_kind)
         if _key in _SNIP_MEMO:
             return _SNIP_MEMO[_key]
         try:
             _kw = {} if width is None else {"max_width": int(width)}
+            if target_kind:
+                _kw["target_kind"] = target_kind
             _s = _codegen.snippet(int(seed), **_kw)
             _s = dict(_s)
             _s.setdefault("ident", _s.get("target"))
@@ -1331,13 +1333,17 @@ def _(DUEL_WIDTH, POOL, np, prior_mean, qmc, random, realize):
                 _ta, _tha = _bred[int(np.argmax(_samp))]
             else:
                 _ta, _tha = _pool[_rng.randrange(len(_pool))]
-            # Comprehension probes carry the difficulty: 100% accuracy over 20 probes means
-            # the task was saturated and only reaction time carried information. A denser
-            # page has more identifiers to reject before the target is found.
+            # Comprehension probes require a CALL-site target (Titus spotted this): a name
+            # at its `def` sits at a line start, at a predictable indent, one or two to a
+            # page, and is found far faster than the same name inside an expression. Mixing
+            # the two kinds puts a step in the task's difficulty, and reaction time then
+            # measures which kind was drawn rather than how the theme reads -- 12 of 60
+            # probe pages were handing out the easy kind.
             _snip = n * 7919 + 17
             _trial = {
                 "mode": "comprehension",
                 "surface": "editor",
+                "target_kind": "call",
                 "kind": "task",
                 "polarity": _pol,
                 "theta_a": [round(float(_v), 6) for _v in _ta],
@@ -1399,7 +1405,7 @@ def _(SESSION_START_N, get_responses, mo, random, render_card, run_info, schedul
     _nd_prev = _nd - (1 if _n > 0 and get_responses()[-1].get("mode") == "duel" else 0)
     _gate = _n == SESSION_START_N or (_n > 0 and schedule_mode(_n - 1, _nd_prev) != (_pol, _mode))
     _rng = random.Random(_n * 48271 % (2**31))
-    _snip = snippet_for(_t["snippet"], _t.get("snippet_width"))
+    _snip = snippet_for(_t["snippet"], _t.get("snippet_width"), _t.get("target_kind"))
     _strip = {"day": "#d8d2cf", "night": "#14161c"}[_t["polarity"]]
     # A duel's surround must not favour either arm, so it stays the polarity's neutral; a
     # single-card trial paints the page with the theme under test.
@@ -1711,7 +1717,7 @@ def _(LOG, datetime, get_responses, json, random, set_responses, snippet_for, ti
             return
         _t = trial_for(n, get_responses())
         _rng = random.Random(n * 48271 % (2**31))
-        _snip = snippet_for(_t["snippet"], _t.get("snippet_width"))
+        _snip = snippet_for(_t["snippet"], _t.get("snippet_width"), _t.get("target_kind"))
         _entry = {
             "ts": datetime.now(timezone.utc).isoformat(timespec="seconds"),
             "n": n,
@@ -1722,6 +1728,7 @@ def _(LOG, datetime, get_responses, json, random, set_responses, snippet_for, ti
             "snippet_hash": _snip.get("hash"),
             "snippet_kind": _snip.get("kind"),
             "snippet_fresh": bool(_snip.get("fresh", True)),
+            "target_kind": _snip.get("target_kind"),
             "surface": _t.get("surface", "editor"),
             "page_bg": (
                 {"day": "#d8d2cf", "night": "#14161c"}[_t["polarity"]]
