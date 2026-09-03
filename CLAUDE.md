@@ -75,7 +75,7 @@ activation — but only the cells the editor has materialized, so on a long note
 cells stay expanded and, the memory now marking them folded, are never retried. The
 reliable spot fix is per cell: the collapse chevron, or the "marimo: Hide cell code"
 command, which also persists. That is stock 0.17.2. On this machine the extension is
-patched — `home/editors/marimo.nix` in the dotfiles repo, re-applied on every extension
+patched — `home/editors/vscode/patches/marimo_fold_authority.py` in the dotfiles repo (the extension patch engine), re-applied on every extension
 update — so every notebook activation re-folds every `hide_code` cell and the file is
 the authority on visibility; a manual expand lasts until the next tab switch. The stock
 description stays because it is what any other machine, and any upstream report, sees.
