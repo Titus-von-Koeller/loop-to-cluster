@@ -110,6 +110,16 @@ Two operational corollaries, both applied and liked:
 - **Content over commentary**: comments sit a deliberate contrast step below body tokens
   (context, not figure), with the italic carrying the rest of the distinction — but never below
   4.5:1 on the deepest surface they appear on.
+- **Reading typography** (iterated live 2026-09-02): running prose holds the 66–70-character
+  measure (38em at 17px serif), leading 1.6 body / 1.3 headings, kerning pinned; code and
+  tables stay uncapped — data may be wide, running text never. Prose sits on the page, only
+  machine artifacts are cards. Shadows in a flat design: y-offset only (light from
+  top-center), two layers (tight contact + wide ambient), alphas low, and tinted with the
+  page's darkened hue on warm paper — never gray-black.
+- **Iterate live, bake the winner**: candidate styles go into the running workbench through
+  the CDP CSS domain (and adoptedStyleSheets for shadow DOM) for instant screenshots; only
+  the converged values are baked into dotfiles (workbench-fonts.css, notebook-prose.py,
+  settings.jsonc). Mechanics live in the vscode-keyhole driving notes and cdplab.py.
 
 Beauty votes through these; the instruments still veto, and Titus's eyes outrank both.
 - Results live with their instrument or in Titus's Notion (his hands only); CLAUDE.md carries
