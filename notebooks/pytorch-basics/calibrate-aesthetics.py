@@ -2090,10 +2090,17 @@ def _(SESSION_START_N, get_responses, mo, random, render_card, run_info, schedul
             stage.style.flex = full ? "1 1 auto" : "0 0 auto";
             stage.style.minHeight = full ? "0" : "";
           };
-          // The instruction bar: what kind of run (chip), what to do (question, large),
-          // where you are in the run (progress). One glance, then act.
+          // The top bar carries only WHERE YOU ARE -- which run (chip, left), how far in
+          // and how to pause (right). What to DO is not here: it belongs directly over the
+          // code, centred, and lives in the stage below.
+          //
+          // It used to sit in this row, left-bound next to the chip, while the code was
+          // centred several hundred pixels lower and to the right. On a full-screen 8k
+          // display that is a real saccade from reading the instruction to starting the
+          // search, and on a timed arm that travel is inside the measurement -- the same
+          // reason the mouse-travel asymmetry had to go.
           const top = document.createElement("div");
-          top.style.cssText = "display:flex;align-items:center;gap:16px";
+          top.style.cssText = "display:flex;align-items:center;gap:16px;justify-content:space-between";
           const chip = document.createElement("div");
           chip.textContent = model.get("chip");
           chip.style.cssText = "font-family:'IBM Plex Serif',serif;font-size:12px;" +
@@ -2101,8 +2108,12 @@ def _(SESSION_START_N, get_responses, mo, random, render_card, run_info, schedul
             "border:1px solid currentColor;border-radius:999px;padding:3px 12px";
           const prompt = document.createElement("div");
           prompt.innerHTML = model.get("prompt_html");
-          prompt.style.cssText = "flex:1 1 0;font-family:'IBM Plex Serif',serif;" +
-            "font-size:19px;line-height:1.3";
+          // Centred on the same axis as the card, sitting just above it, and large enough
+          // to be read without leaning in. Its own line rather than a cell in a flex row,
+          // so nothing to its left or right can push it off centre.
+          prompt.style.cssText = "font-family:'IBM Plex Serif',serif;font-size:21px;" +
+            "line-height:1.35;text-align:center;align-self:center;max-width:min(46em, 92vw);" +
+            "margin:0 auto 26px auto;flex:0 0 auto";
           const keys = document.createElement("div");
           keys.textContent = isDuel ? "← →  or click" : "space pauses";
           keys.style.cssText = "font-family:'IBM Plex Serif',serif;font-size:12px;" +
@@ -2119,16 +2130,22 @@ def _(SESSION_START_N, get_responses, mo, random, render_card, run_info, schedul
           pauseBtn.title = "hide the trial; the clock re-baselines when you reveal it again";
           pauseBtn.style.cssText = btnStyle + ";font-size:13px;opacity:.55;padding:2px 10px;" +
             "visibility:hidden";
-          top.appendChild(prompt);
-          top.appendChild(keys);
-          top.appendChild(progress);
-          top.appendChild(pauseBtn);
+          const meta = document.createElement("div");
+          meta.style.cssText = "display:flex;align-items:center;gap:16px";
+          meta.appendChild(keys);
+          meta.appendChild(progress);
+          meta.appendChild(pauseBtn);
+          top.appendChild(meta);
           // The stimulus row keeps its box in the layout at all times; the cover is an
           // opaque overlay on exactly that box, so reveal/pause never move the page.
           const stage = document.createElement("div");
           // Grows in the full-screen frame so the halves reach the bottom of the viewport;
           // inline it keeps its content height.
-          stage.style.cssText = "position:relative;display:flex;flex-direction:column";
+          // Centres its children AS A GROUP, so the instruction and the code travel
+          // together: the prompt sits directly above the card at a fixed gap rather than
+          // pinned to the top of the screen with the card floating far below it.
+          stage.style.cssText = "position:relative;display:flex;flex-direction:column;" +
+            "justify-content:center";
           // A duel splits the VIEWPORT rather than laying two cards on a shared page.
           // Each half is full-bleed in its own ground, so each candidate is judged in its
           // own adaptation state -- the same reason the page takes the ground on a
@@ -2274,8 +2291,20 @@ def _(SESSION_START_N, get_responses, mo, random, render_card, run_info, schedul
             }
             row.appendChild(card);
           });
-          stage.appendChild(row);
-          stage.appendChild(cover);
+          // The prompt sits ABOVE the covered area, never under it. The cover hides the
+          // stimulus while he reads the instruction and again while paused; if it hid the
+          // instruction too, reading the target name would fall inside the measured time
+          // and every find would carry a word-recognition latency it did not before.
+          const shade = document.createElement("div");
+          // A duel fills the viewport edge to edge, so its stimulus box grows; a single
+          // card is content-sized, so the box hugs it and the prompt above lands a fixed
+          // distance from the code rather than a distance that depends on the window.
+          shade.style.cssText = "position:relative;display:flex;min-height:0;width:100%;" +
+            (isDuel ? "flex:1 1 auto" : "flex:0 0 auto;justify-content:center");
+          shade.appendChild(row);
+          shade.appendChild(cover);
+          stage.appendChild(prompt);
+          stage.appendChild(shade);
           wrap.appendChild(top);
           wrap.appendChild(stage);
           el.replaceChildren(wrap);
@@ -2313,7 +2342,16 @@ def _(SESSION_START_N, get_responses, mo, random, render_card, run_info, schedul
         t_render = traitlets.Float(-1.0).tag(sync=True)
         t_click = traitlets.Float(-1.0).tag(sync=True)
 
-    _mono = "font-family:'IosevkaLigated Nerd Font Mono',monospace;font-size:18px"
+    # The thing he is hunting for, set as a token rather than as running text: same
+    # typeface it wears in the code, on a neutral tint so it reads as a quoted string
+    # rather than as part of the sentence. Neutral on purpose -- a tinted chip in any
+    # theme colour would cue the search, and the find-highlight hue is one of the axes
+    # under test.
+    _mono = (
+        "font-family:'IosevkaLigated Nerd Font Mono',monospace;font-size:20px;"
+        "background:color-mix(in srgb, currentColor 9%, transparent);"
+        "padding:2px 9px;border-radius:6px;letter-spacing:.01em"
+    )
     _chip = {"duel": "duel", "comprehension": "spot", "search": "find"}[_t["mode"]] + f" · {_pol} page"
     _progress = f"{_pos + 1} of {_len}"
     _gate_text = {
@@ -2322,7 +2360,7 @@ def _(SESSION_START_N, get_responses, mo, random, render_card, run_info, schedul
             "click the one you would rather read. Trust the first pull; a slow choice reads as a tie."
         ),
         "comprehension": (
-            f"A run of {_len} probes on the {_pol} page: the bar names a function — "
+            f"A run of {_len} probes on the {_pol} page: the line above names a function — "
             "click that name in the code as fast as you can find it."
         ),
         "search": (
