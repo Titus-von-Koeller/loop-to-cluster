@@ -102,7 +102,13 @@ function in the cell: a later definition stays unmangled in the function body an
 at call time — **only under `marimo run`/`edit`**, because script execution shares one
 namespace and never mangles. So helpers precede their exported callers, and an interactive
 instrument's checks include a served-page smoke test, not just the script run (measured
-2026-09-03, calibrate-aesthetics). UI elements interpolate into
+2026-09-03, calibrate-aesthetics). A `marimo run` page confines outputs to a ~700 px prose
+column; a stimulus that needs width (two code pages at true editor sizes) breaks out with
+`position:relative; left:50%; transform:translateX(-50%); width:min(96vw, 1400px)` on the
+widget's root — and stimulus `<pre>` blocks use `overflow:hidden`, never `auto`, so no
+scrollbar chrome joins the picture being judged. Reaction-time instruments carry a pause
+that hides the stimulus and restarts the clock on resume (an exposed stimulus lets the
+decision form off the clock), auto-pause on tab hide, and a `paused` flag per record. UI elements interpolate into
 `mo.md` f-strings (how controls sit on a styled ground); multi-paragraph `mo.md` inside an
 `hstack` lays its paragraphs out horizontally in the VSCode renderer — use explicit stacks.
 Interactive instruments are verified by clicking them in a real browser (`marimo run` +

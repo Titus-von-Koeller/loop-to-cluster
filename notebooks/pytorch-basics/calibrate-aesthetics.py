@@ -613,7 +613,7 @@ agg_item = agg.item()
             )
         _out.append(
             f"<pre style=\"font-family:'IosevkaLigated Nerd Font Mono',monospace;font-size:{code_px}px;"
-            f'line-height:1.5;margin:0;white-space:pre;overflow-x:auto;color:{theme["punct"]}">'
+            f'line-height:1.5;margin:0;white-space:pre;overflow:hidden;color:{theme["punct"]}">'
         )
         _find_ids = set(snippet["ident_ids"]) if find_current is not None else set()
         for _i, _s in enumerate(snippet["spans"]):
@@ -667,7 +667,7 @@ def _(POOL, np, prior_mean, random, realize):
     def duels_from(responses):
         """(X, duel index pairs, per-duel slopes, prior mean at X) from the log's duels."""
         _pts, _index = [], {}
-        _duels, _rts = [], []
+        _duels, _rts, _paused = [], [], []
         for _r in responses:
             if _r.get("mode") != "duel" or _r.get("choice") not in (0, 1):
                 continue
@@ -682,11 +682,17 @@ def _(POOL, np, prior_mean, random, realize):
             _lose = _ids[1 - _r["choice"]]
             _duels.append((_win, _lose))
             _rts.append(float(_r.get("rt_ms", 2500.0)))
+            _paused.append(bool(_r.get("paused")))
         if not _pts:
             return None
         _X = np.array(_pts)
-        _rt_med = float(np.median(_rts)) if len(_rts) >= 8 else 2500.0
+        _paused = np.array(_paused)
+        _clean = np.array(_rts)[~_paused]
+        _rt_med = float(np.median(_clean)) if len(_clean) >= 8 else 2500.0
         _lam = np.clip(np.sqrt(_rt_med / np.maximum(np.array(_rts), 200.0)), 0.6, 1.8)
+        # A paused trial's time says nothing about the utility gap: its choice still counts,
+        # at the neutral slope, neither sharpened nor flattened by the clock.
+        _lam[_paused] = 1.0
         _m = np.array([prior_mean(_x[:9], "night" if _x[9] > 0.5 else "day") for _x in _X])
         return _X, _duels, _lam, _m
 
@@ -921,26 +927,73 @@ def _(SNIPPETS, get_responses, mo, random, render_card, trial_for):
     import traitlets
 
     class _ThemeTrial(anywidget.AnyWidget):
-        # performance.now is captured once at render and again at the click; both ride the
-        # synced traits into the record. First click only — later clicks and clicks on an
+        # performance.now is captured at the latest reveal and again at the click; both ride
+        # the synced traits into the record. First click only — later clicks and clicks on an
         # orphaned stale widget record nothing (the guard double-checks the trial number).
+        # Pausing hides the stimulus (an exposed stimulus lets a decision form off the
+        # clock), swallows clicks, and restarts the clock on resume; the tab losing
+        # visibility auto-pauses. A trial that was ever paused carries paused=true so the
+        # model reads its reaction time as a near-tie, never as evidence.
         _esm = """
         function render({ model, el }) {
-          const t0 = performance.now();
+          let t0 = performance.now();
+          let pauses = 0;
+          let pausedNow = false;
           el.style.cssText = "display:block;width:100%";
           const wrap = document.createElement("div");
+          // Full-bleed: marimo's prose column is ~700 px, too narrow for two code pages
+          // at true editor sizes; the band breaks out to the viewport, capped at 1400 px.
           wrap.style.cssText = `background:${model.get("strip_bg")};padding:18px;` +
-            `border-radius:10px;display:flex;flex-direction:column;gap:14px;width:100%;` +
-            `box-sizing:border-box`;
+            `border-radius:10px;display:flex;flex-direction:column;gap:14px;` +
+            `position:relative;left:50%;transform:translateX(-50%);` +
+            `width:min(96vw, 1400px);box-sizing:border-box;color:${model.get("ink")}`;
+          const top = document.createElement("div");
+          top.style.cssText = "display:flex;align-items:center;gap:10px";
           const prompt = document.createElement("div");
           prompt.innerHTML = model.get("prompt_html");
-          wrap.appendChild(prompt);
+          prompt.style.cssText = "flex:1 1 0";
+          const pauseBtn = document.createElement("button");
+          pauseBtn.textContent = "pause";
+          pauseBtn.title = "hide the trial and stop the clock; resuming restarts it";
+          pauseBtn.style.cssText = "font-family:'IBM Plex Serif',serif;font-size:13px;" +
+            "background:transparent;color:inherit;border:1px solid currentColor;" +
+            "opacity:.55;border-radius:6px;padding:2px 10px;cursor:pointer";
+          top.appendChild(prompt);
+          top.appendChild(pauseBtn);
           const row = document.createElement("div");
           row.style.cssText = "display:flex;gap:16px;justify-content:center;" +
             "align-items:stretch;width:100%";
+          const cover = document.createElement("div");
+          cover.textContent = "paused — stimulus hidden; click to resume (the clock restarts)";
+          cover.style.cssText = "display:none;align-items:center;justify-content:center;" +
+            "min-height:200px;border:1px dashed currentColor;border-radius:10px;" +
+            "opacity:.7;cursor:pointer;font-family:'IBM Plex Serif',serif;font-size:15px";
+          const doPause = () => {
+            if (pausedNow) return;
+            pausedNow = true;
+            pauses += 1;
+            cover.style.minHeight = row.offsetHeight + "px";
+            row.style.display = "none";
+            cover.style.display = "flex";
+            pauseBtn.style.visibility = "hidden";
+          };
+          const doResume = () => {
+            if (!pausedNow) return;
+            pausedNow = false;
+            row.style.display = "flex";
+            cover.style.display = "none";
+            pauseBtn.style.visibility = "";
+            t0 = performance.now();
+          };
+          pauseBtn.onclick = doPause;
+          cover.onclick = doResume;
+          const onVis = () => { if (document.hidden) doPause(); };
+          document.addEventListener("visibilitychange", onVis);
           const pick = (tid) => {
+            if (pausedNow) return;
             model.set("clicks", model.get("clicks") + 1);
             model.set("choice", tid);
+            model.set("pauses", pauses);
             model.set("t_render", t0);
             model.set("t_click", performance.now());
             model.save_changes();
@@ -961,17 +1014,22 @@ def _(SNIPPETS, get_responses, mo, random, render_card, trial_for):
             }
             row.appendChild(card);
           });
+          wrap.appendChild(top);
           wrap.appendChild(row);
+          wrap.appendChild(cover);
           el.replaceChildren(wrap);
+          return () => document.removeEventListener("visibilitychange", onVis);
         }
         export default { render };
         """
         mode = traitlets.Unicode("duel").tag(sync=True)
         strip_bg = traitlets.Unicode("#888888").tag(sync=True)
+        ink = traitlets.Unicode("#808080").tag(sync=True)
         prompt_html = traitlets.Unicode("").tag(sync=True)
         cards = traitlets.List([]).tag(sync=True)
         choice = traitlets.Int(-1).tag(sync=True)
         clicks = traitlets.Int(0).tag(sync=True)
+        pauses = traitlets.Int(0).tag(sync=True)
         t_render = traitlets.Float(-1.0).tag(sync=True)
         t_click = traitlets.Float(-1.0).tag(sync=True)
 
@@ -1014,7 +1072,9 @@ def _(SNIPPETS, get_responses, mo, random, render_card, trial_for):
         ]
         _prompt = f'<div style="{_pstyle}">Click the <b>current</b> find match — the strongest highlight.</div>'
 
-    trial_widget = mo.ui.anywidget(_ThemeTrial(mode=_t["mode"], strip_bg=_strip, prompt_html=_prompt, cards=_cards))
+    trial_widget = mo.ui.anywidget(
+        _ThemeTrial(mode=_t["mode"], strip_bg=_strip, ink=_ptxt, prompt_html=_prompt, cards=_cards)
+    )
     trial_widget
     return (trial_widget,)
 
@@ -1042,9 +1102,12 @@ def _(LOG, SNIPPETS, datetime, get_responses, json, random, set_responses, timez
             "code_px": _t["code_px"],
             "theta_a": _t["theta_a"],
             "theme_a": _t["theme_a"],
+            # rt_ms runs from the LAST reveal (render, or resume after a pause); a trial
+            # that was ever paused is flagged so its time is read as a near-tie downstream.
             "rt_ms": round(v["t_click"] - v["t_render"], 1),
             "t_render": round(v["t_render"], 1),
             "t_click": round(v["t_click"], 1),
+            "paused": v.get("pauses", 0) > 0,
         }
         if _t["mode"] == "duel":
             _cur = _rng.choice(_snip["ident_ids"]) if _snip["ident_ids"] else None
@@ -1172,7 +1235,10 @@ def _(AXES, DE_MIN, POOL, SNIPPETS, THRESH_DETAIL, VISION_N, fitted, get_respons
                 ]
         _tasks = _frame[_frame["mode"] == "comprehension"]
         if len(_tasks) >= 6:
-            _ok = _tasks[_tasks["correct"] == True]  # noqa: E712
+            # Correct AND never-paused: a paused trial's clock measures the break, not the
+            # eyes. Rows predating the pause affordance lack the field: they count unpaused.
+            _np1 = ~_tasks.get("paused", pd.Series(False, index=_tasks.index)).fillna(False).astype(bool)
+            _ok = _tasks[(_tasks["correct"] == True) & _np1]  # noqa: E712
             _blocks.append(
                 mo.md(
                     f"**Comprehension**: {len(_tasks)} probes, {100 * _tasks['correct'].mean():.0f}% correct; "
@@ -1182,7 +1248,8 @@ def _(AXES, DE_MIN, POOL, SNIPPETS, THRESH_DETAIL, VISION_N, fitted, get_respons
             )
         _hunts = _frame[_frame["mode"] == "search"]
         if len(_hunts) >= 6:
-            _hok = _hunts[_hunts["correct"] == True]  # noqa: E712
+            _np2 = ~_hunts.get("paused", pd.Series(False, index=_hunts.index)).fillna(False).astype(bool)
+            _hok = _hunts[(_hunts["correct"] == True) & _np2]  # noqa: E712
             if len(_hok) >= 4:
                 _z = np.polyfit(_hok["salience"], np.log(_hok["rt_ms"]), 1)
                 _blocks.append(
@@ -1227,7 +1294,12 @@ def _(mo):
     Reaction time is doing quiet work throughout: a fast duel click steepens that duel's
     likelihood (drift-diffusion reading — big utility gaps decide quickly), a slow one
     flattens it toward a tie, so deliberating over a near-tie neither punishes nor rewards
-    either side. Comprehension probes and find hunts measure time directly; they are the
+    either side. Stepping away mid-trial would corrupt that channel, so the strip carries a
+    **pause** button (and the tab losing visibility pauses automatically): pausing hides the
+    stimulus — an exposed one lets a decision form off the clock — resuming restarts the
+    clock, and a trial that was ever paused is flagged in the log; its choice still counts,
+    at the neutral slope, and it is excluded from the comprehension and find-hunt timing
+    statistics. Comprehension probes and find hunts measure time directly; they are the
     glyph-scale ground truth that the 2× threshold safety margin (from the 104-px vision
     fit) is standing in for until this instrument accumulates its own.
 
