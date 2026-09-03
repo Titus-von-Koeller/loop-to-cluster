@@ -146,6 +146,23 @@ interact, and choose the best combination — every step from measurement.
 - **Surface is a stimulus factor, not a theme axis.** A theme is one theme seen in several
   arrangements (bare editor, chat panel, notebook). Keep utility defined over the theme and
   log the surface, so an interaction can be tested later instead of assumed away.
+- **Separate the task's baseline from the effect being measured.** Two timed arms that ask
+  different questions have different baselines — a find hunt highlights its matches and ran
+  1.7x faster than a cold comprehension probe (2726 ms against 4601 ms) — and pooling them
+  into one mean pushes that constant into the surface as if some regions of theme space were
+  slow, when what was slow was the task. Fit a baseline per arm and model only the residual.
+  Provable rather than arguable: with per-arm means, a planted 0.55 log-second task offset
+  costs the recovery nothing (r = 0.81 with it, 0.81 without).
+- **Remove input asymmetries before reading reaction time as evidence.** Clicking the left
+  card is a different distance of mouse travel than the right one on a wide screen, so RT
+  carried a side component on top of the side bias already fitted. Two keys equidistant from
+  the hand remove it; log which input was used so mouse and key trials stay separable.
+- **A leader losing share while the credible set shrinks is not stalling.** It is a genuine
+  plateau coming into focus: evidence still arriving, mass redistributing across survivors
+  rather than concentrating on one page. A convergence readout needs three states — leader
+  gaining (extrapolate, and say it is a straight line through two points), mass spreading
+  while the field narrows (more duels sharpen WHICH themes are on the shelf), and flat on
+  both counts (the shelf is the answer, not a waypoint).
 - **Every arm must reach the verdict, or its clicks are wasted.** The comprehension and
   find arms sat in the analysis as a median and a slope for their whole first life — a
   third of every sitting bought nothing. They measure a different function from preference
