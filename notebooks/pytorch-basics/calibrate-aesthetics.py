@@ -2305,9 +2305,18 @@ def _(mo):
     the neutral slope, and it is excluded from the comprehension and find-hunt timing
     statistics.
 
-    Comprehension probes and find hunts measure time directly; they are the
-    glyph-scale ground truth that the 2× threshold safety margin (from the 104-px vision
-    fit) is standing in for until this instrument accumulates its own.
+    Comprehension probes and find hunts measure time directly, and that time now **binds**:
+    a Gaussian process over log time-to-click gives a legibility surface across theme space,
+    and candidates it says are credibly slower to read than the fastest are dropped before
+    the preference verdict is computed. Constraint first, preference second — the same order
+    the contrast floors use, one level deeper: a floor keeps a page readable in principle,
+    this keeps it readable in fact. A page you like but read slowly is not a winner. The
+    surface estimates its own signal and noise from your times rather than borrowing the
+    preference kernel's, because reaction time is noisy enough that a loose prior invents
+    differences, and with a thin or noisy log it drops nothing — the honest behaviour rather
+    than the convenient one. These arms are also the glyph-scale ground truth that the 2×
+    threshold safety margin (from the 104-px vision fit) stands in for until this instrument
+    accumulates its own.
 
     Hard floors are never traded: every page shown clears WCAG 4.5:1 and APCA 60 on body
     tokens, and every pair of colored roles clears twice your measured CAM16-UCS threshold

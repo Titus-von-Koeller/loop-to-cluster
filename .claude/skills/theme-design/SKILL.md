@@ -146,6 +146,16 @@ interact, and choose the best combination — every step from measurement.
 - **Surface is a stimulus factor, not a theme axis.** A theme is one theme seen in several
   arrangements (bare editor, chat panel, notebook). Keep utility defined over the theme and
   log the surface, so an interaction can be tested later instead of assumed away.
+- **Every arm must reach the verdict, or its clicks are wasted.** The comprehension and
+  find arms sat in the analysis as a median and a slope for their whole first life — a
+  third of every sitting bought nothing. They measure a different function from preference
+  (how fast a name is actually found, not which page he would rather live in), so they get
+  their own GP over log time-to-click, and candidates credibly slower than the fastest are
+  dropped BEFORE the preference verdict: constraint first, preference second, the same
+  order the contrast floors use. Estimate that surface's signal and noise from the times
+  themselves — borrowing the preference kernel's prior sd of 2 meant a factor of seven in
+  log time and predicted 1.4-to-14-second reads on a task he finishes in three — and let a
+  thin log constrain nothing, which is honest rather than convenient.
 - **Optimize by measurement, and state the crossover.** Three "obvious" speedups on the
   instrument's hot path: memoizing the fit (a real win — the trial cell and the analysis
   cell both asked for the same cubic-cost fit), halving the P(best) sample count (145 ms to
