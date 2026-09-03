@@ -166,7 +166,9 @@ comments on the *wrong* lines — diff comment placement against the upstream co
 sanitizing (PyTorch embeds ANSI escapes in them). Vega scheme names can invert orientation
 against the house constants — `blueorange` is the reverse of `POLARITY`; diverging exhibits
 use `POLARITY`/`RAMP` explicit ranges, and non-Vega renderers (graphviz) compute their hexes
-from `_palette` (there's a `tint()` there for mixing toward a card's white). Ruff's isort
+from `_palette` (there's a `tint()` there for mixing toward a card's white). GitHub alert
+syntax (`> [!NOTE]`) renders its marker as literal text in the native notebook — the box is
+styled but "[!NOTE]" stays visible; prefer a bold label or `mo.callout` in new prose. Ruff's isort
 config keeps first-party `_viz`/`_palette` imports in the same block as third-party ones —
 no blank line. Cells chained through the filesystem (save→load) have no DAG edge: file-order
 keeps them correct headless, but a lone re-run of the save cell won't re-trigger its loads.

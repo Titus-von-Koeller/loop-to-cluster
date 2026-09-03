@@ -138,9 +138,14 @@ Two operational corollaries, both applied and liked:
 - **Content over commentary**: comments sit a deliberate contrast step below body tokens
   (context, not figure), with the italic carrying the rest of the distinction — but never below
   4.5:1 on the deepest surface they appear on.
-- **Reading typography**: running prose is a CENTERED reading column — one ~70-character
-  measure (40em at 17px serif) shared by body and headings so the column keeps a single
-  internal left edge, leading 1.6 body / 1.3 headings, kerning pinned; code cells and
+- **Reading typography**: running prose is a CENTERED reading column — one absolute
+  measure (42rem against the webview root) shared by every block. **Never set a shared
+  measure in em**: em resolves against each element's OWN font size, so an h2 at 2x body
+  gets twice the column of its paragraphs (measured — "headings all messed up"); an
+  absolute unit also makes nested caps idempotent, so flat selectors survive unknown
+  nesting. Leading 1.6 body / 1.3 headings, kerning pinned; note-box alerts join the
+  column as FLAT cards on the code paper via host variables (flat tinted panel = aside,
+  shadowed card = machine artifact); code cells and
   in-markdown tables run full ensemble width as deliberate full-bleed breakouts. Prose and
   code share a central axis, not an edge (Titus dropped the shared-edge constraint: moving
   to code is a context switch anyway; symmetric margins read calmer than a one-sided
