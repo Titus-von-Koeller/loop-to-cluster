@@ -51,7 +51,10 @@ def _(mo):
     in CAM16-UCS) and APCA/WCAG contrast floors are **hard constraints, never objectives**:
     every candidate you see is already legible; you are only ever asked which is *better*.
 
-    Trials run in twelve-trial blocks per polarity (light page, dark page) so your adaptation
+    Trials run in twenty-four-trial blocks per polarity (light page, dark page), each a run
+    of sixteen duels, then four comprehension probes, then four find hunts — same-kind
+    trials batched so one instruction serves a run and you never switch task mid-stride; a
+    begin button gates each run. Blocks by polarity so your adaptation
     state is part of the measurement, not noise in it. Every response appends to
     `aesthetics-responses.jsonl` beside this file with the full stimulus and both timestamps;
     sittings accumulate. One input the model still wants and cannot infer: **the colors you
@@ -314,32 +317,39 @@ def _(DE_MIN, apca_lc, composite, hex_to_rgb, math, np, rgb_to_hex, rgb_to_ucs, 
         _cur = composite(_fill, 0.85, _ground)
         _oth = composite(_fill, 0.45, _ground)
 
-        # Hard floors, checked on what will actually render.
+        # Hard floors, checked on what will actually render. One CAM16 conversion for all
+        # eight colors, then plain numpy distances: colour-science's cost is per call, not
+        # per color, and this block once spent 14 calls per theme (measured: 1.0 s of a
+        # 1.7 s duel generation).
         _de = DE_MIN[polarity]
-        _colored = [_roles[r] for r in _ROLE_ORDER]
         _lc = apca_lc(_rgbs, _g6)
         _rr = wcag(_rgbs, _g6)
         if (_rr < 4.5 - 1e-6).any() or (np.abs(_lc[:4]) < 60).any() or (np.abs(_lc[4:]) < 45).any():
             return None
-        for _i in range(3):
-            for _j2 in range(_i + 1, 3):
-                if ucs_dist(_colored[_i], _colored[_j2])[0] < 2 * _de:
-                    return None
-            if ucs_dist(_colored[_i], _roles["ink"])[0] < 2 * _de:
+        _names = ["keyword", "function", "string", "ink", "comment"]
+        _u = rgb_to_ucs(hex_to_rgb([_roles[r] for r in _names] + [_ground, _cur, _oth]))
+        _K, _F, _S, _I, _C, _G, _CUR, _OTH = range(8)
+
+        def _d(a, b):
+            return float(np.linalg.norm(_u[a] - _u[b]))
+
+        for _i in (_K, _F, _S):
+            if _d(_i, _I) < 2 * _de:
                 return None
-        if ucs_dist(_roles["comment"], _roles["ink"])[0] < _de:
+            for _j2 in (_K, _F, _S):
+                if _j2 > _i and _d(_i, _j2) < 2 * _de:
+                    return None
+        if _d(_C, _I) < _de:
             return None
-        if ucs_dist(_cur, _ground)[0] < 1.5 * _de or ucs_dist(_cur, _oth)[0] < _de:
+        if _d(_CUR, _G) < 1.5 * _de or _d(_CUR, _OTH) < _de:
             return None
         # Text must survive sitting on either fill.
-        for _fill_hex in (_cur, _oth):
-            _fr = hex_to_rgb(_fill_hex)
-            if wcag(hex_to_rgb(_roles["ink"]), _fr)[0] < 4.0 or wcag(hex_to_rgb(_roles["string"]), _fr)[0] < 3.5:
-                return None
-        _sal = min(
-            float(ucs_dist(_cur, _ground)[0]),
-            *[float(ucs_dist(_cur, _roles[r])[0]) for r in ("keyword", "function", "string", "ink")],
-        )
+        _fills = hex_to_rgb([_cur, _oth])
+        if (wcag(np.repeat(_rgbs[3:4], 2, 0), _fills) < 4.0).any() or (
+            wcag(np.repeat(_rgbs[2:3], 2, 0), _fills) < 3.5
+        ).any():
+            return None
+        _sal = min(_d(_CUR, _i) for _i in (_G, _K, _F, _S, _I))
         return {
             "ground": _ground,
             **_roles,
@@ -643,7 +653,10 @@ agg_item = agg.item()
 def _(LOG, json, mo):
     _existing = [json.loads(_line) for _line in LOG.read_text().splitlines() if _line.strip()] if LOG.exists() else []
     get_responses, set_responses = mo.state(_existing)
-    return get_responses, set_responses
+    # The first trial of a sitting (and of every run) is gated behind a begin button;
+    # inside a run the previous click anchors the clock, so render time is the baseline.
+    SESSION_START_N = len(_existing)
+    return SESSION_START_N, get_responses, set_responses
 
 
 @app.cell(hide_code=True)
@@ -755,17 +768,31 @@ def _(POOL, np, prior_mean, random, realize):
         return _posterior_over(fit, thetas, polarity)[0]
 
     def schedule_mode(n, n_duels):
-        """Twelve-trial polarity blocks; inside a block two comprehension probes and one
-        find hunt, the rest duels. All-duel until the model has something to probe."""
-        _pol = ("day", "night")[(n // 12) % 2]
+        """Twenty-four-trial polarity blocks, each a run of sixteen duels, then four
+        comprehension probes, then four find hunts — same-kind trials batched so one
+        instruction serves a whole run and no click is spent re-reading. All-duel until the
+        model has something to probe."""
+        _pol = ("day", "night")[(n // 24) % 2]
         if n_duels < 6:
             return _pol, "duel"
-        _slot = n % 12
-        if _slot in (4, 9):
+        _slot = n % 24
+        if _slot < 16:
+            return _pol, "duel"
+        if _slot < 20:
             return _pol, "comprehension"
-        if _slot == 6:
-            return _pol, "search"
-        return _pol, "duel"
+        return _pol, "search"
+
+    def run_info(n, n_duels):
+        """(polarity, mode, position within the run, run length) for trial n."""
+        _pol, _mode = schedule_mode(n, n_duels)
+        if n_duels < 6:
+            return _pol, _mode, min(n_duels, 5), 6
+        _slot = n % 24
+        if _slot < 16:
+            return _pol, _mode, _slot, 16
+        if _slot < 20:
+            return _pol, _mode, _slot - 16, 4
+        return _pol, _mode, _slot - 20, 4
 
     # Deterministic given the log, so a memo keyed by trial number is a pure cache: three
     # cells ask for the same trial and pay for one fit.
@@ -895,29 +922,30 @@ def _(POOL, np, prior_mean, random, realize):
         _TRIAL_MEMO[n] = _trial
         return _trial
 
-    return fitted, mu_at, schedule_mode, trial_for
+    return fitted, mu_at, run_info, schedule_mode, trial_for
 
 
 @app.cell(hide_code=True)
-def _(get_responses, mo, schedule_mode):
+def _(get_responses, mo):
     # The trial number doubles as a staleness indicator: if it disagrees with the stimulus
-    # below, the surface lagged and the guard is dropping clicks.
+    # below, the surface lagged and the guard is dropping clicks. Instructions live in the
+    # instrument's own bar, where the eye already is.
     _n = len(get_responses())
-    _nd = sum(1 for _r in get_responses() if _r.get("mode") == "duel")
-    _pol, _mode = schedule_mode(_n, _nd)
-    _what = {
-        "duel": "click the page you would rather read",
-        "comprehension": "click the named token, fast",
-        "search": "click the current find match, fast",
-    }[_mode]
-    mo.hstack([mo.md(f"**Trial {_n + 1}** · {_pol} block · {_what}.")], justify="center")
+    mo.hstack([mo.md(f"**Trial {_n + 1}**")], justify="center")
     return
 
 
 @app.cell(hide_code=True)
-def _(SNIPPETS, get_responses, mo, random, render_card, trial_for):
+def _(SESSION_START_N, SNIPPETS, get_responses, mo, random, render_card, run_info, schedule_mode, trial_for):
     _n = len(get_responses())
     _t = trial_for(_n, get_responses())
+    _nd = sum(1 for _r in get_responses() if _r.get("mode") == "duel")
+    _pol, _mode, _pos, _len = run_info(_n, _nd)
+    # Gate (begin button) at the first trial of a sitting and at every run boundary — the
+    # moments where a new instruction must be read; inside a run the previous click is
+    # the anchor and the clock starts at render.
+    _nd_prev = _nd - (1 if _n > 0 and get_responses()[-1].get("mode") == "duel" else 0)
+    _gate = _n == SESSION_START_N or (_n > 0 and schedule_mode(_n - 1, _nd_prev) != (_pol, _mode))
     _rng = random.Random(_n * 48271 % (2**31))
     _snip = SNIPPETS[_t["snippet"]]
     _strip = {"day": "#d8d2cf", "night": "#14161c"}[_t["polarity"]]
@@ -927,14 +955,16 @@ def _(SNIPPETS, get_responses, mo, random, render_card, trial_for):
     import traitlets
 
     class _ThemeTrial(anywidget.AnyWidget):
-        # Every trial starts hidden behind an opaque cover; a reveal button uncovers the
-        # stimulus and sets the clock's baseline at that instant. The click stamps the end;
-        # both ride the synced traits into the record. First click only — later clicks and
-        # clicks on an orphaned stale widget record nothing (the guard double-checks the
-        # trial number). Pausing re-covers the stimulus (an exposed one lets a decision form
-        # off the clock) and swallows clicks; revealing again re-baselines the clock. The
-        # tab losing visibility auto-pauses. A trial paused after its first reveal carries
-        # paused=true so the model reads its time as a near-tie, never as evidence.
+        # The clock's baseline is the latest reveal; the click stamps the end; both ride the
+        # synced traits into the record. First click only — later clicks and clicks on an
+        # orphaned stale widget record nothing (the guard double-checks the trial number).
+        # Gated trials (first of a sitting, first of a run) start behind an opaque cover
+        # with the run's instruction and a begin button; the rest reveal at render, since
+        # the click that produced them is the anchor. Pausing re-covers the stimulus (an
+        # exposed one lets a decision form off the clock) and swallows clicks; revealing
+        # again re-baselines. Tab-hide and 25 s of idling auto-pause. A trial paused after
+        # its first reveal carries paused=true: its time is read as a near-tie, never as
+        # evidence.
         _esm = """
         function render({ model, el }) {
           let t0 = -1;               // the clock's baseline: the latest reveal
@@ -949,11 +979,24 @@ def _(SNIPPETS, get_responses, mo, random, render_card, trial_for):
             `border-radius:10px;display:flex;flex-direction:column;gap:14px;` +
             `position:relative;left:50%;transform:translateX(-50%);` +
             `width:min(96vw, 1400px);box-sizing:border-box;color:${model.get("ink")}`;
+          // The instruction bar: what kind of run (chip), what to do (question, large),
+          // where you are in the run (progress). One glance, then act.
           const top = document.createElement("div");
-          top.style.cssText = "display:flex;align-items:center;gap:10px";
+          top.style.cssText = "display:flex;align-items:center;gap:16px";
+          const chip = document.createElement("div");
+          chip.textContent = model.get("chip");
+          chip.style.cssText = "font-family:'IBM Plex Serif',serif;font-size:12px;" +
+            "letter-spacing:.14em;text-transform:uppercase;opacity:.75;white-space:nowrap;" +
+            "border:1px solid currentColor;border-radius:999px;padding:3px 12px";
           const prompt = document.createElement("div");
           prompt.innerHTML = model.get("prompt_html");
-          prompt.style.cssText = "flex:1 1 0";
+          prompt.style.cssText = "flex:1 1 0;font-family:'IBM Plex Serif',serif;" +
+            "font-size:19px;line-height:1.3";
+          const progress = document.createElement("div");
+          progress.textContent = model.get("progress");
+          progress.style.cssText = "font-family:'IBM Plex Serif',serif;font-size:13px;" +
+            "opacity:.6;white-space:nowrap;font-variant-numeric:tabular-nums";
+          top.appendChild(chip);
           const btnStyle = "font-family:'IBM Plex Serif',serif;background:transparent;" +
             "color:inherit;border:1px solid currentColor;border-radius:8px;cursor:pointer";
           const pauseBtn = document.createElement("button");
@@ -962,6 +1005,7 @@ def _(SNIPPETS, get_responses, mo, random, render_card, trial_for):
           pauseBtn.style.cssText = btnStyle + ";font-size:13px;opacity:.55;padding:2px 10px;" +
             "visibility:hidden";
           top.appendChild(prompt);
+          top.appendChild(progress);
           top.appendChild(pauseBtn);
           // The stimulus row keeps its box in the layout at all times; the cover is an
           // opaque overlay on exactly that box, so reveal/pause never move the page.
@@ -976,7 +1020,8 @@ def _(SNIPPETS, get_responses, mo, random, render_card, trial_for):
             `background:${model.get("strip_bg")};border:1px dashed currentColor;` +
             `font-family:'IBM Plex Serif',serif;font-size:15px;box-sizing:border-box`;
           const coverText = document.createElement("div");
-          coverText.style.opacity = ".7";
+          coverText.style.cssText = "opacity:.75;font-size:17px;max-width:38em;text-align:center;" +
+            "line-height:1.5";
           const goBtn = document.createElement("button");
           goBtn.style.cssText = btnStyle + ";font-size:16px;padding:8px 26px;letter-spacing:.02em";
           cover.appendChild(coverText);
@@ -988,6 +1033,11 @@ def _(SNIPPETS, get_responses, mo, random, render_card, trial_for):
             row.style.visibility = "hidden";
             pauseBtn.style.visibility = "hidden";
           };
+          let idleTimer = null;
+          const armIdle = () => {
+            if (idleTimer) clearTimeout(idleTimer);
+            idleTimer = setTimeout(() => doPause("paused after 25 s without a click"), 25000);
+          };
           const reveal = () => {
             cover.style.display = "none";
             row.style.visibility = "visible";
@@ -995,20 +1045,28 @@ def _(SNIPPETS, get_responses, mo, random, render_card, trial_for):
             revealed = true;
             pausedNow = false;
             t0 = performance.now();   // baseline re-initialized on EVERY reveal
+            armIdle();
           };
-          const doPause = () => {
+          const doPause = (why) => {
             if (!revealed || pausedNow) return;
             pausedNow = true;
             pauses += 1;
-            setCover("paused \u2014 the stimulus is hidden; the clock re-baselines on reveal", "resume");
+            if (idleTimer) clearTimeout(idleTimer);
+            setCover((why || "paused") + " \u2014 the stimulus is hidden; " +
+              "the clock re-baselines when you resume", "resume");
           };
-          setCover("the stimulus is hidden; the clock starts when you reveal it", "reveal");
           goBtn.onclick = reveal;
-          pauseBtn.onclick = doPause;
-          const onVis = () => { if (document.hidden) doPause(); };
+          if (model.get("gate")) {
+            setCover(model.get("gate_text"), "begin");
+          } else {
+            reveal();
+          }
+          pauseBtn.onclick = () => doPause("paused");
+          const onVis = () => { if (document.hidden) doPause("paused while the tab was hidden"); };
           document.addEventListener("visibilitychange", onVis);
           const pick = (tid) => {
             if (!revealed || pausedNow) return;
+            if (idleTimer) clearTimeout(idleTimer);
             model.set("clicks", model.get("clicks") + 1);
             model.set("choice", tid);
             model.set("pauses", pauses);
@@ -1037,7 +1095,10 @@ def _(SNIPPETS, get_responses, mo, random, render_card, trial_for):
           wrap.appendChild(top);
           wrap.appendChild(stage);
           el.replaceChildren(wrap);
-          return () => document.removeEventListener("visibilitychange", onVis);
+          return () => {
+            if (idleTimer) clearTimeout(idleTimer);
+            document.removeEventListener("visibilitychange", onVis);
+          };
         }
         export default { render };
         """
@@ -1045,6 +1106,10 @@ def _(SNIPPETS, get_responses, mo, random, render_card, trial_for):
         strip_bg = traitlets.Unicode("#888888").tag(sync=True)
         ink = traitlets.Unicode("#808080").tag(sync=True)
         prompt_html = traitlets.Unicode("").tag(sync=True)
+        chip = traitlets.Unicode("").tag(sync=True)
+        progress = traitlets.Unicode("").tag(sync=True)
+        gate = traitlets.Bool(False).tag(sync=True)
+        gate_text = traitlets.Unicode("").tag(sync=True)
         cards = traitlets.List([]).tag(sync=True)
         choice = traitlets.Int(-1).tag(sync=True)
         clicks = traitlets.Int(0).tag(sync=True)
@@ -1052,7 +1117,23 @@ def _(SNIPPETS, get_responses, mo, random, render_card, trial_for):
         t_render = traitlets.Float(-1.0).tag(sync=True)
         t_click = traitlets.Float(-1.0).tag(sync=True)
 
-    _pstyle = f"font-family:'IBM Plex Serif',serif;font-size:15px;color:{_ptxt};text-align:center"
+    _mono = "font-family:'IosevkaLigated Nerd Font Mono',monospace;font-size:18px"
+    _chip = {"duel": "duel", "comprehension": "spot", "search": "find"}[_t["mode"]] + f" · {_pol} page"
+    _progress = f"{_pos + 1} of {_len}"
+    _gate_text = {
+        "duel": (
+            f"A run of {_len} duels on the {_pol} page: two pages render the same code — "
+            "click the one you would rather read. Trust the first pull; a slow choice reads as a tie."
+        ),
+        "comprehension": (
+            f"A run of {_len} probes on the {_pol} page: the bar names a function — "
+            "click that name in the code as fast as you can find it."
+        ),
+        "search": (
+            f"A run of {_len} find hunts on the {_pol} page: several matches are highlighted — "
+            "click the current one, the strongest highlight, as fast as you can find it."
+        ),
+    }[_t["mode"]]
     if _t["mode"] == "duel":
         _cur = _rng.choice(_snip["ident_ids"]) if _snip["ident_ids"] else None
         _cards = [
@@ -1067,7 +1148,7 @@ def _(SNIPPETS, get_responses, mo, random, render_card, trial_for):
         ]
         if _t["swap"]:
             _cards = _cards[::-1]
-        _prompt = f'<div style="{_pstyle}">Which page would you rather read? Click it — trust the first pull.</div>'
+        _prompt = 'Which page would you rather read? <span style="opacity:.55">Click it.</span>'
     elif _t["mode"] == "comprehension":
         _target = _rng.choice(_snip["fn_ids"])
         _name = _snip["spans"][_target]["text"]
@@ -1077,10 +1158,8 @@ def _(SNIPPETS, get_responses, mo, random, render_card, trial_for):
                 "ground": _t["theme_a"]["ground"],
             }
         ]
-        _prompt = (
-            f'<div style="{_pstyle}">Click the function name '
-            f"<code style=\"font-family:'IosevkaLigated Nerd Font Mono',monospace\">{_name}</code>.</div>"
-        )
+        _prompt = f'Click <code style="{_mono}">{_name}</code>'
+
     else:
         _cur = _rng.choice(_snip["ident_ids"])
         _cards = [
@@ -1089,10 +1168,20 @@ def _(SNIPPETS, get_responses, mo, random, render_card, trial_for):
                 "ground": _t["theme_a"]["ground"],
             }
         ]
-        _prompt = f'<div style="{_pstyle}">Click the <b>current</b> find match — the strongest highlight.</div>'
+        _prompt = 'Click the <b>current</b> match <span style="opacity:.55">— the strongest highlight.</span>'
 
     trial_widget = mo.ui.anywidget(
-        _ThemeTrial(mode=_t["mode"], strip_bg=_strip, ink=_ptxt, prompt_html=_prompt, cards=_cards)
+        _ThemeTrial(
+            mode=_t["mode"],
+            strip_bg=_strip,
+            ink=_ptxt,
+            prompt_html=_prompt,
+            chip=_chip,
+            progress=_progress,
+            gate=bool(_gate),
+            gate_text=_gate_text,
+            cards=_cards,
+        )
     )
     trial_widget
     return (trial_widget,)
@@ -1313,13 +1402,15 @@ def _(mo):
     Reaction time is doing quiet work throughout: a fast duel click steepens that duel's
     likelihood (drift-diffusion reading — big utility gaps decide quickly), a slow one
     flattens it toward a tie, so deliberating over a near-tie neither punishes nor rewards
-    either side. That channel is only as clean as its baseline, so **every trial starts
-    hidden**: a reveal button uncovers the stimulus and the clock starts at that instant —
-    not when the page happened to render. A **pause** button (and the tab losing visibility)
-    re-covers the stimulus — an exposed one lets a decision form off the clock — and
-    revealing again re-baselines the clock; a trial paused after its first reveal is flagged
-    in the log: its choice still counts, at the neutral slope, and it is excluded from the
-    comprehension and find-hunt timing statistics.
+    either side. That channel is only as clean as its baseline. The first trial of a sitting
+    and the first of every run start hidden behind a **begin** button, because those are the
+    moments you read an instruction; inside a run the click that produced a trial is its
+    anchor, so the clock starts at render and no button stands between you and the next
+    page. A **pause** button, the tab losing visibility, or 25 s without a click re-covers the
+    stimulus — an exposed one lets a decision form off the clock — and resuming re-baselines;
+    a trial paused after its first reveal is flagged in the log: its choice still counts, at
+    the neutral slope, and it is excluded from the comprehension and find-hunt timing
+    statistics.
 
     Comprehension probes and find hunts measure time directly; they are the
     glyph-scale ground truth that the 2× threshold safety margin (from the 104-px vision

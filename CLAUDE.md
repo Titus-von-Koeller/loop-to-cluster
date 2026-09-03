@@ -106,11 +106,13 @@ instrument's checks include a served-page smoke test, not just the script run (m
 column; a stimulus that needs width (two code pages at true editor sizes) breaks out with
 `position:relative; left:50%; transform:translateX(-50%); width:min(96vw, 1400px)` on the
 widget's root — and stimulus `<pre>` blocks use `overflow:hidden`, never `auto`, so no
-scrollbar chrome joins the picture being judged. Reaction-time instruments start every
-trial hidden behind an opaque cover on the stimulus's own box (no layout jump): a reveal
-button sets the clock's baseline, a pause re-covers (an exposed stimulus lets the decision
-form off the clock), revealing again re-baselines, tab-hide auto-pauses, and a `paused`
-flag rides each record (Titus's rule, 2026-09-03: the clock never starts on render). UI elements interpolate into
+scrollbar chrome joins the picture being judged. Reaction-time instruments batch same-kind
+trials into runs (one instruction per run, in a large bar: kind chip · question · progress)
+and gate only the first trial of a sitting and of each run behind a begin button on an opaque
+cover over the stimulus's own box (no layout jump); inside a run the click that produced a
+trial is its anchor and the clock starts at render. Pause, tab-hide, or 25 s idle re-covers
+(an exposed stimulus lets the decision form off the clock), resuming re-baselines, and a
+`paused` flag rides each record. Titus rejected per-trial gating as friction (2026-09-03). UI elements interpolate into
 `mo.md` f-strings (how controls sit on a styled ground); multi-paragraph `mo.md` inside an
 `hstack` lays its paragraphs out horizontally in the VSCode renderer — use explicit stacks.
 Interactive instruments are verified by clicking them in a real browser (`marimo run` +
