@@ -13,6 +13,11 @@ python = "3.14.*"
 ruff = ">=0.6"
 pytest = ">=8.0"
 cmcrameri = ">=1.10,<2"
+# CAM16-UCS forward/inverse for the aesthetics-calibration instrument (imports as
+# `colour`). A tested implementation over a hand-rolled one: CAM16 is ~40 constants
+# where one silent transcription error poisons every measurement built on it. Pure
+# Python over numpy/scipy — no torch coupling, so conda-forge per the rule above.
+colour-science = ">=0.4.7,<0.5"
 
 [pypi-dependencies]
 # From PyPI rather than conda-forge. conda-forge builds trail for brand-new CPython
