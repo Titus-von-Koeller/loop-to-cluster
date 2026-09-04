@@ -273,115 +273,19 @@ one-line spark. When a queue item is opened, closed, or founded, mirror the one-
   decouples it; fold his loved colors into the aesthetics prior (still unanswered); GPU
   posterior only if the grid must grow (sanctioned, not yet needed); the cividis-prose
   queue item remains untaken.
-- The aesthetics-preference instrument — `notebooks/pytorch-basics/calibrate-aesthetics.py`,
-  **built and in use**, Titus clicking daily. Torch-free so it serves under `marimo run`;
-  **port 2919**, lock `port-2919`. Data in `aesthetics-responses.jsonl` (committed like any
-  measurement). Recovery tests in `_model_tests.py`; stimulus corpus in `_codegen.py`.
+- **The theme program has moved to its own repository**: `~/src/theme-calibration`
+  (github.com/Titus-von-Koeller/theme-calibration). It outgrew this one — it has its own
+  model, its own measured data, its own web surface and its own tests, and none of that is
+  about learning distributed training. Everything about it now lives there: the method reef
+  (`.claude/skills/theme-design/SKILL.md`), the instruments, the response logs, and
+  `CONTRIBUTING.md`, which carries the engineering procedure the extraction earned.
 
-  *Intention.* Find the theme(s) he most wants to read in, measured rather than guessed, and
-  say honestly whether one theme wins or a set of equally good ones exists. Preference is the
-  objective; legibility and contrast are constraints. His preferences are DISCOVERED, never
-  asked for.
-
-  *How it works now* (2026-09-03, after a day of iteration with him at the screen):
-  preferential Bayesian optimization — Bradley–Terry duels with reaction-time-scaled slopes
-  and a fitted side-advantage term, Laplace GP posterior with ARD length-scales shrunk toward
-  isotropy while relevance is unidentifiable, candidates bred every trial (standing pool as
-  codebook + 64-point Sobol trickle + ARD-scaled mutation + crossover) with a *declared*
-  explore/exploit split via stratified Thompson. A second GP over log time-to-click turns the
-  comprehension and find arms into a legibility surface that CONSTRAINS the verdict. The
-  verdict groups near-identical themes before counting P(best) and reports one of three
-  states: a winner, a plateau, or not-yet-decided. Every trial takes the screen; duels split
-  the viewport with each half in its own ground; stimuli are fresh generated pages every
-  trial, never repeated.
-
-  *State on 178 responses (121 duels):* day is a plateau of ~12 distinct themes, leader 8% and
-  falling while the set narrows — a real plateau resolving. Night is converging: leader 4→10%,
-  set 44→24, naive line ~167 duels to a majority. Night data is the thinner half.
-
-  *Done 2026-09-03/04:* recovery tests now cover the RT surface, the grouping, the
-  convergence readout, the surface test, the axis readout and the size baseline (16 checks,
-  `_model_tests.py`). The duel RT exponent is chosen by held-out log-loss (p = 0.5 won). The
-  timed arms select actively, worth about a quarter less error per click. Surface rotation
-  was locked by `n % 3` against a 24-trial block and is now balanced in shuffled groups of
-  three. `factor_effect` tests any stimulus factor against a permutation null and reports it
-  in the verdict, with the multiplicity said out loud. Duels moved from 12-13px to the sizes
-  he actually reads at (14 editor / panel, 16 notebook), with a per-(arm, size) RT baseline
-  so the change does not land on the theme surface. The verdict reports the speed cost as a
-  difference with an interval (not credible: +0.40 [-0.45, +1.26] by day) and says which axes
-  his clicks have SETTLED. And the champion is published to `measured-theme.json` for
-  `apply-measured-theme`, which rewrites marked regions of settings.jsonc rather than asking
-  anyone to retype twelve hex codes.
-
-  *IN FLIGHT (started 2026-09-04 overnight): moving the trial UI out of the notebook.*
-  The blank-screen failure Titus hit is not a styling bug and not new: reproduced
-  identically on the notebook BEFORE and AFTER that evening's layout change — trial 1
-  renders, trial 2 leaves an empty full-screen `#theme-trial-stage` over the page. Cause is
-  structural. marimo tears down and rebuilds the anywidget on every answer, so the trial UI
-  has no stable DOM: the notebook version already needed reparenting to `<body>` to escape
-  marimo's stacking context, a page-owned persistent stage to stop loading placeholders
-  flashing between trials, and then a render-generation guard on top — three workarounds for
-  not owning the mount. A timed psychophysics task must own its DOM.
-
-  Target: `notebooks/pytorch-basics/theme/` as a plain package (color, space, stimulus,
-  model, schedule, log), `server.py` as a FastAPI app serving `GET /api/trial/{n}` and
-  `POST /api/response` plus one static page that owns the DOM permanently and prefetches
-  trial n+1 while he answers n (so no stall is ever inside the timed window — the analysis
-  was costing 8.3 s per click before the factor tests were bucketed). The notebook keeps
-  what a notebook is good at: reading the log and reporting what the model believes.
-  `_model_tests.py` imports `theme.model` directly instead of AST-loading a notebook cell.
-
-  Also learned and worth acting on: marimo's run-mode skew token is `hash(source)`, and
-  Python salts `hash` per process, so every restart mints a new token and silently kills
-  open tabs (marimo's client never checks for this — a stale tab shows at most an
-  "Unauthorized" toast). Pinning `PYTHONHASHSEED` makes run-mode tokens stable across
-  restarts, which is what marimo's own code comment already intends.
-
-  *Remaining work, ranked by value:*
-  1. His eyes on the two comparison renders (current settings against measured champion, sent
-     2026-09-04). Both verdicts are plateaus at 16-18%, so the model has no strong opinion
-     between the shelf's members and his does — the intended division of labour. Applying is
-     one command whenever he wants it.
-  2. More night sittings. Night is the thinner half and its surface reading (p = 0.09) is the
-     one live hint that a single theme might be the wrong shape of answer; it needs roughly
-     twice the duels to settle either way.
-  3. The find-highlight axes: ax8 ranks high for preference but the legibility surface could
-     not resolve its effect on speed at 29 uniform hunts. Active hunting should fix that —
-     re-read around 60.
-  4. Watch the preference-versus-speed gap. The point estimate says the leader is about 1.5x
-     slower than the quickest page the model knows; the interval is far too wide to act on,
-     but active hunting sharpens exactly that surface, and the verdict flips to a warning on
-     its own if it ever clears zero.
-  5. Ecological-valence prior stays generic by his instruction (preferences discovered, never
-     declared) — so hue axes must keep getting explored; worth a coverage check.
-  6. Screen ICC calibration, still parked: it bounds absolute colour claims, not the relative
-     structure the instrument learns.
-
-- The theme program (named 2026-09-02): determine independently the best *editor* theme for
-  Titus (best-in-class as the starting field — Selenized, Modus, GitHub accessible, Horizon —
-  then self-evolved: token-color overrides tuned by his calibration data and the gallery's
-  contrast instruments) and the best *graphing* theme independently; then characterize how the
-  two interact (shared grounds, simultaneous contrast, accent-vs-data-hue collisions) and
-  determine the best combination. Builds on calibrate-vision data; the deliverable is a ranked,
-  measured recommendation plus the override files to apply it. Titus explicitly deferred the
-  glyph-scale build on 2026-09-02 ("not a green light for now") — his focus is the learning
-  notebooks; the applied best-guess theming (Horizon + measured overrides, cividis house ramp,
-  Okabe-Ito categorical) stands until he re-opens this. A question about the stage is not a go.
-
-**Stopping agents gracefully.** When work must stop (credits, interruption), message running
-agents "commit what is verified, then stop" instead of killing them: a kill converts in-flight
-verified work back into future spend. Kill only when spend must stop this instant, then stash
-uncommitted edits and park a resume point in the queue (measured: one killed agent's full
-re-read, versus two whose partial commits survived). Salvaging a stash later: finish the
-*intent*, not the diff — an imported-but-unused name in stashed WIP is the fingerprint of the
-interrupted edit it was for. Reading one file out of a multi-file stash:
-`git diff 'stash@{0}^' 'stash@{0}' -- <path>` (the `stash show -p -- <path>` form errors).
-
-**A go is standing.** Once Titus has aimed work — "go", or "go on the things you proposed" —
-sessions keep moving through it and through the queue autonomously; the proposals block gates
-*text ratification*, never work he has already directed. Parking directed work behind another
-confirmation is the failure this sentence records.
-
+  What stayed here is what this repo is actually for: the PyTorch series under
+  `notebooks/pytorch-basics/`, and `_viz.py` / `_palette.py`, the figure vocabulary those
+  notebooks share. The theme work's only remaining trace is that the palette those figures
+  use was chosen by it.
+- The theme program's goal, history and standing verdicts live in
+  `~/src/theme-calibration/.claude/skills/theme-design/SKILL.md`.
 - Resume the interrupted series pass (stopped 2026-09-02, credits): 01 and 05 have partial
   commits pushed (through 55c45d6, d1614ea, 2e2e01d); 06 and 07 were mid-verification with
   nothing staged (07 had found a falsified claim: "hundred and twenty printed loss values" is
