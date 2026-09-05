@@ -37,8 +37,37 @@ POLARITY = ["#8f3413", "#d95926", "#eaa886", "#e8e8e6", "#93bae9", "#2a78d6", "#
 
 # Ink for text set on a known square fill — never on the page, whose color belongs to the
 # reader's theme. The pair show()'s contrast crossovers are calibrated against.
-INK_LIGHT = "#ffffff"
-INK_DARK = "#15181d"
+# >>> measured:viz-furniture
+# Written by theme-calibration (`python -m theme.appliers.viz`) from the published palette;
+# never by hand. The ink on a coloured data fill is the paper -- day's on the dark end of a
+# ramp, night's on the light end -- as it is on a button. The data palettes above are chosen
+# by discriminability and are not furniture: the applier refuses any write that changes them.
+INK_LIGHT = "#f9ecdd"
+INK_DARK = "#222325"
+
+# Graph FURNITURE, keyed by polarity: a chart's canvas is the code paper, the page under it
+# the notebook page, its axis ink the measured ink, tick labels the comment step, gridlines
+# and axis lines the border tint. Only the notebook knows which polarity it is read on
+# (mo.app_meta().theme), so both are here.
+FURNITURE = {
+    "day": {
+        "paper": "#f9ecdd",
+        "page": "#efe2d3",
+        "ink": "#474442",
+        "label": "#56524f",
+        "grid": "#cebda6",
+        "axis": "#cebda6",
+    },
+    "night": {
+        "paper": "#222325",
+        "page": "#1b1c1e",
+        "ink": "#c0bfc0",
+        "label": "#a2a2a4",
+        "grid": "#36383b",
+        "axis": "#36383b",
+    },
+}
+# <<< measured:viz-furniture
 
 
 def tint(color, toward_white):
