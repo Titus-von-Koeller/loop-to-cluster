@@ -42,7 +42,10 @@ def show(tensor, title=None, cell=54, facts=True):
 
     frame = pd.DataFrame([{"col": j, "row": i, "v": v} for i, row in enumerate(numbers) for j, v in enumerate(row)])
     # The gap between squares is left transparent, so it takes the color of whatever
-    # theme the notebook is being read in rather than a white I chose.
+    # theme the notebook is being read in rather than a white I chose. The chart's own
+    # background is transparent for the same reason: Vega-Lite paints a white canvas by
+    # default, which drew a white frame around every tensor on the cream paper (Titus,
+    # 2026-09-05: the raster is furniture, so it is the page's colour, never a literal).
     at = {
         "x": alt.X("col:O", axis=None, scale=alt.Scale(paddingInner=0.06)),
         "y": alt.Y("row:O", axis=None, scale=alt.Scale(paddingInner=0.06)),
@@ -74,7 +77,7 @@ def show(tensor, title=None, cell=54, facts=True):
             text=alt.Text("v:Q", format=digits),
             color=alt.condition(on_dark, alt.value(INK_LIGHT), alt.value(INK_DARK)),
         )
-    ).properties(width=cell * len(numbers[0]), height=cell * len(numbers))
+    ).properties(width=cell * len(numbers[0]), height=cell * len(numbers), background="transparent")
 
     caption = (
         f"`{tuple(values.shape)}` · `{str(values.dtype).removeprefix('torch.')}` · "
