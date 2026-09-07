@@ -3,8 +3,8 @@
 #
 # Captures one question for Marc without leaving the terminal: appends a line under
 # "## Open" in ~/src/orga/membrane/questions-for-marc.md and makes one pathspec-scoped
-# commit there, so the capture is the whole cost and the question is already Friday's
-# meeting content.
+# commit there, so the capture is the whole cost and the question is ready for the
+# next conversation. Q_ORGA_DIR can select another orga checkout for testing.
 #
 # The notebook column is a guess: the most recently modified NN-*.py in the working
 # directory, when there is one — run from notebooks/pytorch-basics it names the notebook
@@ -17,8 +17,17 @@ if [ $# -ne 1 ] || [ -z "$1" ]; then
 fi
 question=$1
 
-orga="$HOME/src/orga"
+orga="${Q_ORGA_DIR:-$HOME/src/orga}"
 file="$orga/membrane/questions-for-marc.md"
+
+# Serialize cooperating q writers across the complete read/edit/commit operation.
+# A lock file in Git's common directory stays out of the notes and survives file
+# replacement. Editors and other tools must coordinate separately; Git's index
+# lock alone protects commits, not the read-modify-write of the question file.
+git_dir=$(git -C "$orga" rev-parse --path-format=absolute --git-common-dir)
+exec {capture_lock}>"$git_dir/qcapture.lock"
+flock "$capture_lock"
+
 if ! grep -q '^## Open$' "$file"; then
     echo "q: no '## Open' heading in $file" >&2
     exit 1
@@ -36,14 +45,17 @@ entry="- $(date +%F) · ${notebook} · ${question}"
 # The entry goes at the end of the Open section: printed just before the first heading
 # that follows "## Open", or at end-of-file when no heading follows.
 tmp=$(mktemp)
-awk -v entry="$entry" '
+trap 'rm -f "$tmp"' EXIT
+# awk -v decodes backslash escapes. ENVIRON carries the original words literally,
+# including backslashes and actual newlines, without treating them as awk source.
+Q_CAPTURE_ENTRY="$entry" awk '
+    BEGIN { entry = ENVIRON["Q_CAPTURE_ENTRY"] }
     /^## / && seen_open && !placed { print entry; print ""; placed = 1 }
     { print }
     /^## Open$/ { seen_open = 1 }
     END { if (!placed) print entry }
 ' "$file" >"$tmp"
 cat "$tmp" >"$file"
-rm "$tmp"
 
 subject="membrane(questions): + ${question:0:50}"
 git -C "$orga" commit -q -m "$subject" -m "Membrane-Client: qcapture" -- membrane/questions-for-marc.md
