@@ -59,9 +59,9 @@ def _(mo):
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
-    > **Today's target** — run the notebook; consuming it means having watched one forward
-    > pass change dtype under `autocast`, having seen a weight update disappear in
-    > `bfloat16`, and having measured where 16-bit arithmetic pays and where it does not.
+    > **Today's target** — watch one forward pass change dtype under `autocast`, see a
+    > weight update disappear in `bfloat16`, and understand why the FP16 scaler skips
+    > a nonfinite-gradient step. The five-mode performance experiment is optional.
     >
     > **Depth line** — deeper than the tutorials. `torch.autocast` and `torch.amp.GradScaler`
     > are what every training framework's mixed-precision switch is built on, and every
@@ -69,8 +69,10 @@ def _(mo):
     > say what `autocast` does to one matrix multiply, why `bfloat16` needs no loss scaler
     > and `float16` does, and where the master weights live.
     >
-    > **Stop-line** — done means: ran it, could explain to Marc why the weights stay in
-    > `float32` while the matmuls run in 16 bits, questions captured — close it.
+    > **Stop-line** — explain why weights and their gradients stay `float32`, why matmuls
+    > can run in 16 bits, and what the scaler protects. Capture one assertion you could
+    > test in an Accelerate integration and any open question — then close it. Benchmark
+    > tuning is not a prerequisite for starting that PR.
     >
     > **Capture** — `scripts/q "your question"` appends it to Friday's file for Marc.
     """)
@@ -120,7 +122,16 @@ def _():
 
     device = torch.accelerator.current_accelerator().type if torch.accelerator.is_available() else "cpu"
     device
-    return DataLoader, NeuralNetwork, device, nn, test_data, time, torch, training_data
+    return (
+        DataLoader,
+        NeuralNetwork,
+        device,
+        nn,
+        test_data,
+        time,
+        torch,
+        training_data,
+    )
 
 
 @app.cell(hide_code=True)
@@ -168,7 +179,16 @@ def _():
         "bfloat16": OKABE_ITO["green"],
         "float16": OKABE_ITO["vermillion"],
     }
-    return FORMAT_COLORS, FURNITURE, INK_DARK, INK_LIGHT, OKABE_ITO, alt, pd, tint
+    return (
+        FORMAT_COLORS,
+        FURNITURE,
+        INK_DARK,
+        INK_LIGHT,
+        OKABE_ITO,
+        alt,
+        pd,
+        tint,
+    )
 
 
 @app.cell(hide_code=True)
@@ -324,7 +344,7 @@ def _(mo):
 
     Width is range. `float16` ends abruptly at 65 504 — one step further is infinity — and
     below $6 \times 10^{-5}$ it enters the *subnormal* numbers, where the spacing stops
-    shrinking, then reaches zero at $6 \times 10^{-8}$. `bfloat16` and `float32` continue
+    shrinking down to about $6 \times 10^{-8}$; smaller values can round to zero. `bfloat16` and `float32` continue
     far past both edges of this picture.
 
     Slide the probe. The cell casts one number into each format and reports what came back;
@@ -348,7 +368,17 @@ def _(formats, probe_exponent, torch):
 
 
 @app.cell(hide_code=True)
-def _(FORMAT_COLORS, alt, formats, furnish, mo, pd, probe, probe_exponent, torch):
+def _(
+    FORMAT_COLORS,
+    alt,
+    formats,
+    furnish,
+    mo,
+    pd,
+    probe,
+    probe_exponent,
+    torch,
+):
     def _spacing(values, dtype):
         """Each value once stored in dtype, and its distance to the next number dtype has."""
         stored = values.to(dtype)
@@ -634,9 +664,8 @@ def _(mo):
 
     ## Mixed: compute in 16, keep in 32
 
-    `torch.autocast` is a context manager that intercepts every operation inside it and
-    decides, per operation, which dtype it runs in. The decision is a fixed list, not a
-    heuristic, and it has three entries:
+    `torch.autocast` applies device-specific dtype rules to eligible operations inside
+    its context. For the CUDA operations used here, the important cases are:
 
     - **Down to 16 bits** — the operations that are expensive and tolerant: `matmul`,
       `linear`, `conv*`, `bmm`, and their relatives. Their `float32` inputs are cast on the
@@ -645,8 +674,12 @@ def _(mo):
       `log_softmax`, `cross_entropy`, `layer_norm`, `exp`, `log`, `pow`, `sum`, and the
       other reductions and losses, where a 16-bit intermediate would overflow or lose the
       small terms. Their 16-bit inputs are cast *up* on the way in.
-    - **Everything else** runs in whatever dtype its inputs already have, promoting to the
-      widest when they disagree.
+    - **Selected multi-input operations** promote to the widest input dtype. Unlisted
+      operations follow their own dtype rules; they are not automatically promoted.
+
+    In-place operations, calls with `out=`, and an explicit `dtype=` bypass autocasting.
+    The [operation reference](https://docs.pytorch.org/docs/stable/amp.html#autocast-op-reference)
+    identifies the eligible operations for each device.
 
     Nothing about the model changes. Its parameters stay `float32` — autocast casts a copy
     of each weight the first time an operation asks for it and caches that copy until the
@@ -740,7 +773,8 @@ def _(model, torch):
         for parameter in model.parameters():
             moving = parameter.grad != 0  # a zero gradient moves nothing in any format; count only the rest
             weight, update = parameter.detach()[moving], learning_rate * parameter.grad[moving]
-            swallowed += ((weight - update).to(dtype) == weight.to(dtype)).sum().item()
+            stored = weight.to(dtype)
+            swallowed += ((stored.float() - update).to(dtype) == stored).sum().item()
             total += moving.sum().item()
         return swallowed / total
 
@@ -753,6 +787,7 @@ def _(model, torch):
         }
         for learning_rate in (0.001, 0.01, 0.1)
     ]
+
     return (swallowed_shares,)
 
 
@@ -765,25 +800,27 @@ def _(mo, swallowed_shares):
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
-    At notebook 07's learning rate, a `bfloat16` model would leave almost every parameter
-    that had a gradient exactly where it was — every step, forever. The `float32` column is
-    the control: the same updates, applied at 23 bits of mantissa, essentially all land.
-    Note that the gradients are not the problem here; the small numbers were computed
-    correctly. The problem is purely the addition at the end, and keeping one `float32`
-    copy of the weights is the entire cost of fixing it.
+    The table counts nonzero updates that disappear for this gradient snapshot. It starts
+    from weights stored in the selected dtype, subtracts the original gradient's update
+    in `float32`, then rounds back to the storage dtype. This isolates update rounding;
+    it does not simulate an entire low-precision training run. Future gradients can change.
+    The `float32` column is the control: keeping the accumulating weights in `float32`
+    preserves much smaller updates than storing those weights in `bfloat16`.
 
-    ### Why `float16` needs a scaler and `bfloat16` does not
+    ### Why `float16` usually uses a scaler and `bfloat16` usually does not
 
-    The ruler showed `float16` reaching zero at $6 \times 10^{-8}$. Gradients of a deep
-    network routinely sit at $10^{-6}$ and below, and every such gradient a `float16`
-    backward pass produces is zero — silently, with no error. The fix is arithmetic: multiply
-    the loss by a large factor $S$ before `backward()`, so every gradient comes out $S$ times
-    larger and clears the floor; divide the gradients by $S$ before the optimizer uses them.
+    `float16`'s smallest positive normal value is about $6 \times 10^{-5}$; subnormals
+    extend to about $6 \times 10^{-8}$. A value near $10^{-6}$ is representable, while
+    sufficiently smaller values round to zero. Tiny gradients can therefore disappear
+    during the FP16 backward pass even though parameter gradients are stored in FP32.
+    Autocast selects operation dtypes; loss scaling addresses this separate underflow
+    problem. Multiply the loss by a factor $S$ before `backward()` to enlarge the
+    gradients, then unscale them before the optimizer uses them.
     That is all `torch.amp.GradScaler` does, plus one piece of adaptivity: $S$ starts at
     $2^{16}$, and whenever a scaled gradient overflows to `inf` the scaler *skips that
     optimizer step* and halves $S$; after 2 000 consecutive clean steps it doubles $S$ again.
-    The scale hunts for the largest value the gradients can bear. `bfloat16` has `float32`'s
-    exponent, so its floor is $10^{-38}$ and none of this machinery is needed.
+    `bfloat16` has the same exponent width as `float32`, so its much wider range normally
+    makes loss scaling unnecessary. Neither dtype nor scaling guarantees stable training.
 
     The cell runs five `float16` steps and poisons the third gradient with an `inf` by
     hand. Watch the scale and the weights.
@@ -792,19 +829,22 @@ def _(mo):
 
 
 @app.cell
-def _(device, model, nn, torch):
+def _(NeuralNetwork, device, nn, torch):
+    # A fresh model keeps reruns independent of the earlier dtype/weight exhibits.
+    torch.manual_seed(0)
+    _scaler_model = NeuralNetwork().to(device)
     # The defaults: init_scale=65536, growth_factor=2, backoff_factor=0.5, growth_interval=2000
     scaler = torch.amp.GradScaler(device)
-    optimizer = torch.optim.SGD(model.parameters(), lr=0.1)
+    optimizer = torch.optim.SGD(_scaler_model.parameters(), lr=0.1)
     images_16 = torch.rand(64, 1, 28, 28, device=device)
     labels_16 = torch.randint(0, 10, (64,), device=device)
-    first_weight = model.linear_relu_stack[0].weight
+    first_weight = _scaler_model.linear_relu_stack[0].weight
 
     scaler_trace = []
     for step in range(5):
         optimizer.zero_grad()
         with torch.autocast(device_type=device, dtype=torch.float16):
-            loss_16 = nn.functional.cross_entropy(model(images_16), labels_16)
+            loss_16 = nn.functional.cross_entropy(_scaler_model(images_16), labels_16)
         scaler.scale(loss_16).backward()  # gradients arrive multiplied by the scale
         if step == 2:
             first_weight.grad[0, 0] = float("inf")  # what an overflow in the backward pass looks like
@@ -819,6 +859,7 @@ def _(device, model, nn, torch):
                 "note": "gradient poisoned with inf" if step == 2 else "",
             }
         )
+
     return (scaler_trace,)
 
 
@@ -834,7 +875,7 @@ def _(mo):
     Step 2 — the poisoned one — leaves the weights exactly where they were and halves the
     scale from 65 536 to 32 768; the steps around it move the weights and leave the scale
     alone. A real overflow is handled the same way: the batch is lost, the scale drops, and
-    training continues. A `GradScaler` on a `bfloat16` model is harmless and pointless;
+    training continues. BF16 autocast normally needs no enabled scaler;
     `torch.amp.GradScaler(device, enabled=False)` is the idiom that lets one loop serve both,
     and the loop below uses it.
 
@@ -875,7 +916,7 @@ def _(device, torch):
 
     def test_loop(dataloader, model, loss_fn, autocast_dtype=None):
         model.eval()
-        size, num_batches = len(dataloader.dataset), len(dataloader)
+        size = len(dataloader.dataset)
         test_loss, correct = 0.0, 0
         with (
             torch.no_grad(),
@@ -884,9 +925,9 @@ def _(device, torch):
             for X, y in dataloader:
                 X, y = X.to(device), y.to(device)
                 pred = model(X)
-                test_loss += loss_fn(pred, y).item()
+                test_loss += loss_fn(pred, y).item() * len(y)
                 correct += (pred.argmax(1) == y).to(torch.float32).sum().item()
-        return {"loss": test_loss / num_batches, "accuracy": correct / size}
+        return {"loss": test_loss / size, "accuracy": correct / size}
 
     return test_loop, train_loop
 
@@ -1095,7 +1136,13 @@ def _(device, test_data, torch, training_data):
         def __len__(self):
             return len(self.batches)
 
-    return ResidentBatches, test_images, test_labels, train_images, train_labels
+    return (
+        ResidentBatches,
+        test_images,
+        test_labels,
+        train_images,
+        train_labels,
+    )
 
 
 @app.cell
@@ -1137,6 +1184,7 @@ def _(
         history = train_loop(batches, model, loss_fn, optimizer, scaler, autocast_dtype)
         torch.accelerator.synchronize()
         seconds_per_step = (time.perf_counter() - started) / len(batches)
+        peak_mib = torch.cuda.max_memory_allocated() / 2**20 if device == "cuda" else float("nan")
         torch.set_float32_matmul_precision("highest")
 
         test = test_loop(
@@ -1147,7 +1195,7 @@ def _(
             "mode": mode,
             "ms per step": seconds_per_step * 1e3,
             "TFLOP/s": 6 * parameters * batch_size / seconds_per_step / 1e12,
-            "peak MiB": torch.cuda.max_memory_allocated() / 2**20 if device == "cuda" else float("nan"),
+            "peak MiB": peak_mib,
             "test accuracy": test["accuracy"],
             "final loss": history[-1]["loss"],
             "parameters": parameters,
@@ -1157,7 +1205,15 @@ def _(
 
 
 @app.cell
-def _(PRECISION_MODES, batch_pick, mo, rate_pick, start_comparison, train_one_epoch, width_pick):
+def _(
+    PRECISION_MODES,
+    batch_pick,
+    mo,
+    rate_pick,
+    start_comparison,
+    train_one_epoch,
+    width_pick,
+):
     mo.stop(
         mo.running_in_notebook() and not start_comparison.value,
         mo.md("Set the shape above, then press **Train five ways**. Nothing runs until you do."),
@@ -1172,7 +1228,18 @@ def _(PRECISION_MODES, batch_pick, mo, rate_pick, start_comparison, train_one_ep
 
 
 @app.cell(hide_code=True)
-def _(FORMAT_COLORS, OKABE_ITO, PRECISION_MODES, alt, batch_pick, comparison, furnish, mo, pd, width_pick):
+def _(
+    FORMAT_COLORS,
+    OKABE_ITO,
+    PRECISION_MODES,
+    alt,
+    batch_pick,
+    comparison,
+    furnish,
+    mo,
+    pd,
+    width_pick,
+):
     _colors = {
         "float32": FORMAT_COLORS["float32"],
         "TF32": FORMAT_COLORS["TF32"],

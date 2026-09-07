@@ -277,16 +277,15 @@ def _(mo):
 def _(device, torch):
     def test(dataloader, model, loss_fn):
         size = len(dataloader.dataset)
-        num_batches = len(dataloader)
         model.eval()
         test_loss, correct = (0, 0)
         with torch.no_grad():
             for X, _y in dataloader:
                 X, _y = (X.to(device), _y.to(device))
                 pred = model(X)
-                test_loss = test_loss + loss_fn(pred, _y).item()
+                test_loss = test_loss + loss_fn(pred, _y).item() * len(_y)
                 correct = correct + (pred.argmax(1) == _y).type(torch.float).sum().item()
-        test_loss = test_loss / num_batches
+        test_loss = test_loss / size
         correct = correct / size
         print(f"Test Error: \n Accuracy: {100 * correct:>0.1f}%, Avg loss: {test_loss:>8f} \n")
 
