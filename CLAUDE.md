@@ -55,6 +55,8 @@ variables — never reaches it. Cells there are governed by VSCode's `editor.*` 
 
 ## Editing notebooks
 
+Read [the shared notebook authoring guidance](notebooks/pytorch-basics/AGENTS.md) when changing this series.
+
 A marimo notebook is a Python file: each cell is a function body, the last expression
 statement is what renders, the `return` tuple is what other cells may use, an underscore
 prefix keeps a name cell-local, and a top-level name may be defined by exactly one cell in

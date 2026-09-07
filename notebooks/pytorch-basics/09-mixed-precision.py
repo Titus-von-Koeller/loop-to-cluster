@@ -359,7 +359,9 @@ def _(mo):
 
     Move the probe and compare **stored value**, **relative error** and **spacing**.
     Try $10^{-8}$ and $10^5$: one tests FP16's lower end, the other its upper end.
-    The cell reports actual casts; the chart explains the grid those casts land on.
+    In the visible cell, `torch.nextafter` finds the stored number's next neighbor;
+    their difference measures the spacing. The chart uses that same `neighbor_spacing`
+    function, so the code you read determines the grid you see.
     """)
     return
 
@@ -373,23 +375,22 @@ def _(mo):
 
 @app.cell
 def _(formats, probe_exponent, torch):
+    def neighbor_spacing(values, dtype):
+        stored = values.to(dtype)
+        next_number = torch.nextafter(stored, torch.full_like(stored, float("inf")))
+        return stored.to(torch.float64), next_number.to(torch.float64) - stored.to(torch.float64)
+
     probe = torch.tensor(10.0**probe_exponent.value, dtype=torch.float64)
     {name: probe.to(dtype).item() for name, dtype in formats.items()}
-    return (probe,)
+    return neighbor_spacing, probe
 
 
 @app.cell(hide_code=True)
-def _(FORMAT_COLORS, alt, formats, furnish, mo, pd, probe, probe_exponent, torch):
-    def _spacing(values, dtype):
-        """Each value once stored in dtype, and its distance to the next number dtype has."""
-        stored = values.to(dtype)
-        up = torch.nextafter(stored, torch.full_like(stored, float("inf")))
-        return stored.to(torch.float64), up.to(torch.float64) - stored.to(torch.float64)
-
+def _(FORMAT_COLORS, alt, formats, furnish, mo, neighbor_spacing, pd, probe, probe_exponent, torch):
     _grid = torch.logspace(-8.5, 6.5, 400, dtype=torch.float64)
     _rows = []
     for _name, _dtype in formats.items():
-        _stored, _ulp = _spacing(_grid, _dtype)
+        _stored, _ulp = neighbor_spacing(_grid, _dtype)
         for _x, _s, _u in zip(_grid.tolist(), _stored.tolist(), _ulp.tolist(), strict=True):
             if _s != 0 and _s != float("inf"):
                 _rows.append({"format": _name, "magnitude": _x, "spacing": _u})
@@ -406,7 +407,7 @@ def _(FORMAT_COLORS, alt, formats, furnish, mo, pd, probe, probe_exponent, torch
 
     _probe_rows, _marks = [], []
     for _name, _dtype in formats.items():
-        _stored, _ulp = (t.item() for t in _spacing(probe.reshape(1), _dtype))
+        _stored, _ulp = (t.item() for t in neighbor_spacing(probe.reshape(1), _dtype))
         _finite = 0 < abs(_stored) < float("inf")
         _probe_rows.append(
             {
@@ -484,42 +485,49 @@ def _(mo):
 
 @app.cell
 def _(formats, torch):
-    def add_thousandths(dtype, times=1000):
+    def trace_additions(dtype, increment, steps):
         total = torch.tensor(0.0, dtype=dtype)
-        for _ in range(times):
-            total = total + torch.tensor(0.001, dtype=dtype)
-        return total.item()
+        trace = [total.item()]
+        for _ in range(steps):
+            total = total + torch.tensor(increment, dtype=dtype)
+            trace.append(total.item())
+        return trace
+
+    addition_increment = 0.001
+    addition_count = 1000
+    addition_traces = {
+        name: trace_additions(dtype, addition_increment, addition_count) for name, dtype in formats.items()
+    }
 
     {
         "70 000 in float16": torch.tensor(70_000.0).to(torch.float16).item(),
         "1e-8 in float16": torch.tensor(1e-8).to(torch.float16).item(),
         "1e-8 in bfloat16": torch.tensor(1e-8).to(torch.bfloat16).item(),
-        "0.001 added 1000 times": {name: add_thousandths(dtype) for name, dtype in formats.items()},
+        "final running totals": {name: trace[-1] for name, trace in addition_traces.items()},
     }
-    return
+    return addition_count, addition_increment, addition_traces
 
 
 @app.cell(hide_code=True)
-def _(FORMAT_COLORS, alt, formats, furnish, mo, pd, torch):
-    _rows = []
-    for _name, _dtype in formats.items():
-        _total = torch.tensor(0.0, dtype=_dtype)
-        for _step in range(1, 1001):
-            _total = _total + torch.tensor(0.001, dtype=_dtype)
-            if _step % 5 == 0:
-                _rows.append({"format": _name, "additions": _step, "total": _total.item()})
+def _(FORMAT_COLORS, addition_count, addition_increment, addition_traces, alt, furnish, mo, pd):
+    _rows = [
+        {"format": name, "additions": step, "total": total}
+        for name, trace in addition_traces.items()
+        for step, total in enumerate(trace)
+        if step % 5 == 0 or step == addition_count
+    ]
     _frame = pd.DataFrame(_rows)
-    _ideal = pd.DataFrame({"additions": [0, 1000], "total": [0, 1.0]})
+    _ideal = pd.DataFrame({"additions": [0, addition_count], "total": [0, addition_count * addition_increment]})
     _chart = (
         alt.Chart(_ideal).mark_line(color="gray", strokeDash=[3, 3], opacity=0.6).encode(x="additions:Q", y="total:Q")
         + alt.Chart(_frame)
         .mark_line(strokeWidth=2)
         .encode(
-            x=alt.X("additions:Q", title="additions of 0.001"),
+            x=alt.X("additions:Q", title=f"additions of {addition_increment:g}"),
             y=alt.Y("total:Q", title="running total"),
             color=alt.Color(
                 "format:N",
-                scale=alt.Scale(domain=list(formats), range=[FORMAT_COLORS[name] for name in formats]),
+                scale=alt.Scale(domain=list(addition_traces), range=[FORMAT_COLORS[name] for name in addition_traces]),
                 legend=alt.Legend(title=None, orient="top-left"),
             ),
             tooltip=["format:N", "additions:Q", alt.Tooltip("total:Q", format=".4f")],
@@ -529,9 +537,11 @@ def _(FORMAT_COLORS, alt, formats, furnish, mo, pd, torch):
         [
             furnish(_chart),
             mo.md(
-                "<small>The running total of a thousand additions of 0.001, per format; the dashed line is the exact "
-                "answer. `bfloat16` stalls at 0.5, where its spacing is 0.0039 and 0.001 is less than half a step; "
-                "`float16` bends past 0.5 for the same reason, more gently.</small>"
+                f"<small>The chart reads `addition_traces` from the visible experiment above; "
+                f"the dashed line is the ideal total, {addition_count * addition_increment:g}. "
+                "With the initial settings, BF16 stalls at 0.5: its spacing there is 0.00390625, "
+                "and an increment of 0.001 is less than half a step. Change the visible inputs "
+                "and rerun that cell to test a different case.</small>"
             ),
         ],
         align="center",
@@ -625,7 +635,11 @@ def _(NeuralNetwork, device, nn, torch):
     dtypes["linear_relu_stack[0].weight"] = model.linear_relu_stack[0].weight.dtype
     dtypes["linear_relu_stack[0].weight.grad"] = model.linear_relu_stack[0].weight.grad.dtype
     dtypes["torch.get_autocast_dtype(device) — the default when dtype= is omitted"] = torch.get_autocast_dtype(device)
-    return dtypes, model
+    # Export a fresh snapshot: marimo cannot track later in-place changes to model.grad.
+    weight_gradient_snapshot = [
+        (parameter.detach().clone(), parameter.grad.detach().clone()) for parameter in model.parameters()
+    ]
+    return dtypes, weight_gradient_snapshot
 
 
 @app.cell(hide_code=True)
@@ -657,17 +671,21 @@ def _(mo):
     The next experiment asks a narrow counterfactual: keep this gradient snapshot,
     but store the updated weights in a different dtype. Among parameters with nonzero
     gradients, how many would not move? Predict which learning rate loses the most.
+    The preceding cell clones the weights and gradients into `weight_gradient_snapshot`.
+    This matters in a reactive notebook: marimo tracks dependencies between cells,
+    not later in-place changes inside a model. Rerun the forward/backward cell to
+    produce a new snapshot; rerunning the display does not train the model.
     """)
     return
 
 
 @app.cell
-def _(model, torch):
+def _(torch, weight_gradient_snapshot):
     def share_swallowed(dtype, learning_rate):
         swallowed = total = 0
-        for parameter in model.parameters():
-            moving = parameter.grad != 0  # a zero gradient moves nothing in any format; count only the rest
-            weight, update = parameter.detach()[moving], learning_rate * parameter.grad[moving]
+        for weight_snapshot, gradient_snapshot in weight_gradient_snapshot:
+            moving = gradient_snapshot != 0  # zero gradients move nothing; count only the rest
+            weight, update = weight_snapshot[moving], learning_rate * gradient_snapshot[moving]
             stored = weight.to(dtype)
             swallowed += ((stored.float() - update).to(dtype) == stored).sum().item()
             total += moving.sum().item()
@@ -726,19 +744,19 @@ def _(mo):
 @app.cell
 def _(NeuralNetwork, device, nn, torch):
     torch.manual_seed(0)
-    _scaler_model = NeuralNetwork().to(device)
+    scaler_demo_model = NeuralNetwork().to(device)
     # The defaults: init_scale=65536, growth_factor=2, backoff_factor=0.5, growth_interval=2000
     scaler = torch.amp.GradScaler(device)
-    optimizer = torch.optim.SGD(_scaler_model.parameters(), lr=0.1)
+    optimizer = torch.optim.SGD(scaler_demo_model.parameters(), lr=0.1)
     images_16 = torch.rand(64, 1, 28, 28, device=device)
     labels_16 = torch.randint(0, 10, (64,), device=device)
-    first_weight = _scaler_model.linear_relu_stack[0].weight
+    first_weight = scaler_demo_model.linear_relu_stack[0].weight
 
     scaler_trace = []
     for step in range(5):
         optimizer.zero_grad()
         with torch.autocast(device_type=device, dtype=torch.float16):
-            loss_16 = nn.functional.cross_entropy(_scaler_model(images_16), labels_16)
+            loss_16 = nn.functional.cross_entropy(scaler_demo_model(images_16), labels_16)
         scaler.scale(loss_16).backward()  # gradients arrive multiplied by the scale
         if step == 2:
             first_weight.grad[0, 0] = float("inf")  # what an overflow in the backward pass looks like
