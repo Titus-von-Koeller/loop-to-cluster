@@ -32,26 +32,23 @@ def _(mo):
     mo.md(r"""
     *PyTorch basics, 9 of 9 — before this: [Save & Load Model](08-save-load-run.py)*
 
-    # Mixed Precision
+    # Mixed precision: spend accuracy where it buys learning
 
-    Every tensor in the eight notebooks before this one was `float32`: four bytes per
-    number, about seven decimal digits, a range up to $3.4 \times 10^{38}$. The tensor cores
-    on the GPU in this machine multiply 16-bit matrices several times faster than 32-bit
-    ones — the exact factor is measured below — and a 16-bit activation takes half the
-    memory. So why not train in 16 bits?
+    A training step does two different kinds of work. It estimates a direction from a
+    minibatch, then adds a small correction to weights that may have survived thousands
+    of earlier steps. Those operations need not have the same numerical precision.
+    An approximate matrix multiply may give a useful direction. A weight update that
+    rounds away contributes nothing, however useful that direction was.
 
-    Because two of the three things a training loop does with a number are safe in 16
-    bits and the third is not. Multiplying and adding activations survives the loss of
-    precision. Adding a tiny update to a weight does not: the update rounds away and the
-    weight never moves. *Mixed* precision is the arrangement that puts each operation in
-    the format it can afford — compute in 16 bits, keep the weights in 32. This notebook
-    builds that arrangement up from the bits, then applies it to the training loop of
-    [notebook 07](07-optimization-loop.py), which changes by four lines.
+    Mixed precision exploits this difference. We use less expensive arithmetic for
+    selected operations while retaining enough precision where information must survive.
+    It is a numerical design, not a promise that every 16-bit computation is harmless.
+    The question throughout this notebook is: **where could information disappear,
+    and which part of the recipe protects it?**
 
-    ## Prerequisite Code
-
-    The model, data and loaders are notebook 07's, with one addition: the hidden width is a
-    parameter of `NeuralNetwork`, because the last section needs a wider model.
+    You will build the answer from representable numbers, follow one real forward and
+    backward pass, and reconstruct the training loop. The larger benchmarks come last.
+    You can understand the mechanism without waiting for an epoch to finish.
     """)
     return
 
@@ -59,22 +56,28 @@ def _(mo):
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
-    > **Today's target** — watch one forward pass change dtype under `autocast`, see a
-    > weight update disappear in `bfloat16`, and understand why the FP16 scaler skips
-    > a nonfinite-gradient step. The five-mode performance experiment is optional.
-    >
-    > **Depth line** — deeper than the tutorials. `torch.autocast` and `torch.amp.GradScaler`
-    > are what every training framework's mixed-precision switch is built on, and every
-    > distributed recipe from here on assumes them. The depth that matters is being able to
-    > say what `autocast` does to one matrix multiply, why `bfloat16` needs no loss scaler
-    > and `float16` does, and where the master weights live.
-    >
-    > **Stop-line** — explain why weights and their gradients stay `float32`, why matmuls
-    > can run in 16 bits, and what the scaler protects. Capture one assertion you could
-    > test in an Accelerate integration and any open question — then close it. Benchmark
-    > tuning is not a prerequisite for starting that PR.
-    >
-    > **Capture** — `scripts/q "your question"` appends it to Friday's file for Marc.
+    ## A route through the notebook
+
+    First, predict what rounding will do to a number. Then follow the dtypes through
+    `Linear → ReLU → Linear → loss → backward`. Finally, explain two protections:
+    FP32 weight storage preserves small updates; loss scaling helps small gradients
+    survive an FP16 backward pass. They solve different problems.
+
+    The essential stopping point is **Read the loop as a numerical policy**. The
+    training buttons and matrix benchmark are optional experiments, not admission
+    tests for understanding. Take whichever question interests you into them.
+
+    **Terms.** FP32 means `float32`, FP16 means `float16`, and BF16 means `bfloat16`.
+    Automatic mixed precision (AMP) combines operation-specific dtype selection with
+    gradient scaling when needed. CUDA examples here target the NVIDIA GPU; policies
+    and hardware support differ on other devices.
+
+    ### The familiar model
+
+    We reuse notebook 07's FashionMNIST multilayer perceptron (MLP). Only its hidden
+    width is parameterized for the optional performance experiment. Images and model
+    parameters begin in FP32; class labels remain integers. Precision selection is
+    not a reason to cast labels or the whole model to a floating-point format.
     """)
     return
 
@@ -137,22 +140,28 @@ def _():
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
-    ## Three ways to spend 16 bits
+    ## Range and resolution are different resources
 
-    A floating-point number is three fields: a **sign** bit, an **exponent** that sets the
-    magnitude (how far the binary point slides), and a **mantissa** that sets the digits
-    (how finely the numbers between two powers of two are spaced). More exponent bits buy
-    *range*; more mantissa bits buy *precision*; a format has to choose.
+    A floating-point number stores a sign, an exponent and a fraction. For a normal
+    binary number its value is $(-1)^s\,2^e(1.f)$. The leading 1 is implicit: the
+    fraction field supplies the bits after it. More exponent bits give a wider
+    **range**. More fraction bits give finer **spacing** within that range.
 
-    `float32` spends 8 bits on exponent and 23 on mantissa. The two 16-bit formats split the
-    savings differently. `float16` (IEEE half precision) keeps most of the digits — 10
-    mantissa bits — and pays with a 5-bit exponent, so its range collapses to about
-    $6 \times 10^{-5}$ … $65\,504$. `bfloat16` (Google's *brain float*) is simply `float32`
-    with the last 16 bits cut off: the same 8-bit exponent, so the same range, and only 7
-    mantissa bits, so about two decimal digits. The fourth row, **TF32**, is not a storage
-    format at all — it is what an NVIDIA tensor core reads out of a `float32` input when it
-    is allowed to: the full exponent and the top 10 mantissa bits, the rest dropped.
-    `torch.finfo` reports each format's limits; the picture under it is the layout.
+    | Format | Storage | Exponent bits | Stored fraction bits | What it gives up |
+    | --- | --- | --- | --- | --- |
+    | FP32 | 32 bits | 8 | 23 | Our higher-precision baseline |
+    | FP16 | 16 bits | 5 | 10 | Much of FP32's range |
+    | BF16 | 16 bits | 8 | 7 | More resolution, to retain a similar range |
+
+    FP16's smallest positive *normal* value is about $6.10\times10^{-5}$; subnormals
+    extend down to $5.96\times10^{-8}$. Its largest finite value is 65,504. BF16 has
+    FP32's exponent width, but not all its exact endpoints or representable values.
+    Converting FP32 to BF16 rounds to a coarser grid; it is not generally a bit chop.
+
+    **TensorFloat-32 (TF32)** belongs in a different category. It is an NVIDIA matrix
+    arithmetic mode with an 8-bit exponent and 10 fraction bits of input precision,
+    with FP32 accumulation. The tensors can still be stored as FP32. The diagram's
+    TF32 row illustrates arithmetic precision, not a tensor storage dtype.
     """)
     return
 
@@ -175,7 +184,7 @@ def _():
     # sibling (same exponent, shorter mantissa), so it takes the lighter blue.
     FORMAT_COLORS = {
         "float32": BASE,
-        "TF32": OKABE_ITO["sky"],
+        "FP32 high": OKABE_ITO["sky"],
         "bfloat16": OKABE_ITO["green"],
         "float16": OKABE_ITO["vermillion"],
     }
@@ -237,7 +246,7 @@ def _(FORMAT_COLORS, INK_DARK, INK_LIGHT, alt, furnish, mo, pd, tint):
             if _width == 0:
                 continue
             _key = f"{_name} {_role}"
-            _hue = FORMAT_COLORS[_name]
+            _hue = FORMAT_COLORS["FP32 high" if _name == "TF32" else _name]
             # Role is carried by lightness of the format's own hue: sign is ink, the
             # exponent the hue itself, the mantissa a tint of it, dropped bits nearly paper.
             _colors[_key] = {
@@ -254,7 +263,7 @@ def _(FORMAT_COLORS, INK_DARK, INK_LIGHT, alt, furnish, mo, pd, tint):
                     "start": _start,
                     "end": _start + _width,
                     "mid": _start + _width / 2,
-                    "label": {"sign": "±", "dropped": f"{_width} bits the tensor core drops"}.get(
+                    "label": {"sign": "±", "dropped": f"{_width} omitted fraction bits"}.get(
                         _role, f"{_role} · {_width}"
                     ),
                     "ink": INK_LIGHT if _role in ("sign", "exponent") else INK_DARK,
@@ -291,7 +300,8 @@ def _(FORMAT_COLORS, INK_DARK, INK_LIGHT, alt, furnish, mo, pd, tint):
             furnish(_picture),
             mo.md(
                 "<small>The four layouts, most significant bit at the left. `bfloat16` is the top half of "
-                "`float32`; `float16` trades three exponent bits for three more of mantissa; TF32 reads "
+                "`float32` layout; conversion rounds. `float16` trades three exponent bits for three more "
+                "fraction bits; TF32 arithmetic uses "
                 "19 of a `float32`'s 32 bits.</small>"
             ),
         ],
@@ -304,21 +314,24 @@ def _(FORMAT_COLORS, INK_DARK, INK_LIGHT, alt, furnish, mo, pd, tint):
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
-    ### Counting
+    ### Predict the first missing integer
 
-    The mantissa decides how far a format can count in whole numbers before it skips one:
-    an integer needs as many significant bits as its length, and the mantissa has one more
-    bit than it stores (a leading 1 that is implied, never written). Predict the three
-    numbers before running the cell: `float16` has 10 stored bits, `bfloat16` has 7,
-    `float32` has 23.
+    With $p$ significant bits, every integer through $2^p$ is representable. Immediately
+    above that boundary the spacing becomes 2, so $2^p+1$ is the first missing integer.
+    Here $p$ includes the implicit leading bit: 11 for FP16, 8 for BF16, 24 for FP32.
+
+    Predict each result, then inspect just the five integers around its boundary.
+    A local example is enough; we do not need to allocate millions of numbers.
     """)
     return
 
 
 @app.cell
 def _(formats, torch):
-    def first_uncountable(dtype, upto=2**25):
-        integers = torch.arange(upto, dtype=torch.float64)
+    def first_uncountable(dtype):
+        significant_bits = round(1 - torch.log2(torch.tensor(torch.finfo(dtype).eps)).item())
+        boundary = 2**significant_bits
+        integers = torch.arange(boundary - 2, boundary + 3, dtype=torch.float64)
         skipped = integers[integers.to(dtype).to(torch.float64) != integers]
         return int(skipped[0])
 
@@ -329,26 +342,24 @@ def _(formats, torch):
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
-    $2^{11} + 1 = 2049$, $2^{8} + 1 = 257$, $2^{24} + 1 = 16\,777\,217$. A `bfloat16` cannot
-    tell 257 from 256; in its neighbourhood the representable numbers are two apart. That
-    is not a corner case — it is the format's resolution at every magnitude: about one part
-    in 256, everywhere from $10^{-38}$ to $10^{38}$.
+    The missing integers are 2,049, 257 and 16,777,217 for FP16, BF16 and FP32.
+    BF16 rounds 257 to 256 under round-to-nearest, ties-to-even. It can represent 258;
+    it has not run out of range, only of resolution at this magnitude.
 
-    ### The ruler
+    ### A ruler whose tick spacing changes
 
-    The picture below is the spacing between one representable number and the next — the
-    *unit in the last place*, or ulp — against the number's magnitude, for each format. Each
-    line is a staircase because the spacing doubles at every power of two, and the height of
-    a line is the format's precision: the `bfloat16` staircase sits eight times higher than
-    `float16`'s, `float16`'s eight thousand times higher than `float32`'s.
+    The distance to the next representable number is a *unit in the last place* (ULP).
+    For normal numbers, spacing doubles at each power of two. Relative resolution
+    therefore stays roughly constant, not absolute resolution. At the same magnitude,
+    BF16's spacing is eight times FP16's, and FP16's is 8,192 times FP32's.
 
-    Width is range. `float16` ends abruptly at 65 504 — one step further is infinity — and
-    below $6 \times 10^{-5}$ it enters the *subnormal* numbers, where the spacing stops
-    shrinking down to about $6 \times 10^{-8}$; smaller values can round to zero. `bfloat16` and `float32` continue
-    far past both edges of this picture.
+    Near zero, subnormals keep a fixed absolute spacing and progressively lose relative
+    precision. Some arithmetic paths flush subnormals to zero. A storage-format limit
+    does not guarantee every hardware operation preserves values down to that limit.
 
-    Slide the probe. The cell casts one number into each format and reports what came back;
-    the marks on the chart follow it.
+    Move the probe and compare **stored value**, **relative error** and **spacing**.
+    Try $10^{-8}$ and $10^5$: one tests FP16's lower end, the other its upper end.
+    The cell reports actual casts; the chart explains the grid those casts land on.
     """)
     return
 
@@ -368,17 +379,7 @@ def _(formats, probe_exponent, torch):
 
 
 @app.cell(hide_code=True)
-def _(
-    FORMAT_COLORS,
-    alt,
-    formats,
-    furnish,
-    mo,
-    pd,
-    probe,
-    probe_exponent,
-    torch,
-):
+def _(FORMAT_COLORS, alt, formats, furnish, mo, pd, probe, probe_exponent, torch):
     def _spacing(values, dtype):
         """Each value once stored in dtype, and its distance to the next number dtype has."""
         stored = values.to(dtype)
@@ -464,15 +465,19 @@ def _(
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
-    ### Three ways to lose a number
+    ### Three ways information disappears
 
-    Each format fails in its own place. `float16` fails at the edges of the ruler: a value
-    past 65 504 becomes infinity (*overflow*), and a gradient of $10^{-8}$ becomes exactly
-    zero (*underflow*) — both are ordinary sizes for activations and gradients in a deep
-    network. `bfloat16` never runs off either edge, but it fails in the middle: adding a
-    small number to a larger one rounds the sum back to the larger one, because the small
-    number is less than half a step on the ruler at that magnitude. Predict what a thousand
-    additions of 0.001 come to in each format before running the cell.
+    **Overflow:** 70,000 cannot be stored as finite FP16. **Underflow:** $10^{-8}$
+    rounds to zero in FP16. **Update rounding:** a small addition can round back to
+    the original value even when both operands are individually representable.
+
+    BF16 avoids those two particular FP16 range failures; it can still overflow or
+    underflow at more extreme magnitudes. Its coarser spacing makes update rounding
+    especially easy to encounter.
+
+    Predict the result of adding 0.001 a thousand times. Each addition is rounded back
+    into the selected storage dtype. This is deliberately different from a tensor-core
+    dot product that accumulates products in a wider format.
     """)
     return
 
@@ -538,157 +543,40 @@ def _(FORMAT_COLORS, alt, formats, furnish, mo, pd, torch):
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
-    A weight update is exactly the third failure: $w \leftarrow w - \eta\, g$ adds a small
-    number to a larger one. With notebook 07's learning rate of 0.001 and a gradient of
-    0.01, the update is $10^{-5}$ on a weight of size 0.03 — where `bfloat16`'s spacing is
-    $2^{-13} \approx 1.2 \times 10^{-4}$. The update is a twelfth of a step. It rounds away,
-    and the weight is exactly what it was. That single fact is why the weights in a
-    mixed-precision loop are kept in `float32`; the section on master weights below counts
-    how many updates of the real model it would swallow.
+    The stalled sum is the important surprise: making 0.001 representable did not make
+    repeated addition accurate. As the total grew, its spacing grew too. Eventually
+    the new contribution could no longer move it to the next tick.
 
-    ## Where the speed comes from
-
-    Since the Volta generation, an NVIDIA GPU carries **tensor cores**: units that
-    multiply small matrix tiles in one instruction, and only in the reduced formats. The
-    ordinary `float32` path runs on the general-purpose cores and does one multiply-add per
-    lane per cycle. The cell below times a square matrix multiply in four modes and reports
-    the achieved rate. The two `float32` rows differ only in one global switch:
-    `torch.set_float32_matmul_precision("high")` lets the tensor cores read `float32`
-    inputs as TF32 — 10 mantissa bits instead of 23 — and return a `float32` result.
+    A stochastic gradient descent (SGD) update has the same shape:
+    $w\leftarrow w-\eta g$. With $\eta=0.001$ and $g=0.01$, the update is $10^{-5}$.
+    Near a weight of 0.03, BF16's spacing is about $1.22\times10^{-4}$. That update can
+    disappear when the result is stored in BF16, even if we computed the subtraction
+    in FP32. Wider intermediate arithmetic and wider persistent storage are separate
+    protections. We will measure this distinction on the model's actual gradients.
     """)
     return
 
 
 @app.cell(hide_code=True)
 def _(mo):
-    matmul_size = mo.ui.slider(steps=[1024, 2048, 4096, 8192], value=4096, label="matrix side", show_value=True)
-    matmul_size
-    return (matmul_size,)
-
-
-@app.cell
-def _(device, matmul_size, time, torch):
-    def timed(operation, repeats=20):
-        for _ in range(3):
-            operation()  # warm-up: the first call of each kernel pays for loading it
-        torch.accelerator.synchronize()
-        started = time.perf_counter()
-        for _ in range(repeats):
-            operation()
-        torch.accelerator.synchronize()
-        return (time.perf_counter() - started) / repeats
-
-    n = matmul_size.value
-    a = torch.randn(n, n, device=device, generator=torch.Generator(device).manual_seed(0))
-    b = torch.randn(n, n, device=device, generator=torch.Generator(device).manual_seed(1))
-    reference = a.to(torch.float64) @ b.to(torch.float64)
-
-    matmul_modes = {
-        "float32": ("highest", torch.float32),
-        "TF32": ("high", torch.float32),
-        "bfloat16": ("highest", torch.bfloat16),
-        "float16": ("highest", torch.float16),
-    }
-    matmul_results = []
-    for mode, (precision, dtype) in matmul_modes.items():
-        torch.set_float32_matmul_precision(precision)
-        x, y = a.to(dtype), b.to(dtype)
-        seconds = timed(lambda x=x, y=y: x @ y)
-        error = ((x @ y).to(torch.float64) - reference).norm() / reference.norm()
-        matmul_results.append(
-            {"mode": mode, "ms": seconds * 1e3, "TFLOP/s": 2 * n**3 / seconds / 1e12, "relative error": error.item()}
-        )
-    torch.set_float32_matmul_precision("highest")  # the switch is global; leave it as found
-    return (matmul_results,)
-
-
-@app.cell(hide_code=True)
-def _(FORMAT_COLORS, alt, furnish, matmul_results, matmul_size, mo, pd):
-    _frame = pd.DataFrame(matmul_results)
-    _scale = alt.Scale(domain=list(FORMAT_COLORS), range=list(FORMAT_COLORS.values()))
-    _bars = (
-        alt.Chart(_frame)
-        .mark_bar()
-        .encode(
-            y=alt.Y("mode:N", sort=list(FORMAT_COLORS), title=None),
-            x=alt.X("TFLOP/s:Q", title="achieved TFLOP/s"),
-            color=alt.Color("mode:N", scale=_scale, legend=None),
-            tooltip=["mode:N", alt.Tooltip("ms:Q", format=".2f"), alt.Tooltip("TFLOP/s:Q", format=".0f")],
-        )
-        + alt.Chart(_frame)
-        .mark_text(align="left", dx=4, fontSize=12)
-        .encode(y=alt.Y("mode:N", sort=list(FORMAT_COLORS)), x="TFLOP/s:Q", text=alt.Text("TFLOP/s:Q", format=".0f"))
-    ).properties(width=520, height=4 * 30)
-    _table = [
-        {
-            "mode": r["mode"],
-            "ms per matmul": f"{r['ms']:.2f}",
-            "TFLOP/s": f"{r['TFLOP/s']:.0f}",
-            "vs float32": f"{r['TFLOP/s'] / _frame['TFLOP/s'][0]:.1f}×",
-            "relative error vs float64": f"{r['relative error']:.1e}",
-        }
-        for r in matmul_results
-    ]
-    mo.vstack(
-        [
-            furnish(_bars),
-            mo.md(
-                f"<small>One {matmul_size.value} × {matmul_size.value} matrix multiply, mean of 20 after warm-up, "
-                f"on this machine's GPU. Error is the Frobenius norm of the difference from a float64 result, "
-                f"relative to that result.</small>"
-            ),
-            mo.ui.table(_table, selection=None),
-        ],
-        align="center",
-        gap=0.6,
-    )
-    return
-
-
-@app.cell(hide_code=True)
-def _(mo):
     mo.md(r"""
-    Read the error column against the speed column. TF32 buys its speed with a thousandfold
-    loss of matmul accuracy ($10^{-4}$ against $10^{-7}$), which is why PyTorch does not turn
-    it on for you: `torch.get_float32_matmul_precision()` is `"highest"` by default. The
-    default is not uniform, though — `torch.backends.cudnn.allow_tf32` is `True`, so a
-    *convolution* on `float32` inputs already runs in TF32 while a matrix multiply does not.
-    A `float32` model is, on an NVIDIA card, already slightly mixed.
+    ## Follow one step, rather than one dtype
 
-    The two 16-bit rows are the reason this notebook exists. `bfloat16`'s error is an order
-    of magnitude worse than `float16`'s (seven mantissa bits against ten) at the same speed,
-    and both are far worse than TF32. Training tolerates it: a matmul error of a few parts
-    in a thousand is noise beneath the gradient noise of a minibatch. What training does
-    *not* tolerate is the weight update rounding away, and that is the operation the next
-    section keeps out of 16 bits.
+    The model's parameters stay FP32. Inside `torch.autocast`, eligible operations
+    select a compute dtype according to device-specific rules. On CUDA, `linear`
+    and matrix multiplies can use BF16 here; `cross_entropy` uses FP32. ReLU follows
+    its input. An operation absent from the autocast list follows its own dtype rules.
+    In-place calls, `out=` calls and explicit `dtype=` arguments are important exceptions.
 
-    ## Mixed: compute in 16, keep in 32
+    Leave the context before calling `backward()`. Autograd's backward operations
+    follow the dtypes selected for the corresponding forward operations; leaving
+    autocast does **not** turn the whole backward pass into FP32. Gradients eventually
+    accumulate into the FP32 parameters' `.grad` buffers. Casting a rounded or zero
+    intermediate gradient to FP32 cannot recover information already lost.
 
-    `torch.autocast` applies device-specific dtype rules to eligible operations inside
-    its context. For the CUDA operations used here, the important cases are:
-
-    - **Down to 16 bits** — the operations that are expensive and tolerant: `matmul`,
-      `linear`, `conv*`, `bmm`, and their relatives. Their `float32` inputs are cast on the
-      way in; their outputs come out 16-bit.
-    - **Up to `float32`** — the operations that are cheap and fragile: `softmax`,
-      `log_softmax`, `cross_entropy`, `layer_norm`, `exp`, `log`, `pow`, `sum`, and the
-      other reductions and losses, where a 16-bit intermediate would overflow or lose the
-      small terms. Their 16-bit inputs are cast *up* on the way in.
-    - **Selected multi-input operations** promote to the widest input dtype. Unlisted
-      operations follow their own dtype rules; they are not automatically promoted.
-
-    In-place operations, calls with `out=`, and an explicit `dtype=` bypass autocasting.
-    The [operation reference](https://docs.pytorch.org/docs/stable/amp.html#autocast-op-reference)
-    identifies the eligible operations for each device.
-
-    Nothing about the model changes. Its parameters stay `float32` — autocast casts a copy
-    of each weight the first time an operation asks for it and caches that copy until the
-    context exits, so each weight is cast once per forward pass, not once per use. The
-    backward pass is not inside the context and does not need to be: autograd recorded which
-    dtype each operation ran in and differentiates in that dtype, and each gradient lands
-    in the dtype of the parameter it belongs to. The cell below puts notebook 07's model
-    through one training step under autocast and records the dtype of every tensor it
-    produces.
+    Predict the table before running the cell: input images, each layer's output,
+    loss, stored weight, and stored weight gradient. These are observations at Python
+    boundaries. They do not reveal the internal accumulator precision of a GPU kernel.
     """)
     return
 
@@ -697,10 +585,10 @@ def _(mo):
 def _(mo):
     mo.callout(
         mo.md(
-            "**The default is the older format.** `torch.autocast(device_type='cuda')` with no `dtype` argument "
-            "casts to `float16`, not `bfloat16` — a default set when Volta and Turing cards had `float16` tensor "
-            "cores and nothing else. On any card from Ampere on, pass `dtype=torch.bfloat16` explicitly; the "
-            "section on the loss scaler shows what `float16` costs when you forget."
+            "**Choose the dtype explicitly.** CUDA autocast defaults to FP16; CPU autocast "
+            "defaults to BF16. BF16 is a useful starting point on this GPU because it has "
+            "much more range than FP16. It is not universally more accurate: FP16 has finer "
+            "spacing within its smaller range. Match the model and supported hardware."
         ),
         kind="info",
     )
@@ -716,10 +604,13 @@ def _(NeuralNetwork, device, nn, torch):
 
     # Forward hooks record what each layer hands to the next; the model itself is untouched.
     dtypes = {"input images": images.dtype}
+    _handles = []
     for index, layer in enumerate(model.linear_relu_stack):
-        layer.register_forward_hook(
-            lambda module, inputs, output, i=index: dtypes.__setitem__(
-                f"linear_relu_stack[{i}] {module}", output.dtype
+        _handles.append(
+            layer.register_forward_hook(
+                lambda module, inputs, output, i=index: dtypes.__setitem__(
+                    f"linear_relu_stack[{i}] {module}", output.dtype
+                )
             )
         )
 
@@ -727,6 +618,8 @@ def _(NeuralNetwork, device, nn, torch):
         logits = model(images)
         loss = nn.functional.cross_entropy(logits, labels)
     loss.backward()
+    for _handle in _handles:
+        _handle.remove()
 
     dtypes["loss"] = loss.dtype
     dtypes["linear_relu_stack[0].weight"] = model.linear_relu_stack[0].weight.dtype
@@ -747,21 +640,23 @@ def _(dtypes, mo):
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
-    The `float32` images enter the first `Linear` and `bfloat16` comes out; `ReLU` passes
-    what it is given; the logits are `bfloat16`; `cross_entropy` promotes them and the loss
-    is `float32`. The weight was `float32` before, is `float32` after, and its gradient is
-    `float32` too — the matmul's `bfloat16` gradient was cast up to match. Every 16-bit
-    tensor in that table is transient: it lives for one step and dies. Everything that
-    persists across steps is 32-bit. That is the whole design, and *master weights* is its
-    name.
+    The table separates **storage** from **execution**. FP32 images produce BF16 linear
+    outputs. The loss returns to FP32. The stored parameters and their accumulated
+    gradients remain FP32 in this ordinary AMP recipe. Autocast has not converted
+    the model in place, and this table does not claim that all intermediate gradients
+    were FP32.
 
-    ### Master weights
+    ### What “master weights” means here
 
-    "Master" because the `float32` copy is the one that accumulates; the `bfloat16` copy
-    the matmul sees is derived from it each step and thrown away. The cell takes the
-    gradients the backward pass above just produced and asks, for three learning rates:
-    if the update $-\eta\, g$ were applied to a 16-bit copy of the weight instead, how many
-    parameters would not move at all?
+    The weights that accumulate updates are the lasting record of learning. In this
+    recipe, the ordinary FP32 model parameters already serve that role; there is no
+    separate optimizer-owned master copy to find. Autocast can cache eligible lower-
+    precision weight casts within its context. Other training systems may keep explicit
+    copies or use different parameter, optimizer-state and communication dtypes.
+
+    The next experiment asks a narrow counterfactual: keep this gradient snapshot,
+    but store the updated weights in a different dtype. Among parameters with nonzero
+    gradients, how many would not move? Predict which learning rate loses the most.
     """)
     return
 
@@ -787,7 +682,6 @@ def _(model, torch):
         }
         for learning_rate in (0.001, 0.01, 0.1)
     ]
-
     return (swallowed_shares,)
 
 
@@ -800,37 +694,37 @@ def _(mo, swallowed_shares):
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
-    The table counts nonzero updates that disappear for this gradient snapshot. It starts
-    from weights stored in the selected dtype, subtracts the original gradient's update
-    in `float32`, then rounds back to the storage dtype. This isolates update rounding;
-    it does not simulate an entire low-precision training run. Future gradients can change.
-    The `float32` column is the control: keeping the accumulating weights in `float32`
-    preserves much smaller updates than storing those weights in `bfloat16`.
+    The table isolates **rounding when an updated weight is stored**. It does not
+    simulate an entire BF16 training run: the next gradient would depend on the new
+    weights. Even FP32 can swallow a sufficiently small update; its grid is much finer.
 
-    ### Why `float16` usually uses a scaler and `bfloat16` usually does not
+    ### Loss scaling protects a different part of the journey
 
-    `float16`'s smallest positive normal value is about $6 \times 10^{-5}$; subnormals
-    extend to about $6 \times 10^{-8}$. A value near $10^{-6}$ is representable, while
-    sufficiently smaller values round to zero. Tiny gradients can therefore disappear
-    during the FP16 backward pass even though parameter gradients are stored in FP32.
-    Autocast selects operation dtypes; loss scaling addresses this separate underflow
-    problem. Multiply the loss by a factor $S$ before `backward()` to enlarge the
-    gradients, then unscale them before the optimizer uses them.
-    That is all `torch.amp.GradScaler` does, plus one piece of adaptivity: $S$ starts at
-    $2^{16}$, and whenever a scaled gradient overflows to `inf` the scaler *skips that
-    optimizer step* and halves $S$; after 2 000 consecutive clean steps it doubles $S$ again.
-    `bfloat16` has the same exponent width as `float32`, so its much wider range normally
-    makes loss scaling unnecessary. Neither dtype nor scaling guarantees stable training.
+    An FP32 `.grad` buffer can receive zero because an intermediate FP16 gradient
+    underflowed *before reaching it*. Scaling the loss changes the values traveling
+    through backward. For a fixed scale $S$, the chain rule gives
 
-    The cell runs five `float16` steps and poisons the third gradient with an `inf` by
-    hand. Watch the scale and the weights.
+    $$\nabla_w(SL)=S\nabla_w L,\qquad g=\frac{\nabla_w(SL)}{S}.$$
+
+    In exact arithmetic, unscaling recovers the same gradient, so this is not a larger
+    learning rate. In finite precision, scaling can move small gradients into a usable
+    range. **Unscaling a gradient is not the same as undoing its rounding.** The useful
+    work happened when the scaled intermediate survived instead of becoming zero.
+
+    `GradScaler` also checks gradients for infinities and NaNs. If it finds either,
+    it skips the optimizer update and lowers the scale. Repeated finite steps let it
+    increase the scale. It does not retry the batch automatically, repair an already
+    overflowed forward pass, or solve small updates lost in low-precision weight storage.
+
+    BF16's wider range normally makes a scaler unnecessary. That is a practical
+    advantage, not immunity from numerical failure. The next cell deliberately poisons
+    the third step's gradient: predict which weights change and when the scale falls.
     """)
     return
 
 
 @app.cell
 def _(NeuralNetwork, device, nn, torch):
-    # A fresh model keeps reruns independent of the earlier dtype/weight exhibits.
     torch.manual_seed(0)
     _scaler_model = NeuralNetwork().to(device)
     # The defaults: init_scale=65536, growth_factor=2, backoff_factor=0.5, growth_interval=2000
@@ -849,17 +743,18 @@ def _(NeuralNetwork, device, nn, torch):
         if step == 2:
             first_weight.grad[0, 0] = float("inf")  # what an overflow in the backward pass looks like
         before = first_weight.detach().clone()
+        _scale_before = scaler.get_scale()
         scaler.step(optimizer)  # unscales, checks for inf/nan, steps only if clean
         scaler.update()  # halves the scale after a skipped step; doubles after 2000 clean ones
         scaler_trace.append(
             {
-                "step": step,
+                "step (1-based)": step + 1,
+                "scale before step": _scale_before,
                 "scale after update": scaler.get_scale(),
                 "weights moved": bool((first_weight != before).any()),
                 "note": "gradient poisoned with inf" if step == 2 else "",
             }
         )
-
     return (scaler_trace,)
 
 
@@ -872,23 +767,33 @@ def _(mo, scaler_trace):
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
-    Step 2 — the poisoned one — leaves the weights exactly where they were and halves the
-    scale from 65 536 to 32 768; the steps around it move the weights and leave the scale
-    alone. A real overflow is handled the same way: the batch is lost, the scale drops, and
-    training continues. BF16 autocast normally needs no enabled scaler;
-    `torch.amp.GradScaler(device, enabled=False)` is the idiom that lets one loop serve both,
-    and the loop below uses it.
+    The deliberately poisoned third step should leave the inspected weights unchanged
+    and reduce the scale. Read the before/after columns rather than assuming a specific
+    starting scale survived the earlier steps: natural overflow could also trigger a
+    skip. An unchanged weight alone is not proof of a skipped step; it can also have
+    a zero or rounded-away update. The injected infinity and scale decrease make
+    this experiment interpretable.
 
-    ## Notebook 07's loop, made mixed
+    ## Read the loop as a numerical policy
 
-    Here is `train_loop` from notebook 07 with the recipe applied. Four lines change, each
-    marked: the forward pass and the loss move inside `autocast`; `loss.backward()` becomes
-    `scaler.scale(loss).backward()`; `optimizer.step()` becomes `scaler.step(optimizer)`; and
-    `scaler.update()` follows. With `autocast_dtype=None` and a disabled scaler every one of
-    those lines is a no-op and this *is* notebook 07's loop — so the same function trains
-    the `float32` control. Two smaller edits carry no precision meaning: the batch moves to
-    the accelerator, which 07's loop did not do, and the loss is recorded every twenty
-    batches for the chart instead of printed every hundred.
+    The four changes to the familiar loop each have a job: `autocast` chooses eligible
+    operation dtypes; `scale(loss).backward()` protects the FP16 gradient path;
+    `step(optimizer)` unscales and conditionally updates; `update()` adapts the scale.
+    Use a disabled scaler for BF16 or the FP32 control. Its methods then forward the
+    ordinary work; they do not disable learning.
+
+    Before moving on, explain why these tempting changes are different:
+
+    - `model.bfloat16()` changes persistent parameter storage; BF16 autocast does not.
+    - A `.float()` cast after an underflowed gradient gives FP32 zero, not the lost value.
+    - A larger learning rate changes the intended update; loss scaling is undone before it.
+
+    **One extension worth remembering:** unscale before gradient clipping. For gradient
+    accumulation, keep the scale fixed across the effective batch, then unscale/step/update
+    at its boundary. Otherwise you add gradients expressed in different units.
+    The [AMP examples](https://docs.pytorch.org/docs/stable/notes/amp_examples.html)
+    show those recipes. The loop below deliberately handles one optimizer and one batch
+    per update so that the central mechanism remains visible.
     """)
     return
 
@@ -899,6 +804,7 @@ def _(device, torch):
         model.train()
         history = []
         for batch, (X, y) in enumerate(dataloader):
+            optimizer.zero_grad(set_to_none=True)
             X, y = X.to(device), y.to(device)
             # changed: forward pass and loss run under autocast (disabled, they stay float32)
             with torch.autocast(device_type=device, dtype=autocast_dtype, enabled=autocast_dtype is not None):
@@ -908,7 +814,6 @@ def _(device, torch):
             scaler.scale(loss).backward()  # changed from loss.backward(): the loss is multiplied by the scale
             scaler.step(optimizer)  # changed from optimizer.step(): unscale, check for inf, step if clean
             scaler.update()  # changed: new line, adapts the scale
-            optimizer.zero_grad()
 
             if batch % 20 == 0:
                 history.append({"batches": batch, "loss": loss.item()})
@@ -935,10 +840,17 @@ def _(device, torch):
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
-    The cell below trains three fresh copies of the model for one epoch each — the `float32`
-    control, `bfloat16` autocast, and `float16` autocast with the scaler — from the same
-    seed and in the same batch order, at the learning rate 07's interactive section settled
-    on. Predict how far apart the three loss curves will be before pressing the button.
+    ### Optional: does the recipe still learn?
+
+    Train fresh FP32, BF16-autocast and scaled-FP16 models from the same initialization
+    and batch order. Compare the *trajectory*, final test loss and accuracy, not just
+    whether each run completed. Similar curves support this recipe on this model;
+    they do not establish that precision is irrelevant for all models.
+
+    Predict a result that would make you investigate: nonfinite loss, a persistently
+    diverging curve, or worse accuracy across repeated seeds. A single small difference
+    is not yet evidence of a broken implementation. This is a learning experiment,
+    not a statistically powered equivalence study.
     """)
     return
 
@@ -1017,7 +929,7 @@ def _(FORMAT_COLORS, alt, furnish, mo, pd, recipe_runs):
                 legend=alt.Legend(title=None, orient="top-right"),
             ),
             tooltip=["mode:N", "batches:Q", alt.Tooltip("loss:Q", format=".3f")],
-            # The curves coincide; widths let the lower ones show as halos under the top one.
+            # Different widths keep nearly overlapping curves visible.
             strokeWidth=alt.StrokeWidth(
                 "mode:N", scale=alt.Scale(domain=list(_colors), range=[5, 2.5, 1.2]), legend=None
             ),
@@ -1038,7 +950,8 @@ def _(FORMAT_COLORS, alt, furnish, mo, pd, recipe_runs):
         [
             furnish(_chart),
             mo.md(
-                "<small>Training loss every twenty batches, one epoch of 938 batches of 64, the same seed and batch "
+                "<small>Training loss every twenty batches: 937 batches of 64 and a final batch of 32, "
+                "the same seed and batch "
                 "order for all three; `float32` is drawn widest so the others sit on it. Time is the epoch on this "
                 "machine's GPU, data loading included.</small>"
             ),
@@ -1052,47 +965,151 @@ def _(FORMAT_COLORS, alt, furnish, mo, pd, recipe_runs):
 
 @app.cell(hide_code=True)
 def _(mo):
+    matmul_size = mo.ui.slider(steps=[1024, 2048, 4096, 8192], value=4096, label="matrix side", show_value=True)
+    start_matmul = mo.ui.run_button(label="Measure matrix arithmetic")
+    mo.vstack(
+        [
+            mo.md("## Optional: why faster arithmetic may not make a faster step"),
+            mo.md(
+                "Tensor cores accelerate suitable matrix operations. Compare time with error against an "
+                "FP64 reference. The **FP32 high** row requests a reduced internal-precision policy; "
+                "a dtype table alone cannot identify the selected GPU kernel. Convolutions have separate controls."
+            ),
+            matmul_size,
+            start_matmul,
+        ]
+    )
+    return matmul_size, start_matmul
+
+
+@app.cell
+def _(device, matmul_size, time, torch, mo, start_matmul):
+    mo.stop(
+        mo.running_in_notebook() and not start_matmul.value,
+        mo.md("Press **Measure matrix arithmetic** to run this optional benchmark."),
+    )
+    mo.stop(
+        device != "cuda", mo.md("This timing experiment targets CUDA; the numerical exhibits above also work on CPU.")
+    )
+
+    def timed(operation, repeats=20):
+        for _ in range(3):
+            operation()
+        torch.cuda.synchronize()
+        started = time.perf_counter()
+        for _ in range(repeats):
+            operation()
+        torch.cuda.synchronize()
+        return (time.perf_counter() - started) / repeats
+
+    n = matmul_size.value
+    a = torch.randn(n, n, device=device, generator=torch.Generator(device).manual_seed(0))
+    b = torch.randn(n, n, device=device, generator=torch.Generator(device).manual_seed(1))
+    reference = a.to(torch.float64) @ b.to(torch.float64)
+    matmul_modes = {
+        "float32": ("highest", torch.float32),
+        "FP32 high": ("high", torch.float32),
+        "bfloat16": ("highest", torch.bfloat16),
+        "float16": ("highest", torch.float16),
+    }
+    matmul_results = []
+    _previous_precision = torch.get_float32_matmul_precision()
+    try:
+        for mode, (precision, dtype) in matmul_modes.items():
+            torch.set_float32_matmul_precision(precision)
+            x, y = a.to(dtype), b.to(dtype)
+            seconds = timed(lambda x=x, y=y: x @ y)
+            error = ((x @ y).to(torch.float64) - reference).norm() / reference.norm()
+            matmul_results.append(
+                {
+                    "mode": mode,
+                    "ms": seconds * 1e3,
+                    "TFLOP/s": 2 * n**3 / seconds / 1e12,
+                    "relative error": error.item(),
+                }
+            )
+    finally:
+        torch.set_float32_matmul_precision(_previous_precision)
+    return (matmul_results,)
+
+
+@app.cell(hide_code=True)
+def _(FORMAT_COLORS, alt, furnish, matmul_results, matmul_size, mo, pd):
+    _frame = pd.DataFrame(matmul_results)
+    _scale = alt.Scale(domain=list(FORMAT_COLORS), range=list(FORMAT_COLORS.values()))
+    _bars = (
+        alt.Chart(_frame)
+        .mark_bar()
+        .encode(
+            y=alt.Y("mode:N", sort=list(FORMAT_COLORS), title=None),
+            x=alt.X("TFLOP/s:Q", title="achieved TFLOP/s"),
+            color=alt.Color("mode:N", scale=_scale, legend=None),
+            tooltip=["mode:N", alt.Tooltip("ms:Q", format=".2f"), alt.Tooltip("TFLOP/s:Q", format=".0f")],
+        )
+        + alt.Chart(_frame)
+        .mark_text(align="left", dx=4, fontSize=12)
+        .encode(y=alt.Y("mode:N", sort=list(FORMAT_COLORS)), x="TFLOP/s:Q", text=alt.Text("TFLOP/s:Q", format=".0f"))
+    ).properties(width=520, height=4 * 30)
+    _table = [
+        {
+            "mode": r["mode"],
+            "ms per matmul": f"{r['ms']:.2f}",
+            "TFLOP/s": f"{r['TFLOP/s']:.0f}",
+            "vs float32": f"{r['TFLOP/s'] / _frame['TFLOP/s'][0]:.1f}×",
+            "relative error vs float64": f"{r['relative error']:.1e}",
+        }
+        for r in matmul_results
+    ]
+    mo.vstack(
+        [
+            furnish(_bars),
+            mo.md(
+                f"<small>One {matmul_size.value} × {matmul_size.value} matrix multiply, mean of 20 after warm-up, "
+                f"on this machine's GPU. Error is the Frobenius norm of the difference from a float64 result, "
+                f"relative to that result.</small>"
+            ),
+            mo.ui.table(_table, selection=None),
+        ],
+        align="center",
+        gap=0.6,
+    )
+    return
+
+
+@app.cell(hide_code=True)
+def _(mo):
     mo.md(r"""
-    The three curves lie on top of each other and the three accuracies agree to a fraction
-    of a percent: mixed precision changed what the loop computes with, not what it learns.
-    The `float16` scale is still at its starting value — nothing in one epoch of this model
-    overflowed and 938 steps is short of the 2 000 that would double it.
+    Compare a matrix multiply with a whole training step. A kernel speedup applies only
+    to the time spent in that kernel. Loading examples, launching kernels, moving data,
+    casting tensors and applying optimizer updates still cost time. Similar final loss
+    does not explain a timing difference; use a profiler before naming a bottleneck.
 
-    The time column is the disappointment, and it is the honest one. The matmul benchmark
-    promised a large factor and the loop shows nothing of the kind — this loop is bound by
-    the loader and by the launch of many small kernels, not by arithmetic. The last section
-    takes the loader out of the picture and asks where the factor went.
+    ## Optional: change the shape, change the payoff
 
-    ## The loop, in five precisions
+    The final experiment removes repeated host-to-device batch transfers by preparing
+    resident batches. It still includes Python iteration, kernel launches and optimizer
+    work. It is not a pure arithmetic benchmark. Three warm-up *training* steps change
+    the weights before the timed epoch; every mode receives that same protocol.
 
-    The cell trains for one epoch five times, with the model width and batch size you
-    choose, using the same `train_loop` — fed with batches that already sit on the GPU as
-    slices of one tensor, so nothing but the arithmetic is being timed — and reports the
-    time per step, the peak memory and the test accuracy of each. Two modes are added to
-    the three above:
+    The **FP32 high** mode changes internal matmul precision while retaining FP32
+    storage and output. PyTorch documents TF32 and, where available, BF16-based
+    algorithms for this policy. The label states what we requested, not a profiled kernel.
+    The **pure bfloat16** mode also stores the model in BF16, with no FP32 master
+    parameters. It is a comparison of a different numerical policy, not ordinary AMP.
 
-    - **TF32** — `float32` after `set_float32_matmul_precision("high")`.
-    - **pure bfloat16** — the model itself cast to `bfloat16`, no `float32` copy anywhere.
-      Not mixed precision at all; included because it is the fastest and smallest, and
-      because of what happens to it at notebook 07's learning rate.
+    Investigate one question at a time:
 
-    Worth trying, in this order:
+    - At small width/batch, does casting overhead outweigh faster matrix operations?
+    - At larger shapes, is enough work in matrix multiplies for tensor cores to help?
+    - At learning rate 0.001, does BF16 parameter storage lose useful updates? Use the
+      earlier snapshot table to explain a result, not to predict inevitable failure.
+    - Does saved activation memory outweigh cast copies and other allocations?
 
-    - **Width 512, batch 256** — close to 07's shape. Autocast is *slower* than `float32`
-      here. The matmuls are tiny; the step is dominated by launching kernels and moving the
-      weights (read for the forward, written as gradients, read and written by the
-      optimizer), and casting adds kernels while saving no bytes on any of those.
-    - **Width 8192, batch 4096.** Now each step does sixteen times more arithmetic per byte
-      of weight moved, the tensor cores are the bottleneck, and `bfloat16` autocast runs
-      between two and three times faster than `float32` — the matmul benchmark's ratio,
-      recovered. The two 16-bit modes are indistinguishable in speed here.
-    - **Learning rate 0.001, any shape.** Pure `bfloat16` stops learning: chance accuracy,
-      loss flat. The other four are identical to two decimal places. Master weights are not
-      a refinement; at this learning rate they are the difference between a model and none.
-    - **Peak memory, wide model.** Autocast *raises* it at batch 256 and lowers it at 4096.
-      The cached 16-bit weight copies cost memory; the halved activations save it; which
-      wins is a property of the shape. The memory savings mixed precision is famous for
-      come from activations, and an MLP with a small batch barely has any.
+    Treat the numbers as measurements of this run. Peak memory includes other live
+    tensors in this kernel; it is not an isolated model footprint. FP32 weights alone
+    cost about $4P$ bytes for $P$ parameters, and their FP32 gradients another $4P$.
+    Autocast does not halve those terms. Optimizer state, activations, cast copies and
+    workspaces add their own costs. Our plain SGD has no Adam moment buffers.
     """)
     return
 
@@ -1114,9 +1131,11 @@ def _(mo):
 
 
 @app.cell
-def _(device, test_data, torch, training_data):
-    # The raw uint8 pixels, scaled the way ToDtype(scale=True) scales them, moved to the
-    # accelerator once: 188 MB for the training set. A batch is then an index into it.
+def _(device, test_data, torch, training_data, mo, start_comparison):
+    mo.stop(
+        mo.running_in_notebook() and not start_comparison.value,
+        mo.md("Resident GPU data is prepared only when the five-mode experiment is requested."),
+    )
     train_images = (training_data.data.to(torch.float32) / 255).unsqueeze(1).to(device)
     train_labels = training_data.targets.to(device)
     test_images = (test_data.data.to(torch.float32) / 255).unsqueeze(1).to(device)
@@ -1160,7 +1179,7 @@ def _(
     train_labels,
     train_loop,
 ):
-    PRECISION_MODES = ("float32", "TF32", "bfloat16 autocast", "float16 autocast + scaler", "pure bfloat16")
+    PRECISION_MODES = ("float32", "FP32 high", "bfloat16 autocast", "float16 autocast + scaler", "pure bfloat16")
 
     def train_one_epoch(mode, width, batch_size, learning_rate, seed=0):
         torch.manual_seed(seed)
@@ -1168,52 +1187,49 @@ def _(
         weight_dtype = torch.float32
         if mode == "pure bfloat16":
             model, weight_dtype = model.to(torch.bfloat16), torch.bfloat16
-        torch.set_float32_matmul_precision("high" if mode == "TF32" else "highest")
-        autocast_dtype = {"bfloat16 autocast": torch.bfloat16, "float16 autocast + scaler": torch.float16}.get(mode)
-        scaler = torch.amp.GradScaler(device, enabled=mode == "float16 autocast + scaler")
-        optimizer = torch.optim.SGD(model.parameters(), lr=learning_rate)
-        loss_fn = nn.CrossEntropyLoss()
+        _previous_precision = torch.get_float32_matmul_precision()
+        torch.set_float32_matmul_precision("high" if mode == "FP32 high" else "highest")
+        try:
+            autocast_dtype = {"bfloat16 autocast": torch.bfloat16, "float16 autocast + scaler": torch.float16}.get(
+                mode
+            )
+            scaler = torch.amp.GradScaler(device, enabled=mode == "float16 autocast + scaler")
+            optimizer = torch.optim.SGD(model.parameters(), lr=learning_rate)
+            loss_fn = nn.CrossEntropyLoss()
 
-        batches = ResidentBatches(train_images, train_labels, batch_size, weight_dtype, seed)
-        # The first call of each kernel pays for loading it: three unclocked warm-up batches.
-        train_loop(batches.batches[:3], model, loss_fn, optimizer, scaler, autocast_dtype)
-        if device == "cuda":
-            torch.cuda.reset_peak_memory_stats()
-        torch.accelerator.synchronize()
-        started = time.perf_counter()
-        history = train_loop(batches, model, loss_fn, optimizer, scaler, autocast_dtype)
-        torch.accelerator.synchronize()
-        seconds_per_step = (time.perf_counter() - started) / len(batches)
-        peak_mib = torch.cuda.max_memory_allocated() / 2**20 if device == "cuda" else float("nan")
-        torch.set_float32_matmul_precision("highest")
+            batches = ResidentBatches(train_images, train_labels, batch_size, weight_dtype, seed)
+            # Three unclocked training steps warm up the kernels and update the model.
+            train_loop(batches.batches[:3], model, loss_fn, optimizer, scaler, autocast_dtype)
+            if device == "cuda":
+                torch.cuda.reset_peak_memory_stats()
+            torch.accelerator.synchronize()
+            started = time.perf_counter()
+            history = train_loop(batches, model, loss_fn, optimizer, scaler, autocast_dtype)
+            torch.accelerator.synchronize()
+            seconds_per_step = (time.perf_counter() - started) / len(batches)
+            peak_mib = torch.cuda.max_memory_allocated() / 2**20 if device == "cuda" else float("nan")
 
-        test = test_loop(
-            ResidentBatches(test_images, test_labels, 10_000, weight_dtype), model, loss_fn, autocast_dtype
-        )
-        parameters = sum(p.numel() for p in model.parameters())
-        return {
-            "mode": mode,
-            "ms per step": seconds_per_step * 1e3,
-            "TFLOP/s": 6 * parameters * batch_size / seconds_per_step / 1e12,
-            "peak MiB": peak_mib,
-            "test accuracy": test["accuracy"],
-            "final loss": history[-1]["loss"],
-            "parameters": parameters,
-        }
+            test = test_loop(
+                ResidentBatches(test_images, test_labels, 10_000, weight_dtype), model, loss_fn, autocast_dtype
+            )
+            parameters = sum(p.numel() for p in model.parameters())
+            return {
+                "mode": mode,
+                "ms per step": seconds_per_step * 1e3,
+                "TFLOP/s": 6 * parameters * batch_size / seconds_per_step / 1e12,
+                "peak MiB": peak_mib,
+                "test accuracy": test["accuracy"],
+                "final loss": history[-1]["loss"],
+                "parameters": parameters,
+            }
+        finally:
+            torch.set_float32_matmul_precision(_previous_precision)
 
     return PRECISION_MODES, train_one_epoch
 
 
 @app.cell
-def _(
-    PRECISION_MODES,
-    batch_pick,
-    mo,
-    rate_pick,
-    start_comparison,
-    train_one_epoch,
-    width_pick,
-):
+def _(PRECISION_MODES, batch_pick, mo, rate_pick, start_comparison, train_one_epoch, width_pick):
     mo.stop(
         mo.running_in_notebook() and not start_comparison.value,
         mo.md("Set the shape above, then press **Train five ways**. Nothing runs until you do."),
@@ -1228,21 +1244,10 @@ def _(
 
 
 @app.cell(hide_code=True)
-def _(
-    FORMAT_COLORS,
-    OKABE_ITO,
-    PRECISION_MODES,
-    alt,
-    batch_pick,
-    comparison,
-    furnish,
-    mo,
-    pd,
-    width_pick,
-):
+def _(FORMAT_COLORS, OKABE_ITO, PRECISION_MODES, alt, batch_pick, comparison, furnish, mo, pd, width_pick):
     _colors = {
         "float32": FORMAT_COLORS["float32"],
-        "TF32": FORMAT_COLORS["TF32"],
+        "FP32 high": FORMAT_COLORS["FP32 high"],
         "bfloat16 autocast": FORMAT_COLORS["bfloat16"],
         "float16 autocast + scaler": FORMAT_COLORS["float16"],
         "pure bfloat16": OKABE_ITO["orange"],
@@ -1295,7 +1300,7 @@ def _(
                 f"<small>One epoch — {_steps} steps of {batch_pick.value} — with hidden width {width_pick.value}, "
                 f"{comparison[0]['parameters']:,} parameters, on this machine's GPU, after three warm-up steps. Peak "
                 f"memory is everything allocated on the device during the epoch, the rest of the notebook included. "
-                f"TFLOP/s counts 6 · parameters · batch per step (forward and backward).</small>"
+                f"TFLOP/s is an approximate 6 · parameters · batch per step, not a kernel instruction count.</small>"
             ),
             mo.ui.table(_table, selection=None),
         ],
@@ -1308,43 +1313,45 @@ def _(
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
-    ---
+    ## Carry the distinctions forward
 
-    ## Where to go next
+    You now have a way to reason about a mixed-precision configuration without treating
+    its name as an explanation. Ask which dtype stores parameters, which operations
+    use reduced precision, where gradients accumulate, and what happens on a nonfinite
+    step. In distributed training, add the dtype used to communicate gradients.
 
-    - **The official surface.** [Automatic Mixed Precision
-      package](https://docs.pytorch.org/docs/stable/amp.html) is the reference — its
-      *Autocast Op Reference* is the fixed list of which operations go down to 16 bits and
-      which come up to `float32`; [Automatic Mixed Precision
-      examples](https://docs.pytorch.org/docs/stable/notes/amp_examples.html) has the
-      `GradScaler` idioms for gradient clipping, accumulation, and multiple losses.
-    - **The two papers.** [Mixed Precision Training](https://arxiv.org/abs/1710.03740)
-      (Micikevicius et al., 2017) introduced master weights and loss scaling for `float16`;
-      [A Study of BFLOAT16 for Deep Learning Training](https://arxiv.org/abs/1905.12322)
-      (Kalamkar et al., 2019) is the case that a `float32` exponent makes the scaler
-      unnecessary.
-    - **TF32, the forward-looking spelling.** [CUDA
-      semantics](https://docs.pytorch.org/docs/stable/notes/cuda.html#tensorfloat-32-tf32-on-ampere-and-later-devices)
-      documents `set_float32_matmul_precision` and the newer per-backend
-      `torch.backends.cuda.matmul.fp32_precision`, which is where this control is heading.
-    - **Where the loop's time really went.** The width-and-batch experiment is a first
-      encounter with the *roofline*: arithmetic per byte moved decides whether faster
-      arithmetic helps at all. Horace He's [Making Deep Learning Go
-      Brrrr](https://horace.io/brrr_intro.html) is the one essay to read on it.
-    - **Eight bits.** The GPU in this machine also has `float8` tensor cores;
-      [torchao](https://github.com/pytorch/ao)'s `Float8Linear` and `torch._scaled_mm` are
-      where PyTorch exposes them, with per-tensor scaling in place of a global loss scale.
-    - **The same four lines, behind a flag.** Hugging Face's `accelerate` wraps exactly this
-      recipe: `Accelerator(mixed_precision="bf16")` runs the prepared model's forward under
-      `autocast` and casts its outputs back to `float32`, and `accelerator.backward` carries
-      the `GradScaler` when the mode is `"fp16"`. Its [mixed precision
-      guide](https://huggingface.co/docs/accelerate/usage_guides/mixed_precision) is the
-      operational front end for what this notebook did by hand.
-    - **In the distributed setting.** Once a model shards across GPUs, mixed precision
-      becomes a *policy*: which dtype the shards are stored in, which the compute runs in,
-      which the gradients are reduced in — [FSDP's
-      MixedPrecision](https://docs.pytorch.org/docs/stable/fsdp.html#torch.distributed.fsdp.MixedPrecision)
-      names the three separately. That is where this repository goes next.
+    **A useful integration-test question:** does the prepared training workflow preserve
+    the intended update, within a justified tolerance, when precision or process count
+    changes? Control initialization, examples per update, loss normalization and optimizer
+    steps before interpreting a difference. A dtype assertion checks one boundary;
+    a loss trajectory or parameter comparison checks more of the behavior. Neither alone
+    proves convergence, and a tolerance chosen only to make a test pass explains nothing.
+
+    ### Sources and deeper paths
+
+    - [Micikevicius et al., *Mixed Precision Training*](https://arxiv.org/abs/1710.03740),
+      submitted 2017, ICLR 2018: FP32 weight accumulation and loss scaling in an FP16
+      training recipe. Our native AMP implementation need not have the paper's exact
+      arrangement of explicit weight copies.
+    - [Kalamkar et al., *A Study of BFLOAT16 for Deep Learning Training*](https://arxiv.org/abs/1905.12322),
+      2019: empirical support for BF16 across several training workloads. Successful
+      workloads are evidence, not a guarantee for every model.
+    - [PyTorch AMP reference](https://docs.pytorch.org/docs/stable/amp.html) and
+      [worked examples](https://docs.pytorch.org/docs/stable/notes/amp_examples.html):
+      operation eligibility, scaling, clipping and accumulation. These policies are
+      version- and device-dependent; check the installed version when behavior differs.
+    - [Matmul precision policy](https://docs.pytorch.org/docs/stable/generated/torch.set_float32_matmul_precision.html):
+      why FP32 storage does not fully specify internal arithmetic. Do not mix old and
+      new backend-control APIs without checking their compatibility.
+    - [Williams, Waterman and Patterson, *Roofline*](https://doi.org/10.1145/1498765.1498785),
+      2009: relate arithmetic throughput to data movement. Use it to form a performance
+      hypothesis, then measure which limit matters in the actual workload.
+    - [Accelerator](https://huggingface.co/docs/accelerate/package_reference/accelerator)
+      makes precision a configuration choice. Inspect the prepared forward, backward and
+      optimizer together: the public output dtype alone need not expose autocast inside.
+    - [Fully Sharded Data Parallel mixed-precision policy](https://docs.pytorch.org/docs/stable/fsdp.html#torch.distributed.fsdp.MixedPrecision)
+      separates parameter, reduction and buffer dtypes. Sharding adds more boundaries;
+      it does not remove the distinctions you just learned.
     """)
     return
 
