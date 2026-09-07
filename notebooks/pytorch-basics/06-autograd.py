@@ -40,8 +40,9 @@ def _(mo):
     > `backward()` and `.grad` produce a gradient — and accumulate one when nothing resets it.
     >
     > **Marc's depth line** — the other half of the base Marc named: understanding how the gradient
-    > works. His own checks: `zero_grad` leaves every gradient zero; two backward passes on one
-    > batch without resetting is twice the gradient. Half a day here is fine.
+    > works. Useful checks: `zero_grad()` clears accumulated gradients (normally setting
+    > `.grad` to `None`); two backward passes on the same retained graph without resetting
+    > accumulate twice the gradient. Half a day here is fine.
     >
     > **Stop-line** — done means: ran it, could explain to Marc where a gradient lives and when it
     > accumulates, questions captured — close it.

@@ -295,7 +295,6 @@ def _(batch_size, torch):
         # layers. Unnecessary in this situation but added for best practices.
         model.eval()
         size = len(dataloader.dataset)
-        num_batches = len(dataloader)
         test_loss, correct = (0, 0)
         # Evaluating the model with torch.no_grad() ensures that no gradients are computed
         # during test mode; also serves to reduce unnecessary gradient computations and
@@ -303,9 +302,9 @@ def _(batch_size, torch):
         with torch.no_grad():
             for X, y in dataloader:
                 pred = model(X)
-                test_loss += loss_fn(pred, y).item()
+                test_loss += loss_fn(pred, y).item() * len(y)
                 correct += (pred.argmax(1) == y).type(torch.float).sum().item()
-        test_loss /= num_batches
+        test_loss /= size
         correct /= size
         print(f"Test Error: \n Accuracy: {100 * correct:>0.1f}%, Avg loss: {test_loss:>8f} \n")
 
