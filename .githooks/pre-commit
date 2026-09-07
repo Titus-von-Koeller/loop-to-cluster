@@ -34,8 +34,17 @@ fi
 # Underscore-prefixed files beside the notebooks (_viz.py, _palette.py) are plain
 # modules, and marimo check rejects any .py it is handed that lacks a marimo.App. A new
 # notebook must avoid the underscore prefix to stay under this check.
-if ! pixi run marimo check --strict "$snapshot"/notebooks/pytorch-basics/[!_]*.py; then
-    echo "pre-commit: marimo check failed on staged content" >&2
+# This normally finishes in seconds; an observed sandbox stall held a commit open
+# for minutes. Bound the checker and its process group without skipping validation.
+if timeout --verbose --kill-after=5s 60s pixi run marimo check --strict "$snapshot"/notebooks/pytorch-basics/[!_]*.py; then
+    :
+else
+    check_status=$?
+    case "$check_status" in
+        124) echo "pre-commit: marimo check exceeded its time limit; diagnose and rerun the same checks" >&2 ;;
+        137) echo "pre-commit: marimo check was killed; inspect timeout/resource diagnostics before retrying" >&2 ;;
+        *) echo "pre-commit: marimo check failed on staged content (exit $check_status)" >&2 ;;
+    esac
     exit 1
 fi
 
