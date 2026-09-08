@@ -27,6 +27,15 @@ model must not alter the exported gradient snapshot's interpretation. Check that
 optional training stays button-gated in notebook use. Inspect the rendered page
 in addition to lint and numerical checks; record which surface was inspected.
 
+Notebook changes also require validation in the native VSCode marimo extension,
+Titus's working surface. A browser preview or headless run does not substitute for
+it. Confirm the project interpreter, execute the affected path, exercise a relevant
+reactive change, and inspect outputs, reading order, code folds and optional-work
+gates there. Record the notebook revision, extension version, actions and outcome.
+If extension validation is blocked, preserve the candidate and name the unverified
+behavior; do not describe the notebook as fully validated. Reuse unaffected evidence
+and scope checks to the change rather than rerunning expensive training by default.
+
 Follow the repository CLAUDE.md for environment, folding and editing workflow.
 Use code mode when collaborating inside an active live session. For autonomous
 work, inspect and preserve relevant state, close an unused notebook, then use the
