@@ -869,6 +869,10 @@ def _(mo):
     diverging curve, or worse accuracy across repeated seeds. A single small difference
     is not yet evidence of a broken implementation. This is a learning experiment,
     not a statistically powered equivalence study.
+
+    We do not time these sequential runs: the first would absorb initialization and
+    cold-cache costs that later runs can reuse. The warmed benchmarks below ask the
+    separate performance question.
     """)
     return
 
@@ -890,7 +894,6 @@ def _(
     start_recipe,
     test_data,
     test_loop,
-    time,
     torch,
     train_loop,
     training_data,
@@ -911,15 +914,10 @@ def _(
             )
             _scaler = torch.amp.GradScaler(device, enabled=_autocast_dtype is torch.float16)
             _optimizer = torch.optim.SGD(_model.parameters(), lr=0.1)
-            torch.accelerator.synchronize()
-            _started = time.perf_counter()
             _history = train_loop(_loader, _model, nn.CrossEntropyLoss(), _optimizer, _scaler, _autocast_dtype)
-            torch.accelerator.synchronize()
-            _seconds = time.perf_counter() - _started
             _test = test_loop(DataLoader(test_data, batch_size=64), _model, nn.CrossEntropyLoss(), _autocast_dtype)
             recipe_runs[_name] = {
                 "history": _history,
-                "seconds": _seconds,
                 "scale": _scaler.get_scale() if _scaler.is_enabled() else None,
                 **_test,
             }
@@ -959,7 +957,6 @@ def _(FORMAT_COLORS, alt, furnish, mo, pd, recipe_runs):
             "mode": name,
             "test accuracy": f"{run['accuracy']:.1%}",
             "test loss": f"{run['loss']:.3f}",
-            "epoch, seconds": f"{run['seconds']:.1f}",
             "final loss scale": f"{run['scale']:.0f}" if run["scale"] is not None else "—",
         }
         for name, run in recipe_runs.items()
@@ -970,8 +967,8 @@ def _(FORMAT_COLORS, alt, furnish, mo, pd, recipe_runs):
             mo.md(
                 "<small>Training loss every twenty batches: 937 batches of 64 and a final batch of 32, "
                 "the same seed and batch "
-                "order for all three; `float32` is drawn widest so the others sit on it. Time is the epoch on this "
-                "machine's GPU, data loading included.</small>"
+                "order for all three; `float32` is drawn widest so the others sit on it. "
+                "This compares learning, not execution speed.</small>"
             ),
             mo.ui.table(_table, selection=None),
         ],
