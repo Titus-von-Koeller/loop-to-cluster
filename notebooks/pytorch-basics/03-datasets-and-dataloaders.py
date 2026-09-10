@@ -9,6 +9,7 @@
 # metadata is merged over the project config at the highest precedence, so a notebook
 # opts in on its own. `auto_instantiate` cannot be set here (marimo strips it from script
 # metadata), so opening this file still runs nothing.
+
 import marimo
 
 __generated_with = "0.24.0"
@@ -93,7 +94,6 @@ def _(mo):
 
 @app.cell
 def _():
-    import matplotlib.pyplot as plt
     import torch
     from torch.utils.data import Dataset
     from torchvision import datasets
@@ -112,7 +112,7 @@ def _():
         download=True,
         transform=v2.Compose([v2.ToImage(), v2.ToDtype(torch.float32, scale=True)]),
     )
-    return Dataset, datasets, plt, test_data, torch, training_data, v2
+    return Dataset, datasets, test_data, torch, training_data, v2
 
 
 @app.cell(hide_code=True)
@@ -120,14 +120,15 @@ def _(mo):
     mo.md(r"""
     ## Iterating and visualizing the dataset
 
-    We can index `Datasets` manually like a list: `training_data[index]`. We use `matplotlib` to
-    visualize some samples in our training data.
+    We can index `Datasets` manually like a list: `training_data[index]` returns one
+    `(image, label)` pair — a `(1, 28, 28)` float tensor and an `int`. Nine of them, drawn as
+    pixels with the class name from `labels_map` underneath.
     """)
     return
 
 
 @app.cell
-def _(plt, torch, training_data):
+def _(torch, training_data):
     labels_map = {
         0: "T-Shirt",
         1: "Trouser",
@@ -140,17 +141,26 @@ def _(plt, torch, training_data):
         8: "Bag",
         9: "Ankle Boot",
     }
-    figure = plt.figure(figsize=(8, 8))
-    cols, rows = (3, 3)
-    for i in range(1, cols * rows + 1):
-        sample_idx = torch.randint(len(training_data), size=(1,)).item()
-        _img, _label = training_data[sample_idx]
-        figure.add_subplot(rows, cols, i)
-        plt.title(labels_map[_label])
-        plt.axis("off")
-        plt.imshow(_img.squeeze(), cmap="gray")
-    plt.show()
-    return (labels_map,)
+    # One integer in, one (image, label) pair out -- decoded and transformed on the spot.
+    samples = [training_data[_index] for _index in torch.randint(len(training_data), size=(9,)).tolist()]
+    return labels_map, samples
+
+
+@app.cell(hide_code=True)
+def _(labels_map, mo, samples):
+    _cards = [
+        mo.vstack(
+            [
+                mo.image(_image.squeeze(0), width=196, vmin=0, vmax=1, rounded=True),
+                mo.md(f"<small>{labels_map[int(_label)]}</small>"),
+            ],
+            align="center",
+            gap=0.2,
+        )
+        for _image, _label in samples
+    ]
+    mo.vstack([mo.hstack(_cards[_r : _r + 3], justify="center", gap=0.8) for _r in range(0, 9, 3)], gap=0.8)
+    return
 
 
 @app.cell(hide_code=True)
@@ -246,10 +256,10 @@ def _(Dataset):
         def __len__(self):
             return len(self.img_labels)
 
-        def __getitem__(self, idx):
-            img_path = os.path.join(self.img_dir, self.img_labels.iloc[idx, 0])
+        def __getitem__(self, index):
+            img_path = os.path.join(self.img_dir, self.img_labels.iloc[index, 0])
             image = decode_image(img_path)
-            _label = self.img_labels.iloc[idx, 1]
+            _label = self.img_labels.iloc[index, 1]
             if self.transform:
                 image = self.transform(image)
             if self.target_transform:
@@ -331,12 +341,12 @@ def _(Dataset):
         def __len__(self):
             return 10
 
-        def __getitem__(self, idx):
-            return idx, idx * idx
+        def __getitem__(self, index):
+            return index, index * index
 
     for _indices, _squares in DataLoader(Squares(), batch_size=4):
         print(_indices.tolist(), _squares.tolist(), "  <-", type(_indices).__name__, str(_indices.dtype))
-    return DataLoader, Squares
+    return (DataLoader,)
 
 
 @app.cell(hide_code=True)
@@ -373,16 +383,24 @@ def _(mo):
 
 
 @app.cell
-def _(labels_map, plt, train_dataloader):
-    # Display image and label.
+def _(train_dataloader):
     train_features, train_labels = next(iter(train_dataloader))
     print(f"Feature batch shape: {train_features.size()}")
     print(f"Labels batch shape: {train_labels.size()}")
-    _img = train_features[0].squeeze()
+    return train_features, train_labels
+
+
+@app.cell(hide_code=True)
+def _(labels_map, mo, train_features, train_labels):
     _label = int(train_labels[0])
-    plt.imshow(_img, cmap="gray")
-    plt.show()
-    print(f"Label: {_label} = {labels_map[_label]}")
+    mo.vstack(
+        [
+            mo.image(train_features[0].squeeze(0), width=196, vmin=0, vmax=1, rounded=True),
+            mo.md(f"<small>first image of the batch — label {_label} = {labels_map[_label]}</small>"),
+        ],
+        align="center",
+        gap=0.2,
+    )
     return
 
 
