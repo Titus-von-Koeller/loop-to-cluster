@@ -602,6 +602,28 @@ def _(mo):
       the responsibility this contribution claims.
 
 
+    ### What did coverage tell us?
+
+    A line being executed is not proof that a wrong result would fail an assertion.
+    The subprocess-aware audit compared these four cases with three existing tests
+    for distributed training, accumulation/synchronization and optimizer skip handling.
+    Both sets passed. They execute the **same core accumulation, backward and optimizer
+    branches**. This contribution does not add broad new production-code coverage.
+
+    Its useful addition is the combined causal-LM workload: an internal linear layer
+    actually produces the requested low-precision output, final parameters agree with
+    a same-precision reference, both ranks agree, and FP16 skip/recovery works with
+    accumulation. The existing regression-model AMP checks themselves note that their
+    operations are not converted to BF16/FP16. Existing synchronization tests already
+    protect other gradient-timing and scheduler behavior; this PR complements them.
+
+    The audit also inspected missing branches. Other backends and legacy optimizer
+    signatures are not reasons to enlarge this causal-LM test. Unequal-token loss
+    normalization and partial final accumulation windows remain explicitly unclaimed.
+    Add a case when it protects a meaningful, insufficiently covered behavior—not
+    merely when it increases a percentage. The three deliberate faulty variants
+    provide separate evidence that selected assertions detect real mistakes.
+
     ### A reproducibility failure worth understanding
 
     An older Transformers version (5.14.1) registered Gemma 4's rotary-position buffers
