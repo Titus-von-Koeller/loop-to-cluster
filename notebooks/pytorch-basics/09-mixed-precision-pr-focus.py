@@ -100,7 +100,7 @@ def _(mo):
 
     In the prepared Accelerate checkout, read `tests/test_causal_lm_training.py`
     (the launcher and assertions) alongside
-    `src/accelerate/test_utils/scripts/external_deps/train_causal_lm.py` (the worker).
+    `src/accelerate/test_utils/scripts/external_deps/train_causal_lm.py` (the training script).
     The contribution builds on upstream `b795b483`. Its public PR description should
     name the tested revision, exact environments and any remaining CI limits.
 
@@ -140,7 +140,7 @@ def _(mo):
     Every case compares **one GPU running plain PyTorch on a batch of eight** with
     **two ranks using Accelerator on the same eight examples per effective update**.
     With accumulation factor two, each rank processes two examples twice before
-    updating: $2	ext{ ranks}	imes2	ext{ examples}	imes2	ext{ microbatches}=8$.
+    updating: **2 ranks × 2 examples per microbatch × 2 microbatches = 8 examples**.
     There are ten attempted updates. In FP16 only, the second deliberately gets an
     infinite gradient and must be skipped; the following finite update must succeed.
     That leaves nine successful updates in both FP16 paths.
@@ -179,14 +179,14 @@ def _(mo):
     ```
 
     This excerpt omits observation and the deliberate overflow. Read it with the
-    worker's actual code. `prepare` moves/wraps the components and distributes loader
+    training script's actual code. `prepare` moves/wraps the components and distributes loader
     batches. `accumulate` establishes microbatch boundaries. `backward` applies the
     configured accumulation scaling; **do not divide the loss by that factor again**.
     The optimizer wrapper delays step/zeroing on intermediate microbatches. The last
     backward synchronizes rank gradients and allows the effective update.
 
     `accelerator.reduce(loss.detach(), reduction="mean")`-style reporting is separate:
-    it combines observations, not gradients. The worker averages microbatch losses
+    it combines observations, not gradients. The script averages microbatch losses
     within an update and then rank losses. Equal valid-target counts make that mean
     correct for this fixture. Correct logging alone cannot repair a wrong update.
 
@@ -578,7 +578,7 @@ def _(mo):
 
     ### What makes this easy to review?
 
-    Keep the full required DDP/AMP/accumulation scope. One shared worker and one
+    Keep the full required DDP/AMP/accumulation scope. One training script and one
     parametrized driver currently form a cohesive PR. Split only if each change has
     an independently useful architectural claim and the split lowers review cost.
     There is no target count. Current upstream integration is local; original branch
@@ -611,7 +611,7 @@ def _(mo):
     Matching model weights alone would not detect this; the first-forward loss comparison did.
 
     The [newer implementation sorts the order](https://github.com/huggingface/transformers/blob/856157a2f3e9594954310df18fdccc31ffddebe9/src/transformers/models/gemma4/modeling_gemma4.py#L1088).
-    Setting `PYTHONHASHSEED=0` **before launching workers** also makes the older fixture
+    Setting `PYTHONHASHSEED=0` **before launching the training processes** also makes the older fixture
     consistent. Setting it inside an already-running Python process is too late.
     Source inspection, CPU buffer-order checks and the corrected two-GPU run support
     this explanation. The fixture controls this dependency behavior; the contribution does not fix a current
