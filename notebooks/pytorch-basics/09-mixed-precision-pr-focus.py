@@ -23,21 +23,21 @@ def _(mo):
     mo.md(r"""
     # From one correct update to a useful Accelerate PR
 
-    *A focused companion to [Mixed precision](09-mixed-precision.py), for my own review.*
+    *A focused companion to [Mixed precision](09-mixed-precision.py), for reviewing the proposed contribution.*
 
-    My review target is a complete integration test for **multi-GPU training, mixed
+    Your review target is a complete integration test for **multi-GPU training, mixed
     precision and gradient accumulation**. It compares Accelerate training with a
     plain-PyTorch reference using a tiny, locally initialized Gemma 4 model. Four named
-    cases share one worker, so one cohesive PR currently makes the behavior easiest
+    cases reuse one training script, so one cohesive PR currently makes the behavior easiest
     to review. PR count is a consequence of the design, not a target.
 
     **Start with sections 1, 2 and 4.** They explain an effective update, the actual
-    assertions, and the precision/scaler behavior I need to follow in the code.
+    assertions, and the precision/scaler behavior you need to follow in the code.
     Section 3 is an optional, executable explanation of the historical token-weighting
-    bug. Section 5 explains the architectural and CI decisions. I do not need to
+    bug. Section 5 explains the architectural and CI decisions. You do not need to
     finish the full mixed-precision curriculum before reviewing this contribution.
 
-    I have enough background when I can explain which examples contribute to one
+    You have enough background when you can explain which examples contribute to one
     update, why the reference is meaningful, what changes at each accumulation
     boundary, and how a broken wrapper would make an assertion fail. Any remaining
     code question should lead to a focused explanation, not another broad study detour.
@@ -62,7 +62,7 @@ def _(mo):
 
     The ordinary loop is forward → loss → backward → optimizer step. `backward()`
     adds gradients to `.grad`; `zero_grad()` clears them. Accumulation changes when
-    I clear and apply gradients. Distributed Data Parallel (DDP) changes which
+    the loop clears and applies gradients. Distributed Data Parallel (DDP) changes which
     examples each process sees and averages gradients between processes. Automatic
     mixed precision (AMP) changes the arithmetic used for selected operations.
 
@@ -104,10 +104,31 @@ def _(mo):
     The contribution builds on upstream `b795b483`. Its public PR description should
     name the tested revision, exact environments and any remaining CI limits.
 
+    ### Reusing a script does not share training state between tests
+
+    A **training script** is a Python file. A **process** is one running instance of
+    Python executing that file. Each test case first starts a fresh reference process,
+    then starts two fresh distributed training processes, one per GPU. Every run
+    creates its own model, optimizer, gradients and precision-scaling state. No case
+    starts with weights trained by another case, and no case needs another to run first.
+
+    Each case also gets its own [pytest temporary directory](https://docs.pytest.org/en/stable/how-to/tmp_path.html)
+    for launcher configuration and result files. The two GPU processes intentionally
+    communicate **within that case**: their coordinated training is the behavior under
+    test. This is different from separate test cases depending on one another.
+
+    The reused source code constructs matching models, data and optimizer settings.
+    Think **same recipe, fresh ingredients**. Its plain-PyTorch and Accelerate training
+    loops remain separate; the test driver launches them and checks their results.
+    Sharing the wrappers under test would weaken the independent reference. Reusing
+    a trained model, optimizer or output directory across cases would weaken isolation.
+    Split the script if future backend differences obscure those responsibilities;
+    one file does not by itself determine the number of PRs.
+
     ### Four cases, one claim
 
     The claim is: **Accelerate's preparation and training wrappers preserve the
-    intended update when we distribute, accumulate and change computation precision.**
+    intended update when training is distributed, accumulated and run at different precisions.**
 
     | Case | Computation | Microbatches per update on each rank | What it adds |
     | --- | --- | ---: | --- |
@@ -169,7 +190,7 @@ def _(mo):
     within an update and then rank losses. Equal valid-target counts make that mean
     correct for this fixture. Correct logging alone cannot repair a wrong update.
 
-    ### What each assertion buys me
+    ### What each assertion establishes
 
     - **Ten reported losses and final weights agree** with the ordinary-PyTorch,
       same-precision, full-batch reference within measured per-precision tolerances.
@@ -226,7 +247,7 @@ def _(mo):
     Equal counts make these agree. Unequal counts generally do not: the smaller
     microbatch gets too much weight. For loss sums 8 and 8 from four and one valid
     targets, the intended mean is 3.2; the mean of the two means is 5.0. This changes
-    the objective whose gradient I compute, not just the logged number.
+    the objective whose gradient the loop computes, not just the logged number.
 
     In causal language modeling, count the labels that actually enter the loss
     **after the next-token shift and after masking**. `-100` labels are ignored.
@@ -365,7 +386,7 @@ def _(mo):
     forward and backward on nonfinal microbatches; the final backward synchronizes.
     Those communication details are separate from getting the objective right.
 
-    **Why our integration fixture excludes it:** every rank has the same number of targets,
+    **Why this integration fixture excludes it:** every rank has the same number of targets,
     so even its accumulated batches do not challenge unequal-token weighting. These
     simplifying assumptions define exactly which regression it cannot catch.
     """)
@@ -499,7 +520,7 @@ def _(mo):
 
     Both referenced PRs train real transformer models on GPUs, using a tiny Qwen2
     checkpoint. Loading a testing checkpoint does not establish useful pretrained
-    capabilities. Our config-created current model removes asset loading from a test
+    capabilities. The locally initialized current model removes asset loading from a test
     whose claim concerns training updates.
 
     - [TRL #4784](https://github.com/huggingface/trl/blob/512c3a96b951ddba40739b40caf03f0f580f5dcc/tests/distributed/test_distributed.py)
@@ -514,7 +535,7 @@ def _(mo):
       uses50 Wikitext examples and ten updates, comparing logged losses under wrong
       and corrected normalization. It already protects the historical issue in Trainer.
 
-    Successful execution is useful for a broad integration smoke test. Our narrower
+    Successful execution is useful for a broad integration smoke test. The narrower
     training contract justifies stronger observations of weights, precision, update
     boundaries and skip/recovery. That complements those examples; it does not make
     their tests worthless.
@@ -523,12 +544,12 @@ def _(mo):
 
     PyTorch owns tensor arithmetic, differentiation and DDP's underlying mechanism.
     Transformers owns its model and default loss. Accelerate owns how its API prepares
-    and coordinates these components. We test an observable consequence of that
-    composition. We do not reimplement or re-prove their internal mathematics.
+    and coordinates these components. The test checks an observable consequence of that
+    composition. It does not reimplement or re-prove their internal mathematics.
 
     Accelerate already has regression-model synchronization/accumulation, plain versus
     prepared parameter checks, AMP overflow flags, scheduler tests and real BERT
-    performance integration. Our real causal-LM comparison adds a specific workload
+    performance integration. This real causal-LM comparison adds a specific workload
     and integration contract, not the first meaningful test in the repository.
     The toy normalization example in section3 is teaching. A caller's wrong loss is
     not automatically an Accelerate defect or a reason to create another PR.
@@ -551,7 +572,7 @@ def _(mo):
     it does not maintain another handwritten dependency list. The September 17 [multi-GPU nightly job](https://github.com/huggingface/accelerate/actions/runs/35173549475/job/105050178228)
     reported Torch 2.14.0 and Transformers 5.17.0, which includes Gemma 4. That checks
     model availability; this unsubmitted revision has not run on an HF runner. The
-    existing nightly job failed elsewhere, so its status is not our test result.
+    existing nightly job failed elsewhere, so its status is not this contribution’s test result.
     HF checkpoints/datasets are useful where loading/tokenization is part
     of the claim; they would add an unrelated network dependency to this test.
 
@@ -587,13 +608,13 @@ def _(mo):
     by iterating a Python set. Different processes can iterate that set in a different
     order. DDP broadcasts buffers in registration order, so equal-shaped buffers for
     full and sliding attention could silently exchange values on the second rank.
-    Matching model weights alone would not detect this; our first-forward loss did.
+    Matching model weights alone would not detect this; the first-forward loss comparison did.
 
     The [newer implementation sorts the order](https://github.com/huggingface/transformers/blob/856157a2f3e9594954310df18fdccc31ffddebe9/src/transformers/models/gemma4/modeling_gemma4.py#L1088).
     Setting `PYTHONHASHSEED=0` **before launching workers** also makes the older fixture
     consistent. Setting it inside an already-running Python process is too late.
     Source inspection, CPU buffer-order checks and the corrected two-GPU run support
-    this explanation. We control the fixture; we do not claim to fix a current
+    this explanation. The fixture controls this dependency behavior; the contribution does not fix a current
     Accelerate defect or weaken the assertions to accommodate the mismatch.
 
     ### What has actually been checked?
@@ -622,7 +643,7 @@ def _(mo):
 
     This companion condenses the original notebook's storage, autocast and scaler
     mechanisms, then connects them to distributed-update testing. Its two executable
-    examples are teaching aids; the integration worker lives in Accelerate.
+    examples are teaching aids; the integration training script lives in Accelerate.
 
     - [PyTorch AMP examples](https://docs.pytorch.org/docs/2.14/notes/amp_examples.html)
     - [HF: Fixing Gradient Accumulation](https://huggingface.co/blog/gradient_accumulation)
