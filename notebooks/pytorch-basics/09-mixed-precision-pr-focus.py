@@ -195,8 +195,8 @@ def _(mo):
     - **Ten reported losses and final weights agree** with the ordinary-PyTorch,
       same-precision, full-batch reference within measured per-precision tolerances.
       A second bound limits the norm of weight disagreement to 15% of the reference's
-      actual weight movement. Correct BF16 runs are about 5%; halved gradients produce
-      about 54% and fail. Absolute tolerances alone had missed that fault.
+      actual weight movement. Correct BF16 runs are about 8–9%; halved gradients produce
+      about 51% and fail. Absolute tolerances alone had missed that fault.
       The reference has no Accelerator preparation/backward/optimizer wrapper, so
       the same wrapper bug cannot automatically infect both sides.
     - **Both ranks report their observations, and final replicas agree exactly.**
@@ -643,7 +643,7 @@ def _(mo):
 
     All four cases passed on two RTX 4090s with Python 3.10 / Torch 2.5.1 /
     Transformers 5.17 and Python 3.14 / Torch 2.13 / Transformers 5.14.1.
-    The suite took about 50–55 seconds per environment. Both ranks were observed.
+    The suite took about 47–52 seconds per environment. Both ranks were observed.
     CPU and single-GPU execution skipped all four cases as intended, and repository
     quality checks passed. The three deliberate faults failed at their expected
     assertions. This is useful evidence for review, not universal numerical proof.
