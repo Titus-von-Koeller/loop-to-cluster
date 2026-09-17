@@ -40,7 +40,11 @@ Follow the repository CLAUDE.md for environment, folding and editing workflow.
 Use code mode when collaborating inside an active live session. For autonomous
 work, inspect and preserve relevant state, close an unused notebook, then use the
 supported disk-edit/validate/reopen flow. A stalled approval is not a reason to
-overwrite an open model or stop unrelated work. Do not automate approval clicks.
+overwrite an open model or stop unrelated work. Titus's 17 September instruction
+permits a verified agent click on an execution confirmation popup for an
+already-authorized notebook action. Identify the exact pending request and
+dialog before clicking, and verify the effect; see the shared workspace AGENTS.md
+and Keyhole skill for the current rule.
 
 Origin: direct authoring feedback during the mixed-precision revision, September8.
 Apply these principles economically when touching another notebook; do not launch
